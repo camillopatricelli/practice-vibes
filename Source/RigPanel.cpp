@@ -321,6 +321,23 @@ void RigPanel::timerCallback()
 {
     inputMeter->push (engine.chain->getInputStage().takePeak());
     outputMeter->push (engine.chain->getOutputStage().takePeak());
+
+    // The saved gains are restored after this panel is built (the chain restores once the audio device is up),
+    // so keep the sliders in step with the real gain whenever the user isn't using them.
+    auto sync = [] (juce::Slider& slider, GainMeterProcessor& stage)
+    {
+        if (slider.isMouseButtonDown() || slider.hasKeyboardFocus (true))
+            return;
+
+        const auto db = juce::jlimit (slider.getMinimum(), slider.getMaximum(),
+                                      (double) juce::Decibels::gainToDecibels (stage.gain.load(), -60.0f));
+
+        if (std::abs (db - slider.getValue()) > 0.05)
+            slider.setValue (db, juce::dontSendNotification);
+    };
+
+    sync (inputGainSlider, engine.chain->getInputStage());
+    sync (outputGainSlider, engine.chain->getOutputStage());
 }
 
 void RigPanel::changeListenerCallback (juce::ChangeBroadcaster* source)

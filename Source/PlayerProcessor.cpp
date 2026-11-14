@@ -1,4 +1,5 @@
 #include "PlayerProcessor.h"
+#include "MediaFoundationAudio.h"
 
 namespace pv
 {
@@ -44,6 +45,26 @@ namespace
 
     std::shared_ptr<LoadedSong> decodeSong (juce::AudioFormatManager& formats, const juce::URL& url, juce::String& error)
     {
+        const auto name = juce::URL::removeEscapeChars (url.getFileName());
+        const auto extension = juce::File::createFileWithoutCheckingPath (name).getFileExtension().toLowerCase();
+
+        // AAC / M4A on Windows: JUCE can't decode it, so use Media Foundation.
+        if (MediaFoundationAudio::handlesExtension (extension) && url.isLocalFile())
+        {
+            auto song = std::make_shared<LoadedSong>();
+            song->name = name;
+            const auto result = MediaFoundationAudio::decodeFile (url.getLocalFile(), song->audio, song->sampleRate);
+
+            if (result.failed())
+            {
+                error = "can't decode this " + extension.substring (1).toUpperCase() + " file: " + result.getErrorMessage();
+                return {};
+            }
+
+            song->buildPeaks();
+            return song;
+        }
+
         auto stream = url.createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress));
 
         if (stream == nullptr)
@@ -52,11 +73,20 @@ namespace
             return {};
         }
 
-        std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (std::move (stream)));
+        // Pick the decoder by extension, like createReaderFor (File). Sniffing every format lets the lenient
+        // MP3 decoder "succeed" on other formats (it played .m4a files as noise); only sniff unknown extensions.
+        std::unique_ptr<juce::AudioFormatReader> reader;
+
+        if (auto* format = extension.isNotEmpty() ? formats.findFormatForFileExtension (extension) : nullptr)
+            reader.reset (format->createReaderFor (stream.release(), true));
+        else
+            reader.reset (formats.createReaderFor (std::move (stream)));
 
         if (reader == nullptr)
         {
-            error = "unsupported or damaged audio file";
+            error = extension.isNotEmpty() && formats.findFormatForFileExtension (extension) == nullptr
+                        ? "unsupported audio format (" + extension + ")"
+                        : "unsupported or damaged audio file";
             return {};
         }
 
@@ -70,7 +100,7 @@ namespace
 
         auto song = std::make_shared<LoadedSong>();
         song->sampleRate = reader->sampleRate > 0 ? reader->sampleRate : 44100.0;
-        song->name = juce::URL::removeEscapeChars (url.getFileName());
+        song->name = name;
         song->audio.setSize (2, length);
 
         reader->read (&song->audio, 0, length, 0, true, true);

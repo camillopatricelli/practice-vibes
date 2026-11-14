@@ -67,10 +67,15 @@ struct Topic
     juce::File getFile (const Resource& r) const    { return r.isLink() ? juce::File() : folder.getChildFile (r.fileName); }
     bool isMissing (const Resource& r) const        { return ! r.isLink() && ! getFile (r).existsAsFile(); }
     Resource* findResource (const juce::String& resourceId);
+    /** Search: every word must start a word in the title, tags, notes, or a resource's name, tags or notes. */
     bool matches (const juce::String& searchText) const;
 
     /** True if the topic or any of its resources carries the tag (empty tag = always). */
     bool matchesTag (const juce::String& tag) const;
+
+    /** Why a matching topic is listed when the reason isn't visible in the list (resource, notes, a resource's tag),
+        e.g. "in resource “Autumn Leaves.mp3”"; empty when the title or the topic's own tags explain it. */
+    juce::String describeMatch (const juce::String& searchText, const juce::String& tag) const;
 };
 
 /** The user's library folder: one sub-folder per topic, plus loose files (the Inbox).

@@ -180,30 +180,74 @@ Resource* Topic::findResource (const juce::String& resourceId)
     return nullptr;
 }
 
-bool Topic::matches (const juce::String& searchText) const
+namespace
 {
-    const auto text = searchText.trim();
-
-    if (text.isEmpty())
-        return true;
-
-    auto tagsMatch = [&] (const juce::StringArray& list)
+    /** True if `word` starts a word in `text` ("am" finds "Amazing Grace", not "Hammer-on"). */
+    bool hasWordStartingWith (const juce::String& text, const juce::String& word)
     {
-        for (auto& t : list)
-            if (t.containsIgnoreCase (text))
+        for (auto i = text.indexOfIgnoreCase (word); i >= 0; i = text.indexOfIgnoreCase (i + 1, word))
+            if (i == 0 || ! juce::CharacterFunctions::isLetterOrDigit (text[i - 1]))
                 return true;
 
         return false;
-    };
+    }
 
-    if (title.containsIgnoreCase (text) || description.containsIgnoreCase (text) || tagsMatch (tags))
-        return true;
+    bool anyStartsWith (const juce::StringArray& list, const juce::String& word)
+    {
+        for (auto& s : list)
+            if (hasWordStartingWith (s, word))
+                return true;
 
-    for (auto& r : resources)
-        if (r.title.containsIgnoreCase (text) || r.description.containsIgnoreCase (text) || tagsMatch (r.tags))
-            return true;
+        return false;
+    }
 
-    return false;
+    juce::String resourceName (const Resource& r)
+    {
+        return r.title.isNotEmpty() ? r.title : (r.isLink() ? r.url : r.fileName);
+    }
+
+    juce::StringArray searchWords (const juce::String& searchText)
+    {
+        juce::StringArray words;
+        words.addTokens (searchText, " 	", "\"");
+        words.trim();
+        words.removeEmptyStrings();
+        return words;
+    }
+
+    /** Where `word` matches: an empty string for places shown in the topic list (title, topic tags),
+        a description for hidden ones, or nullopt when it doesn't match at all. */
+    std::optional<juce::String> findWord (const Topic& t, const juce::String& word)
+    {
+        if (hasWordStartingWith (t.title, word) || anyStartsWith (t.tags, word))
+            return juce::String();
+
+        for (auto& r : t.resources)
+            if (hasWordStartingWith (resourceName (r), word))
+                return juce::String (juce::CharPointer_UTF8 ("in resource â")) + resourceName (r) + juce::String (juce::CharPointer_UTF8 ("â"));
+
+        for (auto& r : t.resources)
+            if (anyStartsWith (r.tags, word))
+                return juce::String (juce::CharPointer_UTF8 ("tag on â")) + resourceName (r) + juce::String (juce::CharPointer_UTF8 ("â"));
+
+        if (hasWordStartingWith (t.description, word))
+            return juce::String ("in notes");
+
+        for (auto& r : t.resources)
+            if (hasWordStartingWith (r.description, word))
+                return juce::String (juce::CharPointer_UTF8 ("in notes of â")) + resourceName (r) + juce::String (juce::CharPointer_UTF8 ("â"));
+
+        return std::nullopt;
+    }
+}
+
+bool Topic::matches (const juce::String& searchText) const
+{
+    for (auto& word : searchWords (searchText))
+        if (! findWord (*this, word).has_value())
+            return false;
+
+    return true;
 }
 
 bool Topic::matchesTag (const juce::String& tag) const
@@ -216,6 +260,26 @@ bool Topic::matchesTag (const juce::String& tag) const
             return true;
 
     return false;
+}
+
+juce::String Topic::describeMatch (const juce::String& searchText, const juce::String& tag) const
+{
+    juce::StringArray places;
+
+    if (tag.isNotEmpty() && ! hasTag (tags, tag))
+        for (auto& r : resources)
+            if (hasTag (r.tags, tag))
+            {
+                places.add ("#" + tag + juce::String (juce::CharPointer_UTF8 (" on â")) + resourceName (r)
+                            + juce::String (juce::CharPointer_UTF8 ("â")));
+                break;
+            }
+
+    for (auto& word : searchWords (searchText))
+        if (auto place = findWord (*this, word); place.has_value() && place->isNotEmpty())
+            places.addIfNotAlreadyThere (*place);
+
+    return places.joinIntoString (", ");
 }
 
 //==============================================================================

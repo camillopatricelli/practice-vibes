@@ -603,7 +603,7 @@ void PracticePanel::openFile()
 {
     fileChooser = std::make_unique<juce::FileChooser> ("Choose a song",
                                                        juce::File::getSpecialLocation (juce::File::userMusicDirectory),
-                                                       "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.m4a;*.ogg");
+                                                       "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.m4a;*.aac;*.ogg");
 
     fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [this] (const juce::FileChooser& chooser)

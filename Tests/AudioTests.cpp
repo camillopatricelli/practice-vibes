@@ -8,6 +8,7 @@
 #include "../Source/Library.h"
 #include "../Source/LoopFiles.h"
 #include "../Source/Looper.h"
+#include "../Source/MediaFoundationAudio.h"
 #include "../Source/MetronomeProcessor.h"
 #include "../Source/PlayerProcessor.h"
 #include "../Source/PracticeLog.h"
@@ -250,6 +251,58 @@ namespace
         }
 
         file.deleteFile();
+
+        if (MediaFoundationAudio::isAvailable())
+        {
+            auto loadFile = [] (const juce::File& f, PlayerProcessor& p)
+            {
+                juce::String r = "pending";
+                p.loadAsync (juce::URL (f), [&r] (const juce::String& error) { r = error; });
+
+                for (int i = 0; i < 200 && r == "pending"; ++i)
+                    juce::MessageManager::getInstance()->runDispatchLoopUntil (50);
+
+                return r;
+            };
+
+            // A 3-second 440 Hz AAC file, made with the Windows encoder.
+            auto m4a = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("pv-test-song.m4a");
+            const auto written = MediaFoundationAudio::writeAacFile (m4a, makeSine (48000.0, 440.0, 3.0)->audio, 48000.0);
+            check (written.wasOk(), "test M4A written" + (written.wasOk() ? juce::String() : ": " + written.getErrorMessage()));
+
+            PlayerProcessor m4aPlayer;
+            const auto m4aResult = loadFile (m4a, m4aPlayer);
+            check (m4aResult.isEmpty(), "M4A file loads without error" + (m4aResult.isEmpty() ? juce::String() : ": " + m4aResult));
+
+            if (auto song = m4aPlayer.getSong(); song != nullptr && m4aResult.isEmpty())
+            {
+                check (std::abs (song->getLengthSeconds() - 3.0) < 0.1, "M4A length is 3 s: " + juce::String (song->getLengthSeconds(), 3));
+                check (song->sampleRate == 48000.0, "M4A sample rate 48 kHz: " + juce::String (song->sampleRate));
+
+                juce::AudioBuffer<float> middle (1, 48000);
+                middle.copyFrom (0, 0, song->audio, 0, 48000, 48000);
+                const auto f = estimateFrequency (middle, song->sampleRate);
+                check (std::abs (f - 440.0) < 5.0, "M4A decodes the tone, not noise: " + juce::String (f, 1) + " Hz (want 440)");
+                const auto peak = middle.getMagnitude (0, 0, 48000);
+                check (peak > 0.4f && peak < 0.6f, "M4A level: peak " + juce::String (peak, 2) + " (want 0.5)");
+                check (! song->peakLevels.empty(), "M4A waveform cache built");
+            }
+
+            // Junk with an .m4a name must fail with a message, not "load" as noise.
+            auto junk = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("pv-test-junk.m4a");
+            juce::MemoryBlock bytes;
+
+            for (int i = 0; i < 200000; ++i)
+                bytes.append (i % 4000 == 0 ? "ÿûd" : "abcd", 4);   // sprinkle MP3 frame-sync words
+
+            junk.replaceWithData (bytes.getData(), bytes.getSize());
+            PlayerProcessor junkPlayer;
+            const auto junkResult = loadFile (junk, junkPlayer);
+            check (junkResult.isNotEmpty() && junkResult != "pending", "junk .m4a is refused: " + junkResult);
+
+            m4a.deleteFile();
+            junk.deleteFile();
+        }
     }
 
     void testMetronome()
@@ -1884,6 +1937,14 @@ static void testLibrary()
             check (t->matches ("STANDARDS") && t->matches ("play along") && ! t->matches ("bebop"), "search: tags + resource text");
             check (t->matchesTag ("Backing Track") && t->matchesTag ("jazz") && ! t->matchesTag ("rock"),
                    "tag filter: topic or resource tags, ignoring case");
+            check (t->matches ("autumn sol") && t->matches ("  JAZ ") && ! t->matches ("tumn") && ! t->matches ("autumn bebop"),
+                   "search: every word must start a word");
+            check (t->describeMatch ("autumn", {}).isEmpty() && t->describeMatch ("standards", "jazz").isEmpty(),
+                   "no match note when the title / topic tags explain it");
+            check (t->describeMatch ("backing", {}).startsWith ("tag on") && t->describeMatch ("line", {}) == "in notes",
+                   "match note for a resource tag / the notes: " + t->describeMatch ("backing", {}) + " | " + t->describeMatch ("line", {}));
+            check (t->describeMatch ({}, "backing track").startsWith ("#backing track on"),
+                   "tag filter note for a resource tag: " + t->describeMatch ({}, "backing track"));
         }
 
         check (lib.getAllTags() == juce::StringArray ({ "backing track", "jazz", "standards" }), "all tags, sorted");

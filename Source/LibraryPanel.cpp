@@ -913,9 +913,17 @@ void LibraryPanel::paintListBoxItem (int row, juce::Graphics& g, int width, int 
         g.setColour (juce::Colours::white.withAlpha (0.6f));
         g.setFont (juce::FontOptions (12.5f));
         const auto n = (int) t->resources.size();
-        const auto info = formatDate (t->created) + (n > 0 ? "   " + juce::String (n) + (n == 1 ? " resource" : " resources") : juce::String());
+        auto info = formatDate (t->created) + (n > 0 ? "   " + juce::String (n) + (n == 1 ? " resource" : " resources") : juce::String());
+
+        // When the search or tag filter matched something not shown in this row, say where instead.
+        if (const auto why = t->describeMatch (searchBox.getText(), tagFilter); why.isNotEmpty())
+        {
+            g.setColour (selected ? juce::Colours::white.withAlpha (0.85f) : theme::highlight.withAlpha (0.9f));
+            info = why;
+        }
+
         const auto infoWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (juce::Font (juce::FontOptions (12.5f)), info)) + 10;
-        g.drawText (info, r.removeFromLeft (infoWidth), juce::Justification::centredLeft, true);
+        g.drawText (info, r.removeFromLeft (juce::jmin (infoWidth, r.getWidth())), juce::Justification::centredLeft, true);
         drawTagChips (g, r.reduced (0, 3), t->tags, tagFilter);
     }
 }
@@ -986,7 +994,7 @@ void LibraryPanel::rebuildList (const juce::String& idToSelect)
             rowIds.push_back (inboxId);
 
         for (auto& t : library->getTopics())
-            if ((t.matches (searchBox.getText()) && t.matchesTag (tagFilter)) || t.id == selectId)
+            if (t.matches (searchBox.getText()) && t.matchesTag (tagFilter))
                 rowIds.push_back (t.id);
     }
 
@@ -1176,6 +1184,8 @@ void LibraryPanel::newTopic()
         const auto id = t->id;
         signature = library->computeSignature();
         searchBox.clear();
+        tagFilter = {};
+        updateTagButton();
         rebuildList (id);
         topicView->focusTitle();
     }

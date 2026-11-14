@@ -77,6 +77,7 @@ target_sources(PracticeVibes PRIVATE
     Source/Looper.cpp
     Source/LooperPanel.cpp
     Source/MainComponent.cpp
+    Source/MediaFoundationAudio.cpp
     Source/MetronomeProcessor.cpp
     Source/MidiMonitor.cpp
     Source/PlayerProcessor.cpp
@@ -132,6 +133,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         Source/Library.cpp
         Source/LoopFiles.cpp
         Source/Looper.cpp
+        Source/MediaFoundationAudio.cpp
         Source/MetronomeProcessor.cpp
         Source/PlayerProcessor.cpp
         Source/PracticeLog.cpp
