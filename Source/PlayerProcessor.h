@@ -50,7 +50,7 @@ public:
     void loadAsync (const juce::URL& file, LoadCallback onDone);
 
     /** Makes an already-decoded song current (message thread). */
-    void setSong (std::shared_ptr<LoadedSong>);
+    void setSong (std::shared_ptr<const LoadedSong>);
 
     std::shared_ptr<const LoadedSong> getSong() const  { return song; }
     bool hasSong() const                                { return song != nullptr; }
@@ -128,7 +128,7 @@ public:
     void loadTakeAsync (const juce::URL& file, TakeTimeline, LoadCallback onDone);
 
     /** Message thread. nullptr removes the take (the song stays loaded, paused). Loading a song removes it too. */
-    void setTake (std::shared_ptr<Take>);
+    void setTake (std::shared_ptr<const Take>);
     bool hasTake() const noexcept                       { return take != nullptr; }
     std::shared_ptr<const Take> getTake() const         { return take; }
 
@@ -140,6 +140,12 @@ public:
     double getTakeLength() const                        { return take != nullptr ? take->getLengthSeconds() : 0.0; }
 
     std::atomic<float> takeGain { 1.0f };
+
+    /** Renders a take replayed over its song, as heard in take mode, into `out` (stereo, at the take's sample
+        rate; scaled down if it would clip). Any thread, faster than real time. `cancel` may stop it early. */
+    static juce::Result renderTakeMix (std::shared_ptr<const LoadedSong>, std::shared_ptr<const Take>, float songGain,
+                                       float takeGain, juce::AudioBuffer<float>& out, double& sampleRate,
+                                       const std::atomic<bool>* cancel = nullptr);
 
     /** The speed / pitch actually used (a replaying take's timeline overrides setSpeed / setSemitones). */
     double getEffectiveSpeed() const noexcept           { return effectiveSpeed.load(); }
@@ -184,7 +190,7 @@ private:
 
     // The song is swapped under this lock; the audio thread only ever try-locks it.
     juce::SpinLock songLock;
-    std::shared_ptr<LoadedSong> song;
+    std::shared_ptr<const LoadedSong> song;
 
     signalsmith::stretch::SignalsmithStretch<float> stretch;
     double deviceSampleRate = 48000.0;
@@ -200,7 +206,7 @@ private:
     std::atomic<juce::int64> loopStart { 0 }, loopEnd { 0 };
 
     // Take replay (the take is swapped under songLock, like the song)
-    std::shared_ptr<Take> take;
+    std::shared_ptr<const Take> take;
     std::atomic<bool> takePlaying { false };
     std::atomic<double> takeSeek { -1.0 }, takePosition { 0.0 };
     double takePos = 0.0;               // audio thread: seconds = takeSamples / deviceSampleRate

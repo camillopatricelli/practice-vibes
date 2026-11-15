@@ -65,6 +65,7 @@ juce_add_gui_app(PracticeVibes
 
 target_sources(PracticeVibes PRIVATE
     Source/Main.cpp
+    Source/AacFile.cpp
     Source/AppEngine.cpp
     Source/AppLog.cpp
     Source/ChordAnalyzer.cpp
@@ -89,6 +90,7 @@ target_sources(PracticeVibes PRIVATE
     Source/PracticeViews.cpp
     Source/Recorder.cpp
     Source/RigPanel.cpp
+    Source/StoragePanel.cpp
     Source/Take.cpp
     Source/TodayPanel.cpp
     Source/Tuner.cpp
@@ -104,6 +106,11 @@ target_compile_definitions(PracticeVibes PRIVATE
     JUCE_USE_CURL=0
     JUCE_STRICT_REFCOUNTEDPOINTER=1
     JUCE_SILENCE_XCODE_15_LINKER_WARNING=1)
+
+# iPad: exported mixes go out through the share sheet.
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    target_compile_definitions(PracticeVibes PRIVATE JUCE_CONTENT_SHARING=1)
+endif()
 
 if(WIN32)
     target_compile_definitions(PracticeVibes PRIVATE
@@ -130,6 +137,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
 
     target_sources(PracticeVibesTests PRIVATE
         Tests/AudioTests.cpp
+        Source/AacFile.cpp
         Source/ChordAnalyzer.cpp
         Source/Footswitch.cpp
         Source/Library.cpp
@@ -141,6 +149,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         Source/PracticeLog.cpp
         Source/PracticePlanner.cpp
         Source/Recorder.cpp
+        Source/StoragePanel.cpp
         Source/Take.cpp
         Source/Tuner.cpp)
 

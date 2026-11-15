@@ -227,7 +227,7 @@ void PlayerProcessor::loadAsync (const juce::URL& file, LoadCallback onDone)
     });
 }
 
-void PlayerProcessor::setSong (std::shared_ptr<LoadedSong> newSong)
+void PlayerProcessor::setSong (std::shared_ptr<const LoadedSong> newSong)
 {
     playing = false;
     loopEnabled = false;
@@ -236,8 +236,8 @@ void PlayerProcessor::setSong (std::shared_ptr<LoadedSong> newSong)
     positionSeconds = 0.0;
 
     takePlaying = false;
-    std::shared_ptr<LoadedSong> old;
-    std::shared_ptr<Take> oldTake;
+    std::shared_ptr<const LoadedSong> old;
+    std::shared_ptr<const Take> oldTake;
 
     {
         const juce::SpinLock::ScopedLockType lock (songLock);
@@ -281,18 +281,64 @@ void PlayerProcessor::loadTakeAsync (const juce::URL& file, TakeTimeline timelin
     });
 }
 
-void PlayerProcessor::setTake (std::shared_ptr<Take> newTake)
+void PlayerProcessor::setTake (std::shared_ptr<const Take> newTake)
 {
     playing = false;
     takePlaying = false;
     takePosition = 0.0;
     takeSeek = 0.0;
-    std::shared_ptr<Take> old;
+    std::shared_ptr<const Take> old;
 
     {
         const juce::SpinLock::ScopedLockType lock (songLock);
         old = std::exchange (take, std::move (newTake));
     }
+}
+
+juce::Result PlayerProcessor::renderTakeMix (std::shared_ptr<const LoadedSong> song, std::shared_ptr<const Take> take,
+                                             float songGain, float takeGain, juce::AudioBuffer<float>& out,
+                                             double& sampleRate, const std::atomic<bool>* cancel)
+{
+    if (song == nullptr || take == nullptr || take->audio.audio.getNumSamples() == 0)
+        return juce::Result::fail ("nothing to export");
+
+    constexpr int block = 512;
+    sampleRate = take->audio.sampleRate;
+    const auto total = take->audio.audio.getNumSamples();
+
+    PlayerProcessor renderer;
+    renderer.prepareToPlay (sampleRate, block);
+    renderer.setSong (song);
+    renderer.setTake (take);
+    renderer.gain = songGain;
+    renderer.lastGain = songGain;
+    renderer.takeGain = takeGain;
+    renderer.lastTakeGain = takeGain;
+    renderer.playTake();
+
+    out.setSize (2, total);
+    out.clear();
+    juce::AudioBuffer<float> buffer (2, block);
+    juce::MidiBuffer midi;
+
+    for (int done = 0; done < total; done += block)
+    {
+        if (cancel != nullptr && cancel->load())
+            return juce::Result::fail ("cancelled");
+
+        buffer.clear();
+        renderer.processBlock (buffer, midi);
+        const auto n = juce::jmin (block, total - done);
+
+        for (int ch = 0; ch < 2; ++ch)
+            out.copyFrom (ch, done, buffer, ch, 0, n);
+    }
+
+    // Song and guitar together can go over full scale: turn the whole mix down rather than clip it.
+    if (const auto peak = out.getMagnitude (0, total); peak > 0.98f)
+        out.applyGain (0.98f / peak);
+
+    return juce::Result::ok();
 }
 
 void PlayerProcessor::playTake()

@@ -14,6 +14,7 @@
 #include "../Source/PracticeLog.h"
 #include "../Source/PracticePlanner.h"
 #include "../Source/Recorder.h"
+#include "../Source/StoragePanel.h"
 #include "../Source/Take.h"
 #include "../Source/Tuner.h"
 #include "../Source/GainMeterProcessor.h"
@@ -2769,8 +2770,157 @@ static void testTakes()
         const auto lag = envelopeLag (fromMiddle, takeOut, (int) (7.3 * rate), (int) (8.8 * rate), 2400);
         check (std::abs (lag) <= 48, "replay from the middle of the take is in step (lag " + juce::String (lag) + ")" + label);
 
+        // 3. Export mix: the offline render matches the live replay (song + take), scaled down only if it would clip.
+        {
+            juce::AudioBuffer<float> mix;
+            double mixRate = 0.0;
+            const auto rendered = PlayerProcessor::renderTakeMix (song, take, 1.0f, 1.0f, mix, mixRate);
+            const auto both = replay (1.0f, 1.0f, 0.0).first;
+            double dot = 0.0, energy = 0.0, residual = 0.0;
+            auto peak = 0.0f;
+
+            for (int k = 0; k < mix.getNumSamples() && k < total; ++k)
+            {
+                dot += (double) mix.getSample (0, k) * both[(size_t) k];
+                energy += (double) both[(size_t) k] * both[(size_t) k];
+                peak = juce::jmax (peak, std::abs (mix.getSample (0, k)), std::abs (mix.getSample (1, k)));
+            }
+
+            const auto scale = energy > 0.0 ? dot / energy : 0.0;
+
+            for (int k = 0; k < mix.getNumSamples() && k < total; ++k)
+                residual += juce::square ((double) mix.getSample (0, k) - scale * both[(size_t) k]);
+
+            const auto relError = energy > 0.0 && scale > 0.0 ? std::sqrt (residual / (scale * scale * energy)) : 1.0;
+            check (rendered.wasOk() && mixRate == take->audio.sampleRate && mix.getNumSamples() == take->audio.audio.getNumSamples(),
+                   "export mix renders the whole take at its rate" + label + (rendered.wasOk() ? juce::String() : ": " + rendered.getErrorMessage()));
+            check (relError < 0.01 && scale > 0.2 && scale < 1.001, "export mix = song + take as replayed (error " + juce::String (relError, 5)
+                                                                     + ", scale " + juce::String (scale, 3) + ")" + label);
+            check (peak <= 0.9801f, "export mix doesn't clip: peak " + juce::String (peak, 3) + label);
+        }
+
+       #if JUCE_WINDOWS
+        // 4. The take is kept as AAC (.m4a): small, and still in step with the song.
+        if (MediaFoundationAudio::isAvailable())
+        {
+            const auto m4a = file.withFileExtension ("m4a");
+            const auto converted = Recorder::convertToAac (file, m4a);
+            check (converted.wasOk(), "take converted to m4a" + label + (converted.wasOk() ? juce::String() : ": " + converted.getErrorMessage()));
+            juce::AudioBuffer<float> decoded;
+            double decodedRate = 0.0;
+            const auto read = MediaFoundationAudio::decodeFile (m4a, decoded, decodedRate);
+            const auto seconds = decodedRate > 0.0 ? decoded.getNumSamples() / decodedRate : 0.0;
+            check (read.wasOk() && decodedRate == rate && std::abs (seconds - take->getLengthSeconds()) < 0.05,
+                   "m4a take decodes: " + juce::String (seconds, 3) + " s (want " + juce::String (take->getLengthSeconds(), 3) + ")" + label);
+            const auto kbps = (double) m4a.getSize() * 8.0 / 1000.0 / juce::jmax (0.1, take->getLengthSeconds());
+            check (kbps > 64.0 && kbps < 200.0, "m4a take is small: " + juce::String (kbps, 0) + " kbit/s" + label);
+
+            std::vector<float> original ((size_t) total, 0.0f), aac ((size_t) total, 0.0f);
+
+            for (int k = 0; k < total; ++k)
+            {
+                if (k < take->audio.audio.getNumSamples()) original[(size_t) k] = take->audio.audio.getSample (0, k);
+                if (k < decoded.getNumSamples())           aac[(size_t) k] = decoded.getSample (0, k);
+            }
+
+            const auto aacLag = envelopeLag (original, aac, (int) (0.5 * rate), (int) (3.5 * rate), 4800);
+            check (std::abs (aacLag) <= 48, "m4a take keeps its timing (lag " + juce::String (aacLag) + " samples)" + label);
+            m4a.deleteFile();
+        }
+       #endif
+
         file.deleteFile();
     }
+}
+
+static void testStorage()
+{
+    std::cout << "Storage and clean-up" << std::endl;
+
+    const auto base = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("pv-test-storage");
+    base.deleteRecursively();
+    const auto root = base.getChildFile ("Library"), loops = base.getChildFile ("Loops"), appData = base.getChildFile ("AppData");
+    auto writeBytes = [] (const juce::File& f, int n)
+    {
+        f.getParentDirectory().createDirectory();
+        juce::MemoryBlock block ((size_t) n, true);
+        f.replaceWithData (block.getData(), block.getSize());
+    };
+
+    root.createDirectory();
+
+    {
+        Library lib (root);
+        auto* topic = lib.createTopic ("Storage test");
+        check (topic != nullptr, "storage: test topic created");
+
+        if (topic == nullptr)
+            return;
+
+        // A topic with a song, a 40-day-old take and a 2-day-old take; the practice log; a take in the Inbox.
+        writeBytes (topic->folder.getChildFile ("song.mp3"), 50000);
+        const auto oldTake = topic->folder.getChildFile ("Take old.m4a"), newTake = topic->folder.getChildFile ("Take new.m4a");
+        writeBytes (oldTake, 3000);
+        writeBytes (newTake, 2000);
+        const auto now = juce::Time::getCurrentTime();
+        TakeInfo info;
+        info.recorded = now - juce::RelativeTime::days (40);
+        info.lengthSeconds = 75.0;
+        info.save (oldTake);
+        info.recorded = now - juce::RelativeTime::days (2);
+        info.save (newTake);
+        writeBytes (root.getChildFile (".practice/log.xml"), 700);
+        const auto inboxTake = root.getChildFile ("Take inbox.m4a");
+        writeBytes (inboxTake, 1000);
+        info.recorded = now - juce::RelativeTime::days (10);
+        info.save (inboxTake);
+
+        writeBytes (loops.getChildFile ("Session A/loop1.wav"), 4000);
+        writeBytes (loops.getChildFile ("Session B/loop1.wav"), 6000);
+        writeBytes (appData.getChildFile ("chain.xml"), 100);
+        writeBytes (appData.getChildFile ("WebView2/cache.bin"), 9000);
+
+        lib.rescan();
+        const auto takes = StorageScan::listTakes (lib);
+        check (takes.size() == 3, "storage: 3 takes found (2 in the topic, 1 in the Inbox): " + juce::String ((int) takes.size()));
+
+        const auto report = StorageScan::run (root, takes, loops, appData);
+        using K = StorageItem::Kind;
+        auto count = [&] (K k) { return (int) std::count_if (report.items.begin(), report.items.end(), [k] (const StorageItem& i) { return i.kind == k; }); };
+        check (count (K::take) == 3 && count (K::loops) == 2 && count (K::webCache) == 1,
+               "storage: items = 3 takes, 2 loop sessions, the web cache");
+        check (report.takeBytes == 6000 && report.loopBytes == 10000 && report.webCacheBytes == 9000 && report.practiceLogBytes == 700,
+               "storage: sizes added up (takes " + juce::String (report.takeBytes) + ", loops " + juce::String (report.loopBytes)
+                   + ", cache " + juce::String (report.webCacheBytes) + ", log " + juce::String (report.practiceLogBytes) + ")");
+        check (report.libraryBytes >= 50000 + 6000 + 700, "storage: library size includes everything: " + juce::String (report.libraryBytes));
+        check (report.appDataBytes >= 9100 && report.appDataBytes < 20000, "storage: app data size: " + juce::String (report.appDataBytes));
+        check (! report.items.empty() && report.items[0].file == newTake, "storage: newest take listed first");
+
+        const auto month = report.olderThan (K::take, juce::RelativeTime::days (30), now);
+        const auto week = report.olderThan (K::take, juce::RelativeTime::weeks (1), now);
+        check (month.size() == 1 && report.items[(size_t) month[0]].file == oldTake, "storage: 'older than a month' picks the 40-day-old take");
+        check (week.size() == 2, "storage: 'older than a week' picks 2 takes");
+        check (report.olderThan (K::loops, {}, now).size() == 2, "storage: 'all saved loops'");
+
+        check (StorageScan::formatBytes (1536) == "1 KB" && StorageScan::formatBytes (5 * 1024 * 1024) == "5.0 MB"
+                   && StorageScan::formatBytes ((juce::int64) 3 * 1024 * 1024 * 1024) == "3.00 GB",
+               "storage: sizes formatted (" + StorageScan::formatBytes (5 * 1024 * 1024) + ")");
+
+        // Removing a take from the topic takes its details file with it.
+        auto* t = lib.findTopic (report.items[0].topicId);
+        check (t != nullptr && lib.removeResource (*t, report.items[0].resourceId) && ! newTake.exists()
+                   && ! TakeInfo::infoFileFor (newTake).exists(), "storage: removing a take removes its details too");
+
+        // The web cache is cleared at the next start, and only when asked.
+        StorageScan::clearWebCacheIfAsked (appData);
+        check (appData.getChildFile ("WebView2").isDirectory(), "storage: web cache kept unless asked");
+        StorageScan::clearWebCacheMarker (appData).replaceWithText ("x");
+        StorageScan::clearWebCacheIfAsked (appData);
+        check (! appData.getChildFile ("WebView2").exists() && ! StorageScan::clearWebCacheMarker (appData).exists(),
+               "storage: web cache cleared at start when asked");
+    }
+
+    base.deleteRecursively();
 }
 
 int main()
@@ -2797,6 +2947,7 @@ int main()
     testPracticeLog();
     testPracticePlanner();
     testTakes();
+    testStorage();
 
     std::cout << (failures == 0 ? "ALL TESTS PASSED" : juce::String (failures) + " TEST(S) FAILED") << std::endl;
     return failures == 0 ? 0 : 1;

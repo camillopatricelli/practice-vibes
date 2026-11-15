@@ -3,6 +3,7 @@
 #include "AppLog.h"
 #include "AppPaths.h"
 #include "MainComponent.h"
+#include "StoragePanel.h"
 
 namespace pv
 {
@@ -53,6 +54,7 @@ public:
                                   + " (" + juce::SystemStats::getDeviceDescription() + ")");
         juce::Logger::writeToLog ("Data folder: " + getAppDataFolder().getFullPathName());
 
+        pv::StorageScan::clearWebCacheIfAsked (getAppDataFolder());    // before any web view uses it
         engine = std::make_unique<AppEngine>();
         mainWindow = std::make_unique<MainWindow> (getApplicationName(), *engine, *log);
         engine->start();

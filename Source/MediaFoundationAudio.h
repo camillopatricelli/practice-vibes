@@ -19,8 +19,8 @@ namespace MediaFoundationAudio
     /** Decodes the whole file to stereo float (mono is copied to both channels, extra channels dropped). */
     juce::Result decodeFile (const juce::File& file, juce::AudioBuffer<float>& stereo, double& sampleRate);
 
-    /** Encodes audio as an AAC .m4a file (used by the tests to make a test file). 44.1 or 48 kHz. */
-    juce::Result writeAacFile (const juce::File& file, const juce::AudioBuffer<float>& audio, double sampleRate);
+    /** Encodes audio as an AAC .m4a file. 44.1 or 48 kHz; kbps: 96, 128, 160 or 192. */
+    juce::Result writeAacFile (const juce::File& file, const juce::AudioBuffer<float>& audio, double sampleRate, int kbps = 128);
 }
 
 } // namespace pv

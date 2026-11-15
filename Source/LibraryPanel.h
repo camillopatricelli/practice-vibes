@@ -41,6 +41,7 @@ public:
 
     /** Re-reads the folder if anything changed on disk (e.g. from another device). */
     void checkForChanges();
+    void showStorage();       // overlay: space used, takes / saved loops / caches to remove
 
     /** Opens the topic's first song or YouTube video; false if it has none. */
     bool openFirstMedia (const juce::String& topicId);

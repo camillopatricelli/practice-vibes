@@ -65,7 +65,7 @@ private:
     // Takes
     void toggleRecording();
     void startRecording();
-    void stopRecording();
+    void stopRecording (bool waitForFile = false);
     void updateRecordButton();
     juce::File takeFolder() const;
     void openAudioFile (const juce::File&);     // a take replays over its song; anything else loads as a song

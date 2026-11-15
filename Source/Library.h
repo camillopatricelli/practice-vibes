@@ -127,6 +127,9 @@ public:
     /** Removes a resource; a file resource's file goes to the bin (or is deleted where there's no bin). */
     bool removeResource (Topic&, const juce::String& resourceId);
 
+    /** Moves a file or folder to the bin (deletes it where there's no bin, e.g. on the iPad). */
+    static bool moveToBin (const juce::File&);
+
     bool moveResource (Topic&, const juce::String& resourceId, int delta);
 
     static bool isIgnoredFile (const juce::File&);

@@ -334,7 +334,7 @@ MainComponent::~MainComponent()
     stopTimer();
 
     if (engine.recorder->isRecording())
-        stopRecording();    // keep what was recorded
+        stopRecording (true);   // keep what was recorded
 
     engine.onToggleRecording = nullptr;
     tracker.finish();
@@ -925,7 +925,7 @@ void MainComponent::startRecording()
     updateRecordButton();
 }
 
-void MainComponent::stopRecording()
+void MainComponent::stopRecording (bool waitForFile)
 {
     auto result = engine.recorder->stop();
 
@@ -950,26 +950,75 @@ void MainComponent::stopRecording()
     // Only name a song the take actually played along to.
     const auto what = recordingInfo.timeline.usesSong() ? recordingInfo.songName : recordingInfo.youTubeTitle;
     const auto base = TakeInfo::makeFileName (recordingInfo.recorded, what);
-    auto target = recordingFolder.getChildFile (base + ".flac");
-
-    for (int n = 2; target.exists(); ++n)
-        target = recordingFolder.getChildFile (base + " (" + juce::String (n) + ").flac");
-
-    if (! result.file.moveFileTo (target))
+    const auto folder = recordingFolder;
+    auto uniqueFile = [folder, base] (const juce::String& extension)
     {
-        target = result.file;   // keep it where it is rather than lose it
-        juce::Logger::writeToLog ("Could not rename the take; it stays at " + target.getFullPathName());
+        auto f = folder.getChildFile (base + extension);
+
+        for (int n = 2; f.exists(); ++n)
+            f = folder.getChildFile (base + " (" + juce::String (n) + ")" + extension);
+
+        return f;
+    };
+
+    // Recorded as FLAC (safe in real time), kept as a small AAC .m4a: encoding takes a moment, so off the UI thread
+    // (except when the app is closing).
+    auto finish = [recorded = result.file, target = uniqueFile (".m4a"), flacTarget = uniqueFile (".flac"), info = recordingInfo]
+    {
+        auto saved = target;
+        auto converted = Recorder::convertToAac (recorded, target);
+
+        if (converted.wasOk())
+        {
+            recorded.deleteFile();
+        }
+        else
+        {
+            target.deleteFile();
+            saved = recorded.moveFileTo (flacTarget) ? flacTarget : recorded;   // keep it rather than lose it
+        }
+
+        info.save (saved);
+        return std::make_pair (saved, converted);
+    };
+
+    auto report = [this, seconds = result.seconds, usesSong = recordingInfo.timeline.usesSong(),
+                   songName = recordingInfo.songName] (const juce::File& saved, const juce::Result& converted)
+    {
+        if (converted.failed())
+            juce::Logger::writeToLog ("Could not make an .m4a of the take (" + converted.getErrorMessage() + "): kept as FLAC");
+
+        juce::Logger::writeToLog ("Saved take " + saved.getFileName() + " (" + juce::String (seconds, 1) + " s, "
+                                  + juce::String (saved.getSize() / 1024) + " KB"
+                                  + (usesSong ? ", in step with " + songName : juce::String()) + ") to "
+                                  + saved.getParentDirectory().getFullPathName());
+        recordMessage = "Take saved";
+        recordMessageCountdown = 30;
+        libraryPanel->checkForChanges();
+        updateRecordButton();
+    };
+
+    if (waitForFile)
+    {
+        const auto [saved, converted] = finish();
+        report (saved, converted);
+        return;
     }
 
-    recordingInfo.save (target);
-    juce::Logger::writeToLog ("Saved take " + target.getFileName() + " (" + juce::String (result.seconds, 1) + " s"
-                              + (recordingInfo.timeline.usesSong() ? ", in step with " + recordingInfo.songName : juce::String())
-                              + ") to " + recordingFolder.getFullPathName());
-
-    recordMessage = "Take saved";
-    recordMessageCountdown = 30;
-    libraryPanel->checkForChanges();
+    recordMessage = "Saving...";
+    recordMessageCountdown = 600;
     updateRecordButton();
+
+    juce::Thread::launch ([finish, report, safe = SafePointer<MainComponent> (this)]
+    {
+        const auto [saved, converted] = finish();
+
+        juce::MessageManager::callAsync ([safe, report, saved = saved, converted = converted]
+        {
+            if (safe != nullptr)
+                report (saved, converted);
+        });
+    });
 }
 
 void MainComponent::updateRecordButton()

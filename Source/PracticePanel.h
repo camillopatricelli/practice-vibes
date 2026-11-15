@@ -64,7 +64,10 @@ private:
     std::unique_ptr<TakeTimelineView> takeTimeline;
     juce::Label guitarVolumeLabel;
     juce::Slider guitarVolumeSlider;
-    juce::TextButton closeTakeButton { "Close take" };
+    juce::TextButton closeTakeButton { "Close take" }, exportMixButton { "Export mix..." };
+    juce::ScopedMessageBox shareBox;                // iPad share sheet for an exported mix
+    void exportMix();
+    void renderMix (const juce::File& target, bool share);
     juce::String takeTitle;
     bool takeShown = false;
     double savedSpeed = 100.0, savedPitch = 0.0, savedLoopStart = 0.0, savedLoopEnd = 0.0;

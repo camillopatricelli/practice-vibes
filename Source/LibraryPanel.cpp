@@ -1,5 +1,7 @@
 #include "LibraryPanel.h"
 #include "AppPaths.h"
+#include "LoopFiles.h"
+#include "StoragePanel.h"
 #include "Theme.h"
 #include "WebView.h"
 
@@ -806,8 +808,21 @@ void LibraryPanel::showFolderMenu()
         signature = library->computeSignature();
         refreshAfterRescan();
     });
+    menu.addSeparator();
+    menu.addItem ("Storage and clean-up...", [this] { showStorage(); });
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&folderButton));
+}
+
+void LibraryPanel::showStorage()
+{
+    if (library == nullptr || ! showOverlay)
+        return;
+
+    flush();
+    auto panel = std::make_unique<StoragePanel> (library.get(), LoopFiles::getLoopsFolder(), getAppDataFolder());
+    panel->onRemoved = [this] { checkForChanges(); };
+    showOverlay ("Storage and clean-up", std::move (panel));
 }
 
 //==============================================================================

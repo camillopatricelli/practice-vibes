@@ -189,7 +189,7 @@ juce::Result decodeFile (const juce::File& file, juce::AudioBuffer<float>& stere
     return juce::Result::ok();
 }
 
-juce::Result writeAacFile (const juce::File& file, const juce::AudioBuffer<float>& audio, double sampleRate)
+juce::Result writeAacFile (const juce::File& file, const juce::AudioBuffer<float>& audio, double sampleRate, int kbps)
 {
     Session session;
 
@@ -213,7 +213,9 @@ juce::Result writeAacFile (const juce::File& file, const juce::AudioBuffer<float
     outType->SetUINT32 (MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
     outType->SetUINT32 (MF_MT_AUDIO_SAMPLES_PER_SECOND, rate);
     outType->SetUINT32 (MF_MT_AUDIO_NUM_CHANNELS, channels);
-    outType->SetUINT32 (MF_MT_AUDIO_AVG_BYTES_PER_SECOND, 16000);   // 128 kbit/s
+    // The encoder takes 96, 128, 160 or 192 kbit/s (12000 / 16000 / 20000 / 24000 bytes per second).
+    const auto bytesPerSecond = (UINT32) (juce::jlimit (96, 192, (kbps + 16) / 32 * 32) / 8 * 1000);
+    outType->SetUINT32 (MF_MT_AUDIO_AVG_BYTES_PER_SECOND, bytesPerSecond);
 
     DWORD stream = 0;
     hr = writer->AddStream (outType.Get(), &stream);
@@ -278,7 +280,7 @@ juce::Result decodeFile (const juce::File&, juce::AudioBuffer<float>&, double&)
     return juce::Result::fail ("not supported on this platform");
 }
 
-juce::Result writeAacFile (const juce::File&, const juce::AudioBuffer<float>&, double)
+juce::Result writeAacFile (const juce::File&, const juce::AudioBuffer<float>&, double, int)
 {
     return juce::Result::fail ("not supported on this platform");
 }

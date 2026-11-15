@@ -40,6 +40,11 @@ public:
     /** Stops and closes the file. */
     Result stop();
 
+    /** Turns a recorded (FLAC) take into a small AAC .m4a file (any thread; takes a moment for long takes). */
+    static juce::Result convertToAac (const juce::File& recorded, const juce::File& m4a, int kbps = takeKbps);
+
+    static constexpr int takeKbps = 128;        // takes are for listening back, not for release: ~1 MB per minute
+
     bool isRecording() const noexcept                   { return active.load(); }
     double getRecordedSeconds() const noexcept          { return (double) written.load() / juce::jmax (1.0, rate.load()); }
     bool hasDroppedAudio() const noexcept               { return dropped.load(); }

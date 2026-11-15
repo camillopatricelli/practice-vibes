@@ -1,4 +1,5 @@
 #include "Recorder.h"
+#include "AacFile.h"
 
 namespace pv
 {
@@ -88,6 +89,23 @@ Recorder::Result Recorder::stop()
     result.seconds = getRecordedSeconds();
     result.timeline.segments = segments;
     return result;
+}
+
+juce::Result Recorder::convertToAac (const juce::File& recorded, const juce::File& m4a, int kbps)
+{
+    juce::AudioFormatManager formats;
+    formats.registerFormat (new juce::FlacAudioFormat(), true);
+    std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (recorded));
+
+    if (reader == nullptr || reader->lengthInSamples <= 0)
+        return juce::Result::fail ("can't read the recording");
+
+    juce::AudioBuffer<float> audio ((int) juce::jlimit (1u, 2u, reader->numChannels), (int) reader->lengthInSamples);
+    reader->read (&audio, 0, audio.getNumSamples(), 0, true, audio.getNumChannels() > 1);
+    const auto rate = reader->sampleRate;
+    reader.reset();
+
+    return AacFile::write (m4a, audio, rate, kbps);
 }
 
 //==============================================================================

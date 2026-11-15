@@ -1,4 +1,5 @@
 #include "PracticePanel.h"
+#include "AacFile.h"
 #include "Theme.h"
 #include "YouTubePlayer.h"
 
@@ -252,6 +253,10 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
     addChildComponent (guitarVolumeSlider);
     addChildComponent (closeTakeButton);
     closeTakeButton.onClick = [this] { closeTake(); };
+    addChildComponent (exportMixButton);
+    exportMixButton.setTooltip ("Song + your take in one .m4a file, as you hear it now (speed, loop and the two volumes), "
+                                "e.g. to send to a teacher");
+    exportMixButton.onClick = [this] { exportMix(); };
 
     openButton.onClick = [this] { openFile(); };
     rewindButton.onClick = [this]
@@ -756,6 +761,81 @@ void PracticePanel::openTake (const juce::File& takeSongFile, const juce::File& 
         loadSong (juce::URL (takeSongFile), std::nullopt, loadTake);
 }
 
+void PracticePanel::exportMix()
+{
+    if (! player.hasSong() || ! player.hasTake())
+        return;
+
+    const auto name = juce::File::createLegalFileName (takeTitle + " (mix).m4a");
+
+   #if JUCE_IOS
+    renderMix (juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile (name), true);
+   #else
+    fileChooser = std::make_unique<juce::FileChooser> ("Export the mix (song + take)",
+                                                       juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile (name),
+                                                       "*.m4a");
+    fileChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                                  | juce::FileBrowserComponent::warnAboutOverwriting,
+                              [safeThis = SafePointer<PracticePanel> (this)] (const juce::FileChooser& chooser)
+    {
+        auto file = chooser.getResult();
+
+        if (safeThis != nullptr && file != juce::File())
+            safeThis->renderMix (file.hasFileExtension ("m4a") ? file : file.withFileExtension ("m4a"), false);
+    });
+   #endif
+}
+
+void PracticePanel::renderMix (const juce::File& target, bool share)
+{
+    auto song = player.getSong();
+    auto take = player.getTake();
+    const auto songGain = player.gain.load(), takeGain = player.takeGain.load();
+
+    exportMixButton.setEnabled (false);
+    exportMixButton.setButtonText ("Exporting...");
+
+    juce::Thread::launch ([safeThis = SafePointer<PracticePanel> (this), song, take, songGain, takeGain, target, share]
+    {
+        juce::AudioBuffer<float> mix;
+        double rate = 48000.0;
+        auto result = PlayerProcessor::renderTakeMix (song, take, songGain, takeGain, mix, rate);
+
+        if (result.wasOk())
+            result = AacFile::write (target, mix, rate, 192);
+
+        juce::MessageManager::callAsync ([safeThis, result, target, share]
+        {
+            if (safeThis == nullptr)
+                return;
+
+            safeThis->exportMixButton.setEnabled (true);
+            safeThis->exportMixButton.setButtonText ("Export mix...");
+
+            if (result.failed())
+            {
+                juce::Logger::writeToLog ("Could not export the mix: " + result.getErrorMessage());
+                safeThis->songLabel.setText ("Could not export the mix: " + result.getErrorMessage(), juce::dontSendNotification);
+                return;
+            }
+
+            juce::Logger::writeToLog ("Exported the mix to " + target.getFullPathName() + " (" + juce::String (target.getSize() / 1024) + " KB)");
+
+           #if JUCE_IOS
+            if (share)
+            {
+                safeThis->shareBox = juce::ContentSharer::shareFilesScoped ({ juce::URL (target) }, [] (bool, const juce::String&) {},
+                                                                           safeThis.getComponent());
+                return;
+            }
+           #endif
+
+            juce::ignoreUnused (share);
+            target.revealToUser();
+        });
+    });
+}
+
 void PracticePanel::closeTake()
 {
     player.setTake (nullptr);
@@ -815,7 +895,8 @@ void PracticePanel::updateTakeMode()
     for (auto* c : std::initializer_list<juce::Component*> { &setAButton, &setBButton, &loopButton, &clearLoopButton, &snapButton })
         c->setVisible (! on);
 
-    for (auto* c : std::initializer_list<juce::Component*> { takeTimeline.get(), &guitarVolumeLabel, &guitarVolumeSlider, &closeTakeButton })
+    for (auto* c : std::initializer_list<juce::Component*> { takeTimeline.get(), &guitarVolumeLabel, &guitarVolumeSlider, &closeTakeButton,
+                                                             &exportMixButton })
         c->setVisible (on);
 
     for (auto* c : std::initializer_list<juce::Component*> { &speedSlider, &speedLabel, &pitchSlider, &pitchLabel })
@@ -1190,8 +1271,9 @@ void PracticePanel::resized()
     if (takeShown)
     {
         closeTakeButton.setBounds (transport.removeFromRight (110).reduced (2, 0));
+        exportMixButton.setBounds (transport.removeFromRight (130).reduced (2, 0));
         transport.removeFromRight (8);
-        guitarVolumeSlider.setBounds (transport.removeFromRight (juce::jmin (230, transport.getWidth() / 3)));
+        guitarVolumeSlider.setBounds (transport.removeFromRight (juce::jmin (200, transport.getWidth() / 3)));
         guitarVolumeLabel.setBounds (transport.removeFromRight (56));
         transport.removeFromRight (12);
         takeTimeline->setBounds (transport);

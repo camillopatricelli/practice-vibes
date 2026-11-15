@@ -607,7 +607,7 @@ bool Library::saveTopic (const Topic& t)
     return xml.writeTo (t.folder.getChildFile (topicFileName));
 }
 
-static bool removeToBin (const juce::File& f)
+bool Library::moveToBin (const juce::File& f)
 {
     if (! f.exists())
         return true;
@@ -624,7 +624,7 @@ bool Library::deleteTopic (const juce::String& topicId)
 {
     auto it = std::find_if (topics.begin(), topics.end(), [&] (const Topic& t) { return t.id == topicId; });
 
-    if (it == topics.end() || ! removeToBin (it->folder))
+    if (it == topics.end() || ! moveToBin (it->folder))
         return false;
 
     topics.erase (it);
@@ -728,7 +728,7 @@ bool Library::removeResource (Topic& topic, const juce::String& resourceId)
     if (it == topic.resources.end())
         return false;
 
-    if (! it->isLink() && ! removeToBin (topic.getFile (*it)))
+    if (! it->isLink() && ! moveToBin (topic.getFile (*it)))
         return false;
 
     if (! it->isLink())
