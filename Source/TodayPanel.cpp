@@ -538,7 +538,8 @@ void TodayPanel::updateSession()
         {
             const auto n = (int) session.getSlots().size();
             sessionTitle.setText (session.isTimeUp() ? juce::String ("Time's up!")
-                                                     : "Session: topic " + juce::String (session.getIndex() + 1) + " of " + juce::String (n),
+                                                     : "Session: topic " + juce::String (session.getIndex() + 1) + " of " + juce::String (n)
+                                                         + (session.isPaused() ? "  -  the clock runs while you play" : ""),
                                   juce::dontSendNotification);
             sessionTitle.setColour (juce::Label::textColourId, session.isTimeUp() ? theme::highlight : juce::Colours::white);
             nextButton.setButtonText (session.getNext() != nullptr ? "Next topic" : "Finish");
@@ -679,7 +680,7 @@ void TodayPanel::paint (juce::Graphics& g)
 
             if (current)
                 right = session.isTimeUp() ? "over by " + formatClock (-session.getRemainingSeconds())
-                                           : formatClock (session.getRemainingSeconds()) + " left";
+                                           : formatClock (session.getRemainingSeconds()) + (session.isPaused() ? " left (paused)" : " left");
             else if (done)
                 right = "done";
 

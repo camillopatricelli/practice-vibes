@@ -220,6 +220,9 @@ public:
 
     bool isPlaying() const noexcept                                 { return detector.isPlaying(); }
 
+    /** Seconds counted as played in the last tick() (drives the practice session's clock). */
+    double getLastTickPlayedSeconds() const noexcept                { return lastTickPlayed; }
+
     /** Played time on the active topic since it became active (all its entries). */
     double getActiveSeconds() const noexcept                        { return activeSeconds; }
 
@@ -245,7 +248,7 @@ private:
     bool saved = false;                                  // the current entry is in the log already
 
     std::optional<PracticeEntry> lastFinished;           // the entry that just ended (still takes a note)
-    double sinceFinished = 0.0, sinceNoteEdit = 0.0;
+    double sinceFinished = 0.0, sinceNoteEdit = 0.0, lastTickPlayed = 0.0;
     bool noteDirty = false;
 };
 

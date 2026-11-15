@@ -139,14 +139,15 @@ const SessionSlot* PracticeSession::getNext() const noexcept
     return running && juce::isPositiveAndBelow (index + 1, (int) slots.size()) ? &slots[(size_t) index + 1] : nullptr;
 }
 
-bool PracticeSession::tick (double seconds)
+bool PracticeSession::tick (double playedSeconds)
 {
     if (! running)
         return false;
 
-    seconds = juce::jlimit (0.0, 5.0, seconds);
-    slotElapsed += seconds;
-    totalElapsed += seconds;
+    playedSeconds = juce::jlimit (0.0, 5.0, playedSeconds);
+    playing = playedSeconds > 0.0;
+    slotElapsed += playedSeconds;
+    totalElapsed += playedSeconds;
 
     if (! announced && isTimeUp())
     {

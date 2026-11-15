@@ -50,12 +50,17 @@ public:
     const SessionSlot* getCurrent() const noexcept;
     const SessionSlot* getNext() const noexcept;
 
-    /** Real time passing; true once, when the current slot's time runs out. */
-    bool tick (double seconds);
+    /** `playedSeconds` of guitar playing in the last tick (PlayDetector, as in the practice log): the slot's clock runs
+        only while you play, so "5 min" means five minutes of playing; silence (not started yet, a phone call) pauses it.
+        True once, when the current slot's time runs out. */
+    bool tick (double playedSeconds);
 
     double getRemainingSeconds() const noexcept;            // negative when over time
     bool isTimeUp() const noexcept                          { return getRemainingSeconds() <= 0.0; }
-    double getElapsedSeconds() const noexcept               { return totalElapsed; }
+    double getElapsedSeconds() const noexcept               { return totalElapsed; }   // played time, whole session
+
+    /** Running, time left, but nothing played in the last tick: the clock is waiting for you to play. */
+    bool isPaused() const noexcept                          { return running && ! playing && ! isTimeUp(); }
 
     /** Moves to the next slot; false when that was the last one (the session is over). */
     bool next();
@@ -66,7 +71,7 @@ private:
     std::vector<SessionSlot> slots;
     int index = 0;
     double slotElapsed = 0.0, extraSeconds = 0.0, totalElapsed = 0.0;
-    bool running = false, announced = false, finished = false;
+    bool running = false, announced = false, finished = false, playing = false;
 };
 
 /** "6:05", "-1:30". */

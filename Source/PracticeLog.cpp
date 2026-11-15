@@ -606,6 +606,7 @@ void PracticeTracker::tick (double seconds, float inputPeak, const Activity& act
 {
     seconds = juce::jlimit (0.0, 5.0, seconds);   // the app was suspended: don't count the gap
     const auto played = detector.process (inputPeak, seconds);
+    lastTickPlayed = played;
 
     sinceFinished += seconds;
     sinceNoteEdit += seconds;

@@ -2542,6 +2542,53 @@ static void testPracticePlanner()
         check (s.tick (1000.0) == false, "a stopped session doesn't tick");
     }
 
+    // The slot's clock runs only while the guitar is played (owner's example: "warm-up 5 min", a phone call 2 min in).
+    {
+        PracticeSession s;
+        PracticeTracker tracker;
+        PracticeTracker::Activity a;
+        s.start ({ { "w", "Warm-up", 5 } });
+        auto clock = juce::Time (2026, 10, 15, 18, 0, 0, 0, true);
+        float lastLevel = 0.0f;
+        int noteTick = 0;
+
+        auto run = [&] (double seconds, bool playingGuitar)
+        {
+            for (double t = 0.0; t < seconds - 1.0e-9; t += 0.1)
+            {
+                // Plucked notes every second over a quiet floor, or just the floor.
+                lastLevel = playingGuitar ? juce::jmax (0.002f, 0.3f * (float) std::exp (-0.25 * (noteTick++ % 10))) : 0.002f;
+                clock = clock + juce::RelativeTime::milliseconds (100);
+                tracker.tick (0.1, lastLevel, a, clock);
+                s.tick (tracker.getLastTickPlayedSeconds());
+            }
+        };
+
+        run (40.0, false);   // pressed Start, tuning up / getting ready: silence
+        check (std::abs (s.getRemainingSeconds() - 300.0) < 0.01 && s.isPaused(), "before playing: the clock hasn't started");
+
+        run (120.0, true);   // two minutes of playing
+        const auto afterTwo = s.getRemainingSeconds();
+        check (std::abs (afterTwo - 180.0) < 2.0 && ! s.isPaused(), "two minutes of playing: 3:00 left (" + formatClock (afterTwo) + ")");
+
+        run (180.0, false);  // the phone rings: only the detector's short grace period still counts
+        const auto afterCall = s.getRemainingSeconds();
+        check (afterTwo - afterCall <= PlayDetector::graceSeconds + 0.5 && s.isPaused(),
+               "a 3-minute phone call pauses the clock (" + formatClock (afterCall) + " left)");
+
+        bool chimed = false;
+
+        for (int i = 0; i < 2000 && ! chimed; ++i)
+        {
+            lastLevel = juce::jmax (0.002f, 0.3f * (float) std::exp (-0.25 * (noteTick++ % 10)));
+            clock = clock + juce::RelativeTime::milliseconds (100);
+            tracker.tick (0.1, lastLevel, a, clock);
+            chimed = s.tick (tracker.getLastTickPlayedSeconds());
+        }
+
+        check (chimed && std::abs (s.getElapsedSeconds() - 300.0) < 0.2, "time's up after five minutes of actual playing");
+    }
+
     check (formatClock (365.0) == "6:05" && formatClock (-90.0) == "-1:30" && formatClock (0.4) == "0:01", "clock texts");
 
     // Weekly history

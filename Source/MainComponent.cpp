@@ -544,8 +544,8 @@ void MainComponent::tickTracker()
 
     tracker.tick (seconds, engine.chain->getInputStage().takeActivityPeak(), activity, juce::Time::getCurrentTime());
 
-    // A session slot's time is up: a soft chime (no forced move: you go on when you're ready).
-    if (session.tick (seconds))
+    // The slot's clock counts only time spent playing. Time's up: a soft chime (no forced move: you go on when ready).
+    if (session.tick (tracker.getLastTickPlayedSeconds()))
     {
         engine.metronome->requestChime();
         updatePractisingButton();
@@ -568,7 +568,8 @@ void MainComponent::updatePractisingButton()
     {
         const auto n = (int) session.getSlots().size();
         text = juce::String (session.getIndex() + 1) + "/" + juce::String (n) + "  " + slot->title + "  -  "
-             + formatClock (juce::jmax (0.0, session.getRemainingSeconds()));
+             + formatClock (juce::jmax (0.0, session.getRemainingSeconds()))
+             + (session.isPaused() ? "  (paused: play to continue)" : "");
 
         if (session.isTimeUp())
             text = session.getNext() != nullptr ? "Time's up - next: " + session.getNext()->title
