@@ -45,7 +45,8 @@ jobs:
       - name: Configure
         run: cmake --preset ios
 
-      # Built unsigned: SideStore signs the app with the user's own Apple ID on install.
+      # Built unsigned, then ad-hoc signed with the entitlements when packaged: SideStore signs the app with
+      # the user's own Apple ID on install.
       - name: Build
         run: |
           cmake --build build/ios --config Release --target PracticeVibes -- \
@@ -59,6 +60,19 @@ jobs:
           test -n "$APP_PATH"
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
+
+          # Ad-hoc sign with JUCE's generated entitlements: SideStore re-signs with the entitlements it finds
+          # in the app, and an unsigned build has none. "inter-app-audio" is what lets an iOS app see
+          # third-party AUv3 plug-ins (without it only Apple's built-in Audio Units are listed).
+          ENTITLEMENTS="$(find build/ios -name 'PracticeVibes.entitlements' | head -n 1)"
+          echo "Entitlements: $ENTITLEMENTS"
+          test -n "$ENTITLEMENTS"
+          cat "$ENTITLEMENTS"
+          grep -q "inter-app-audio" "$ENTITLEMENTS"
+          APP_IN_PAYLOAD="Payload/$(basename "$APP_PATH")"
+          codesign --force --sign - --timestamp=none --entitlements "$ENTITLEMENTS" "$APP_IN_PAYLOAD"
+          codesign -d --entitlements - "$APP_IN_PAYLOAD"
+
           zip -qry PracticeVibes.ipa Payload
 
       - uses: actions/upload-artifact@v4
