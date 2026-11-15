@@ -51,6 +51,12 @@ bool hasTag (const juce::StringArray& tags, const juce::String& tag);
 /** Short text for the resource's badge, e.g. "PDF", "MP3", "YT", "WEB". */
 juce::String badgeText (const Resource&);
 
+/** Search for a single resource (Links tab): every word must start a word in its title, URL, tags or notes. */
+bool resourceMatches (const Resource&, const juce::String& searchText);
+
+/** Trims a typed URL and adds "https://" when it has no scheme ("www.x.com" -> "https://www.x.com"). */
+juce::String normaliseUrl (const juce::String& url);
+
 /** A practice topic: a folder in the library holding topic.xml and the topic's files. */
 struct Topic
 {

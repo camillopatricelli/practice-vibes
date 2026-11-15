@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "LibraryPanel.h"
+#include "LinksPanel.h"
 #include "LooperPanel.h"
 #include "PracticePanel.h"
 #include "PracticeViews.h"
@@ -238,6 +239,7 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     todayPanel = std::make_unique<TodayPanel> (tracker, session);
     practicePanel = std::make_unique<PracticePanel> (*engine.player, *engine.metronome);
     libraryPanel = std::make_unique<LibraryPanel>();
+    linksPanel = std::make_unique<LinksPanel>();
     looperPanel = std::make_unique<LooperPanel> (engine);
     rigPanel = std::make_unique<RigPanel> (engine);
     logPanel = std::make_unique<LogPanel> (appLog);
@@ -250,6 +252,10 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     libraryPanel->hideOverlay = [this] { closeOverlay(); };
     libraryPanel->onOpenAudio = [this] (const juce::File& file) { openAudioFile (file); };
     libraryPanel->onOpenYouTube = [this] (const YouTubeLink& link, const juce::String& title) { openYouTube (link, title); };
+    linksPanel->showOverlay = [this] (const juce::String& title, std::unique_ptr<juce::Component> c) { showOverlay (title, std::move (c)); };
+    linksPanel->hideOverlay = [this] { closeOverlay(); };
+    linksPanel->onOpenYouTube = [this] (const YouTubeLink& link, const juce::String& title) { openYouTube (link, title); };
+    linksPanel->onChooseLibrary = [this] { showTab (libraryPanel.get()); };
 
     // Practice log: opening something from a topic makes it the topic you're practising.
     libraryPanel->onLibraryOpened = [this] { libraryOpened(); };
@@ -304,6 +310,7 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     tabs.addTab ("Today", theme::background, todayPanel.get(), false);
     tabs.addTab ("Practice", theme::background, practicePanel.get(), false);
     tabs.addTab ("Topics", theme::background, libraryPanel.get(), false);
+    tabs.addTab ("Links", theme::background, linksPanel.get(), false);
     tabs.addTab ("Looper", theme::background, looperPanel.get(), false);
     tabs.addTab ("Guitar rig", theme::background, rigPanel.get(), false);
     tabs.addTab ("Log", theme::background, logPanel.get(), false);
@@ -437,6 +444,7 @@ void MainComponent::libraryOpened()
     tracker.setLog (nullptr);
     practiceLog.reset();
     tracker.setActiveTopic ({}, {});   // topic ids belong to the old library
+    linksPanel->setLibraryRoot (libraryPanel->getLibrary() != nullptr ? libraryPanel->getLibrary()->getRoot() : juce::File());
 
     if (auto* lib = libraryPanel->getLibrary())
     {

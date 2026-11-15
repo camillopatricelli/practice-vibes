@@ -12,6 +12,7 @@ namespace pv
 {
 
 class LibraryPanel;
+class LinksPanel;
 class LooperPanel;
 class PracticePanel;
 class RigPanel;
@@ -105,6 +106,7 @@ private:
     std::unique_ptr<TodayPanel> todayPanel;
     std::unique_ptr<PracticePanel> practicePanel;
     std::unique_ptr<LibraryPanel> libraryPanel;
+    std::unique_ptr<LinksPanel> linksPanel;
     std::unique_ptr<LooperPanel> looperPanel;
     std::unique_ptr<RigPanel> rigPanel;
     std::unique_ptr<LogPanel> logPanel;

@@ -6,6 +6,7 @@
 #include "../Source/Footswitch.h"
 #include "../Source/LatencyCalibrator.h"
 #include "../Source/Library.h"
+#include "../Source/Links.h"
 #include "../Source/LoopFiles.h"
 #include "../Source/Looper.h"
 #include "../Source/MediaFoundationAudio.h"
@@ -2068,6 +2069,58 @@ static void testLibrary()
            "no video id (playlist, channel, other site, bad characters) -> not a YouTube video");
 }
 
+static void testLinks()
+{
+    std::cout << "\n[Links tab]\n";
+
+    const auto root = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("pv-links-test");
+    root.deleteRecursively();
+    root.createDirectory();
+
+    {
+        LinkList links (root);
+        check (links.getLinks().empty(), "a new library has no links");
+        check (links.add ("", "  ", {}, {}) == nullptr, "an empty URL is refused");
+
+        auto* a = links.add ("", "www.circleoffifths.example/learn", { "theory" }, "Keys and their signatures");
+        check (a != nullptr && a->url == "https://www.circleoffifths.example/learn" && a->title == "circleoffifths.example",
+               "scheme added, title from the domain: " + (a != nullptr ? a->title : juce::String()));
+        links.add ("Scale finder", "https://scales.example", { "Theory", "scales" }, {});
+        links.add ("Lesson video", "https://youtu.be/abcDEF12345", {}, {});
+
+        check (links.move (links.getLinks()[2].id, -1) && links.getLinks()[1].title == "Lesson video", "move up");
+        check (! links.move (links.getLinks()[0].id, -1), "the first link can't move up");
+        check (links.getAllTags() == juce::StringArray ({ "scales", "theory" }), "tags merged ignoring case: "
+               + links.getAllTags().joinIntoString (","));
+    }
+
+    // Another LinkList (another device) reads what was saved; edits made there are picked up here.
+    LinkList here (root);
+    check (here.getLinks().size() == 3 && here.getLinks()[2].title == "Scale finder"
+               && here.getLinks()[0].description == "Keys and their signatures",
+           "links, order and notes come back from links.xml");
+    check (root.getChildFile (".links").getChildFile ("links.xml").existsAsFile() && Library (root).getInbox().isEmpty(),
+           "kept in .links (not shown in the Topics Inbox)");
+
+    {
+        LinkList there (root);
+        there.remove (there.getLinks()[1].id);
+        auto* r = there.find (there.getLinks()[0].id);
+        r->title = "Circle of fifths";
+        there.save();
+    }
+
+    check (here.reloadIfChanged() && here.getLinks().size() == 2 && here.getLinks()[0].title == "Circle of fifths",
+           "changes from another device are picked up");
+    check (! here.reloadIfChanged(), "no change -> no reload");
+
+    check (resourceMatches (here.getLinks()[0], "circ keys") && resourceMatches (here.getLinks()[0], "theory")
+               && ! resourceMatches (here.getLinks()[0], "ircle") && resourceMatches (here.getLinks()[1], "scales.example"),
+           "search: word starts in title, notes, tags, URL");
+
+    root.deleteRecursively();
+}
+
 static void testPracticeLog()
 {
     std::cout << "Practice log (played time, entries, setups)" << std::endl;
@@ -3307,6 +3360,7 @@ int main()
     testTuner();
     testTunings();
     testLibrary();
+    testLinks();
     testPracticeLog();
     testPracticePlanner();
     testTakes();

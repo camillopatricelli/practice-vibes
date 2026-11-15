@@ -52,8 +52,6 @@ public:
 private:
     class TopicView;
     class InboxView;
-    class ResourceRow;
-    class ResourceEditor;
     class Viewer;
     friend class TopicView;
     friend class InboxView;

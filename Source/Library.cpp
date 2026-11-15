@@ -247,6 +247,22 @@ namespace
     }
 }
 
+bool resourceMatches (const Resource& r, const juce::String& searchText)
+{
+    for (auto& word : searchWords (searchText))
+        if (! (hasWordStartingWith (resourceName (r), word) || hasWordStartingWith (r.url, word)
+                || anyStartsWith (r.tags, word) || hasWordStartingWith (r.description, word)))
+            return false;
+
+    return true;
+}
+
+juce::String normaliseUrl (const juce::String& url)
+{
+    auto clean = url.trim();
+    return clean.isEmpty() || clean.containsChar (':') ? clean : "https://" + clean;
+}
+
 bool Topic::matches (const juce::String& searchText) const
 {
     for (auto& word : searchWords (searchText))

@@ -92,6 +92,8 @@ target_sources(PracticeVibes PRIVATE
     Source/FootswitchPanel.cpp
     Source/Library.cpp
     Source/LibraryPanel.cpp
+    Source/Links.cpp
+    Source/LinksPanel.cpp
     Source/LoopFiles.cpp
     Source/Looper.cpp
     Source/LooperPanel.cpp
@@ -185,6 +187,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         Source/FolderAccess.cpp
     Source/Footswitch.cpp
         Source/Library.cpp
+        Source/Links.cpp
         Source/LoopFiles.cpp
         Source/Looper.cpp
         Source/MediaFoundationAudio.cpp
