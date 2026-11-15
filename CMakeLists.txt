@@ -29,6 +29,14 @@ if(WIN32)
     FetchContent_MakeAvailable(webview2)
     set(JUCE_WEBVIEW2_PACKAGE_LOCATION ${CMAKE_BINARY_DIR}/nuget)
     set(PV_WEBVIEW2 TRUE)
+
+    # Stem separation runs the Demucs network with ONNX Runtime (MIT). Only its headers are used at build time;
+    # onnxruntime.dll is copied next to the app and loaded on first use.
+    set(PV_ONNXRUNTIME_VERSION 1.20.1)
+    FetchContent_Declare(onnxruntime
+        URL https://github.com/microsoft/onnxruntime/releases/download/v${PV_ONNXRUNTIME_VERSION}/onnxruntime-win-x64-${PV_ONNXRUNTIME_VERSION}.zip)
+    FetchContent_MakeAvailable(onnxruntime)
+    set(PV_ONNXRUNTIME_DIR ${onnxruntime_SOURCE_DIR})
 else()
     set(PV_WEBVIEW2 FALSE)
 endif()
@@ -78,6 +86,7 @@ target_sources(PracticeVibes PRIVATE
     Source/Looper.cpp
     Source/LooperPanel.cpp
     Source/MainComponent.cpp
+    Source/OnnxDemucs.cpp
     Source/MediaFoundationAudio.cpp
     Source/MetronomeProcessor.cpp
     Source/MidiMonitor.cpp
@@ -90,7 +99,9 @@ target_sources(PracticeVibes PRIVATE
     Source/PracticeViews.cpp
     Source/Recorder.cpp
     Source/RigPanel.cpp
+    Source/StemMixer.cpp
     Source/StoragePanel.cpp
+    Source/Stems.cpp
     Source/Take.cpp
     Source/TodayPanel.cpp
     Source/Tuner.cpp
@@ -119,6 +130,20 @@ if(WIN32)
         JUCE_WASAPI=1
         JUCE_DIRECTSOUND=0)
 endif()
+
+# Adds ONNX Runtime's headers to a target and puts onnxruntime.dll next to its executable.
+function(pv_use_onnxruntime target)
+    if(PV_ONNXRUNTIME_DIR)
+        target_include_directories(${target} SYSTEM PRIVATE ${PV_ONNXRUNTIME_DIR}/include)
+        target_compile_definitions(${target} PRIVATE PV_HAS_ONNX=1)
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PV_ONNXRUNTIME_DIR}/lib/onnxruntime.dll $<TARGET_FILE_DIR:${target}>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PV_ONNXRUNTIME_DIR}/LICENSE $<TARGET_FILE_DIR:${target}>/onnxruntime-LICENSE.txt
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PV_ONNXRUNTIME_DIR}/ThirdPartyNotices.txt $<TARGET_FILE_DIR:${target}>/onnxruntime-ThirdPartyNotices.txt)
+    endif()
+endfunction()
+
+pv_use_onnxruntime(PracticeVibes)
 
 target_link_libraries(PracticeVibes
     PRIVATE
@@ -149,9 +174,13 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         Source/PracticeLog.cpp
         Source/PracticePlanner.cpp
         Source/Recorder.cpp
+        Source/OnnxDemucs.cpp
         Source/StoragePanel.cpp
+        Source/Stems.cpp
         Source/Take.cpp
         Source/Tuner.cpp)
+
+    pv_use_onnxruntime(PracticeVibesTests)
 
     target_compile_definitions(PracticeVibesTests PRIVATE
         JUCE_WEB_BROWSER=0

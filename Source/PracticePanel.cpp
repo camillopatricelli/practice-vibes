@@ -1,5 +1,6 @@
 #include "PracticePanel.h"
 #include "AacFile.h"
+#include "Library.h"
 #include "Theme.h"
 #include "YouTubePlayer.h"
 
@@ -259,6 +260,15 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
     exportMixButton.onClick = [this] { exportMix(); };
 
     openButton.onClick = [this] { openFile(); };
+
+    addAndMakeVisible (stemsButton);
+    stemsButton.setTooltip ("Split the song into vocals, guitar, bass, drums, piano and other; mute or solo any of them");
+    stemsButton.onClick = [this] { showStemMixer(); };
+    stemService.onFinished = [this] (const juce::File& folder, const juce::Result& result)
+    {
+        if (result.wasOk() && folder == stemFolder)
+            stemsChecked = false;       // load them now
+    };
     rewindButton.onClick = [this]
     {
         const auto target = loopIsEnabled() ? loopStartSeconds() : 0.0;
@@ -673,10 +683,103 @@ void PracticePanel::updateModeVisibility()
     openOnYouTubeButton.setVisible (youTubeMode && youtube != nullptr && youtube->getState().errorCode != 0);
     pitchSlider.setEnabled (! youTubeMode);
     pitchLabel.setEnabled (! youTubeMode);
+    stemsButton.setVisible (! youTubeMode);
 
     hintLabel.setText (youTubeMode ? "YouTube: tap the timeline to jump, drag on it to set a loop. Speed snaps to the speeds the video offers."
                                    : "Tap the waveform to jump, drag to loop, drag a loop edge to adjust it. Zoom: pinch, or Ctrl+wheel. Double-click a slider to reset it.",
                        juce::dontSendNotification);
+}
+
+//==============================================================================
+void PracticePanel::updateStems()
+{
+    const auto song = player.getSong();
+
+    if (song != stemsSong || songOfFile != stemsSongOfFile)
+    {
+        stemsSong = song;
+        stemsSongOfFile = songOfFile;
+        auto root = LibraryLocation::load();
+
+        if (root == juce::File())
+            root = LibraryLocation::getDefaultFolder();
+
+        stemFolder = song != nullptr && song == songOfFile ? Stems::folderFor (songFile, root) : juce::File();
+        stemsChecked = false;
+    }
+
+    if (! stemsChecked && ! loadingStems)
+    {
+        stemsChecked = true;
+        loadStems();
+    }
+
+    juce::String text = "Stems";
+
+    if (stemService.isBusy())
+        text = "Stems " + juce::String (juce::roundToInt (stemService.getProgress() * 100.0)) + " %";
+    else if (player.hasStems() && ! stemControls.isNeutral())
+        text = "Stems: " + stemControls.describe();
+
+    if (stemsButton.getButtonText() != text)
+    {
+        const auto active = text.startsWith ("Stems:");
+        stemsButton.setButtonText (text);
+        stemsButton.setColour (juce::TextButton::buttonColourId, active ? theme::accent : findColour (juce::TextButton::buttonColourId, false));
+        resized();
+    }
+}
+
+void PracticePanel::loadStems()
+{
+    if (stemFolder == juce::File() || stemsSong == nullptr || ! Stems::isComplete (stemFolder) || player.hasStems())
+        return;
+
+    loadingStems = true;
+    juce::Thread::launch ([folder = stemFolder, song = stemsSong, safeThis = SafePointer<PracticePanel> (this)]
+    {
+        juce::String error;
+        auto stems = PlayerProcessor::loadStems (folder, song->sampleRate, error);
+
+        juce::MessageManager::callAsync ([safeThis, stems, song, error]
+        {
+            if (safeThis == nullptr)
+                return;
+
+            safeThis->loadingStems = false;
+
+            if (stems == nullptr)
+            {
+                juce::Logger::writeToLog ("Stems: can't load them: " + error);
+                return;
+            }
+
+            safeThis->player.setStems (stems, song.get());
+            safeThis->applyStemGains();
+            juce::Logger::writeToLog ("Stems loaded for \"" + song->name + "\"");
+        });
+    });
+}
+
+void PracticePanel::applyStemGains()
+{
+    for (int s = 0; s < Stems::count; ++s)
+        player.stemGains[(size_t) s] = stemControls.gainFor (s);
+}
+
+void PracticePanel::separateCurrentSong()
+{
+    if (stemsSong != nullptr && stemFolder != juce::File())
+        stemService.start (stemsSong, stemFolder);
+}
+
+void PracticePanel::showStemMixer()
+{
+    if (! player.hasStems() && ! loadingStems)
+        stemsChecked = false;   // stems may have arrived since (e.g. synced from another device)
+
+    updateStems();
+    juce::CallOutBox::launchAsynchronously (std::make_unique<StemMixer> (static_cast<StemMixer::Host&> (*this)), stemsButton.getScreenBounds(), nullptr);
 }
 
 //==============================================================================
@@ -791,15 +894,20 @@ void PracticePanel::renderMix (const juce::File& target, bool share)
     auto song = player.getSong();
     auto take = player.getTake();
     const auto songGain = player.gain.load(), takeGain = player.takeGain.load();
+    const auto stems = player.getStems();
+    std::array<float, Stems::count> stemGains {};
+
+    for (int s = 0; s < Stems::count; ++s)
+        stemGains[(size_t) s] = player.stemGains[(size_t) s].load();
 
     exportMixButton.setEnabled (false);
     exportMixButton.setButtonText ("Exporting...");
 
-    juce::Thread::launch ([safeThis = SafePointer<PracticePanel> (this), song, take, songGain, takeGain, target, share]
+    juce::Thread::launch ([safeThis = SafePointer<PracticePanel> (this), song, take, songGain, takeGain, stems, stemGains, target, share]
     {
         juce::AudioBuffer<float> mix;
         double rate = 48000.0;
-        auto result = PlayerProcessor::renderTakeMix (song, take, songGain, takeGain, mix, rate);
+        auto result = PlayerProcessor::renderTakeMix (song, take, songGain, takeGain, mix, rate, nullptr, stems, stemGains);
 
         if (result.wasOk())
             result = AacFile::write (target, mix, rate, 192);
@@ -1073,6 +1181,8 @@ bool PracticePanel::keyPressed (const juce::KeyPress& key)
 
 void PracticePanel::timerCallback()
 {
+    updateStems();
+
     if (auto song = player.getSong(); song != shownSong)
     {
         if (youTubeMode)
@@ -1232,6 +1342,9 @@ void PracticePanel::resized()
     auto top = area.removeFromTop (44);
     songHeader.setBounds (top.removeFromLeft (70));
     openButton.setBounds (top.removeFromLeft (170).reduced (3));
+
+    if (! youTubeMode)
+        stemsButton.setBounds (top.removeFromLeft (juce::jmin (230, juce::jmax (110, stemsButton.getBestWidthForHeight (38) + 24))).reduced (3));
     timeLabel.setBounds (top.removeFromRight (190));
     top.removeFromRight (12);
 

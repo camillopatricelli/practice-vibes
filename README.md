@@ -29,6 +29,13 @@ It is built on [JUCE](https://juce.com).
   change (+/-12 semitones), powered by
   [Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch)
 - A-B looping (drag across the waveform, or Set A / Set B)
+- Stem separation (Windows): splits a song into vocals, guitar, bass, drums,
+  piano and other with Meta's [Demucs](https://github.com/facebookresearch/demucs)
+  (htdemucs_6s, run with [ONNX Runtime](https://onnxruntime.ai)); mute, solo or
+  rebalance the stems while practising, at any speed or pitch. Stems saved in the
+  library reach the iPad too
+- Record takes (your guitar after the effects) and replay them in step with the
+  song; export song + take as one .m4a file
 - Metronome with subdivisions (with swing, from straight to shuffle and dotted),
   several sounds and a speed trainer (e.g. +2 bpm every minute, up to a limit);
   it can also follow the song's detected beats
@@ -98,3 +105,8 @@ cmake --build build/ios --config Release --target PracticeVibes -- -sdk iphoneos
 ## License
 
 [GNU AGPLv3](LICENSE). JUCE is used under its AGPLv3 option.
+
+Third-party components keep their own licences: Signalsmith Stretch (MIT),
+ONNX Runtime (MIT; its licence and notices ship next to the Windows app),
+Demucs and its htdemucs_6s model (MIT, downloaded by the app on first use;
+exported to ONNX with [demucs.onnx](https://github.com/sevagh/demucs.onnx), MIT).

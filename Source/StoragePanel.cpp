@@ -1,5 +1,7 @@
 #include "StoragePanel.h"
+#include "Stems.h"
 #include "Take.h"
+#include "AppPaths.h"
 #include "Theme.h"
 
 namespace pv
@@ -135,6 +137,51 @@ StorageReport StorageScan::run (const juce::File& libraryRoot, std::vector<Stora
     std::stable_sort (loops.begin(), loops.end(), [] (const StorageItem& a, const StorageItem& b) { return a.when > b.when; });
     report.items.insert (report.items.end(), loops.begin(), loops.end());
 
+    // Stems: "<folder>/.stems/<song file>" in the library (top level = Inbox, and each topic), and the app's Stems folder.
+    {
+        juce::Array<juce::File> stemParents;
+
+        if (libraryRoot.isDirectory())
+        {
+            stemParents.add (libraryRoot.getChildFile (Stems::folderName));
+
+            for (const auto& entry : juce::RangedDirectoryIterator (libraryRoot, false, "*", juce::File::findDirectories))
+                stemParents.add (entry.getFile().getChildFile (Stems::folderName));
+        }
+
+        stemParents.add (appDataFolder.getChildFile ("Stems"));
+        std::vector<StorageItem> stems;
+
+        for (const auto& parent : stemParents)
+        {
+            if (! parent.isDirectory())
+                continue;
+
+            for (const auto& entry : juce::RangedDirectoryIterator (parent, false, "*", juce::File::findDirectories))
+            {
+                StorageItem item;
+                item.kind = StorageItem::Kind::stems;
+                item.file = entry.getFile();
+                item.bytes = folderBytes (item.file);
+                item.when = Stems::infoFile (item.file).getLastModificationTime();
+                auto title = item.file.getFileName();
+
+                if (auto xml = juce::XmlDocument::parse (Stems::infoFile (item.file)))
+                    title = xml->getStringAttribute ("song", title);
+
+                item.title = title;
+                const auto where = parent.getParentDirectory();
+                item.detail = (where == libraryRoot ? juce::String ("Inbox") : where == appDataFolder ? juce::String ("not in the library") : where.getFileName())
+                              + "  -  " + (Stems::isComplete (item.file) ? "separated " + item.when.formatted ("%d %b %Y") : juce::String ("incomplete"));
+                report.stemBytes += item.bytes;
+                stems.push_back (item);
+            }
+        }
+
+        std::stable_sort (stems.begin(), stems.end(), [] (const StorageItem& a, const StorageItem& b) { return a.when > b.when; });
+        report.items.insert (report.items.end(), stems.begin(), stems.end());
+    }
+
     // The app's own folder (on the iPad it also holds the library and the loops: those are counted above).
     report.appDataBytes = folderBytes (appDataFolder, { libraryRoot, loopsFolder });
     const auto webCache = appDataFolder.getChildFile ("WebView2");
@@ -237,7 +284,8 @@ private:
         {
             const auto kind = (StorageItem::Kind) (-1 - index);
             const auto* text = kind == StorageItem::Kind::take ? "Takes"
-                             : kind == StorageItem::Kind::loops ? "Saved loops" : "Caches";
+                             : kind == StorageItem::Kind::loops ? "Saved loops"
+                             : kind == StorageItem::Kind::stems ? "Stems (they can be made again)" : "Caches";
             g.setColour (juce::Colours::white.withAlpha (0.9f));
             g.setFont (theme::headerFont());
             g.drawText (text, r.withTrimmedTop (14), juce::Justification::centredLeft, true);
@@ -312,6 +360,8 @@ StoragePanel::StoragePanel (Library* lib, juce::File loops, juce::File appData)
     selectBox.addItem ("Saved loops older than a month", 5);
     selectBox.addItem ("All saved loops", 6);
     selectBox.addSeparator();
+    selectBox.addItem ("All stems", 8);
+    selectBox.addSeparator();
     selectBox.addItem ("Nothing", 7);
     selectBox.onChange = [this]
     {
@@ -329,6 +379,7 @@ StoragePanel::StoragePanel (Library* lib, juce::File loops, juce::File appData)
             case 5: pick = report.olderThan (K::loops, juce::RelativeTime::days (30), now); break;
             case 6: pick = report.olderThan (K::loops, {}, now); break;
             case 7: std::fill (selected.begin(), selected.end(), false); break;
+            case 8: pick = report.olderThan (K::stems, {}, now); break;
             default: break;
         }
 
@@ -348,7 +399,7 @@ StoragePanel::StoragePanel (Library* lib, juce::File loops, juce::File appData)
     removeButton.onClick = [this] { removeSelected(); };
     addAndMakeVisible (removeButton);
 
-    emptyLabel.setText ("Nothing to clean up: no takes, saved loops or caches.", juce::dontSendNotification);
+    emptyLabel.setText ("Nothing to clean up: no takes, saved loops, stems or caches.", juce::dontSendNotification);
     emptyLabel.setJustificationType (juce::Justification::centred);
     emptyLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.55f));
     addChildComponent (emptyLabel);
@@ -392,7 +443,7 @@ void StoragePanel::scanned (StorageReport newReport)
 
     if (library != nullptr)
         lines.add ("Library: " + StorageScan::formatBytes (report.libraryBytes) + "   (takes "
-                   + StorageScan::formatBytes (report.takeBytes) + ", practice log "
+                   + StorageScan::formatBytes (report.takeBytes) + ", stems " + StorageScan::formatBytes (report.stemBytes) + ", practice log "
                    + StorageScan::formatBytes (report.practiceLogBytes) + ", the rest are your songs and documents)");
 
     lines.add ("Saved loops: " + StorageScan::formatBytes (report.loopBytes)
@@ -483,6 +534,7 @@ void StoragePanel::removeSelected()
                 }
 
                 case StorageItem::Kind::loops:
+                case StorageItem::Kind::stems:
                     ok = Library::moveToBin (item.file);
                     break;
 

@@ -5,6 +5,7 @@
 #include "MetronomeProcessor.h"
 #include "PracticeLog.h"
 #include "PlayerProcessor.h"
+#include "StemMixer.h"
 #include "Take.h"
 #include "WaveformView.h"
 
@@ -15,7 +16,8 @@ class YouTubePlayer;
 
 /** The "Practice" tab: song player (speed, pitch, A-B loop) and metronome. */
 class PracticePanel final : public juce::Component,
-                            private juce::Timer
+                            private juce::Timer,
+                            private StemMixer::Host
 {
 public:
     PracticePanel (PlayerProcessor&, MetronomeProcessor&);
@@ -59,6 +61,26 @@ private:
     class BeatIndicator;
     class YouTubeTimeline;
     class TakeTimelineView;
+
+    // Stems (see Stems.h / StemMixer.h): separated in the background, mixed by the player
+    StemService stemService;
+    StemControls stemControls;
+    juce::TextButton stemsButton { "Stems" };
+    juce::File stemFolder;                              // for the song loaded now
+    std::shared_ptr<const LoadedSong> stemsSong, stemsSongOfFile;
+    bool stemsChecked = false, loadingStems = false;
+    void updateStems();
+    void loadStems();
+    void applyStemGains();
+    void showStemMixer();
+
+    PlayerProcessor& getPlayer() override               { return player; }
+    StemService& getStemService() override              { return stemService; }
+    StemControls& getStemControls() override            { return stemControls; }
+    void stemControlsChanged() override                 { applyStemGains(); }
+    juce::File getStemFolder() override                 { return stemFolder; }
+    bool isLoadingStems() override                      { return loadingStems; }
+    void separateCurrentSong() override;
 
     // Take mode (a recorded take replays over the song)
     std::unique_ptr<TakeTimelineView> takeTimeline;

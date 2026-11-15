@@ -15,6 +15,8 @@
 #include "../Source/PracticePlanner.h"
 #include "../Source/Recorder.h"
 #include "../Source/StoragePanel.h"
+#include "../Source/Stems.h"
+#include "../Source/AacFile.h"
 #include "../Source/Take.h"
 #include "../Source/Tuner.h"
 #include "../Source/GainMeterProcessor.h"
@@ -2906,6 +2908,26 @@ static void testStorage()
                    && StorageScan::formatBytes ((juce::int64) 3 * 1024 * 1024 * 1024) == "3.00 GB",
                "storage: sizes formatted (" + StorageScan::formatBytes (5 * 1024 * 1024) + ")");
 
+        // Stems of the song: listed, and removed with the song.
+        const auto stemFolder = Stems::folderFor (topic->folder.getChildFile ("song.mp3"), root);
+        writeBytes (Stems::stemFile (stemFolder, 0), 5000);
+        Stems::infoFile (stemFolder).replaceWithText ("<STEMS song=\"song\"/>");
+        const auto withStems = StorageScan::run (root, takes, loops, appData);
+        const auto stemItems = withStems.olderThan (K::stems, {}, now);
+        check (stemItems.size() == 1 && withStems.items[(size_t) stemItems[0]].title == "song" && withStems.stemBytes > 5000,
+               "storage: a song's stems are listed (" + juce::String ((int) stemItems.size()) + ")");
+
+        if (auto* songTopic = lib.findTopic (topic->id))
+        {
+            juce::String songId;
+
+            for (auto& r : songTopic->resources)
+                if (r.fileName == "song.mp3")
+                    songId = r.id;
+
+            check (songId.isNotEmpty() && lib.removeResource (*songTopic, songId) && ! stemFolder.exists(), "storage: removing a song removes its stems");
+        }
+
         // Removing a take from the topic takes its details file with it.
         auto* t = lib.findTopic (report.items[0].topicId);
         check (t != nullptr && lib.removeResource (*t, report.items[0].resourceId) && ! newTake.exists()
@@ -2923,9 +2945,332 @@ static void testStorage()
     base.deleteRecursively();
 }
 
+/** A stand-in network: source 0 gets the input spectrogram back (and nothing from the time branch), the rest
+    silence, so the whole separation pipeline must give the input back as stem 0. */
+struct PassThroughModel final : DemucsModel
+{
+    juce::Result run (const float*, const float* spec, float* freqOut, float* timeOut) override
+    {
+        std::fill (freqOut, freqOut + (size_t) Stems::count * specSize, 0.0f);
+        std::fill (timeOut, timeOut + (size_t) Stems::count * 2 * segment, 0.0f);
+        std::copy_n (spec, specSize, freqOut);
+        ++calls;
+        return juce::Result::ok();
+    }
+
+    int calls = 0;
+};
+
+static void testStems()
+{
+    std::cout << "Stem separation" << std::endl;
+
+    // JUCE's real FFT: forward is e^-i (as numpy / torch), the inverse is scaled by 1/N.
+    {
+        juce::dsp::FFT fft (12);
+        std::vector<float> d (8192, 0.0f);
+
+        for (int n = 0; n < 4096; ++n)
+            d[(size_t) n] = std::sin (juce::MathConstants<float>::twoPi * 5.0f * (float) n / 4096.0f);
+
+        fft.performRealOnlyForwardTransform (d.data(), true);
+        check (std::abs (d[11] + 2048.0f) < 0.5f && std::abs (d[10]) < 0.5f, "FFT sign: sin at bin 5 = -i N/2 (" + juce::String (d[11], 1) + ")");
+        fft.performRealOnlyInverseTransform (d.data());
+        check (std::abs (d[1024] - std::sin (juce::MathConstants<float>::twoPi * 5.0f * 1024.0f / 4096.0f)) < 1.0e-4f, "inverse FFT scaled by 1/N");
+    }
+
+    // Spectrogram there and back = the segment (away from its edges, where demucs drops frames).
+    {
+        constexpr int S = DemucsModel::segment;
+        std::vector<float> l ((size_t) S), r ((size_t) S), spec ((size_t) DemucsModel::specSize), outL ((size_t) S, 0.0f), outR ((size_t) S, 0.0f);
+        juce::Random random (7);
+
+        for (int i = 0; i < S; ++i)
+        {
+            l[(size_t) i] = 0.5f * std::sin ((float) i * 0.031f) + 0.1f * (random.nextFloat() - 0.5f);
+            r[(size_t) i] = 0.3f * std::sin ((float) i * 0.007f) + 0.1f * (random.nextFloat() - 0.5f);
+        }
+
+        DemucsDsp dsp;
+        dsp.spectrogram (l.data(), r.data(), spec.data());
+        dsp.addInverse (spec.data(), outL.data(), outR.data());
+        auto maxError = 0.0f;
+
+        for (int i = 3000; i < S - 3000; ++i)
+            maxError = juce::jmax (maxError, std::abs (outL[(size_t) i] - l[(size_t) i]), std::abs (outR[(size_t) i] - r[(size_t) i]));
+
+        check (maxError < 3.0e-3f, "Demucs spectrogram -> inverse gives the segment back (minus the Nyquist bin demucs drops) (max error " + juce::String (maxError, 7) + ")");
+    }
+
+    // Whole pipeline (segments, overlap-add, normalisation) with the pass-through network.
+    {
+        const int length = (int) (20.0 * DemucsModel::sampleRate);
+        juce::AudioBuffer<float> mix (2, length);
+        juce::Random random (3);
+
+        for (int i = 0; i < length; ++i)
+        {
+            mix.setSample (0, i, 0.4f * std::sin ((float) i * 0.02f) + 0.05f * (random.nextFloat() - 0.5f) + 0.01f);
+            mix.setSample (1, i, 0.2f * std::sin ((float) i * 0.05f) + 0.05f * (random.nextFloat() - 0.5f));
+        }
+
+        PassThroughModel model;
+        DemucsDsp dsp;
+        std::vector<std::vector<float>> out (12, std::vector<float> ((size_t) length, 0.0f));
+        std::vector<int> nextStart (6, 0);
+        auto inOrder = true;
+        float lastProgress = -1.0f;
+
+        const auto result = dsp.separate (mix, model, [&] (int s, const float* l, const float* r, int start, int count)
+        {
+            inOrder = inOrder && start == nextStart[(size_t) s];
+            nextStart[(size_t) s] = start + count;
+            std::copy_n (l, count, out[(size_t) s * 2].data() + start);
+            std::copy_n (r, count, out[(size_t) s * 2 + 1].data() + start);
+            return true;
+        }, [&] (float p) { lastProgress = p; return true; });
+
+        double err = 0.0, ref = 0.0, other = 0.0;
+        const auto edge = (int) (0.2 * DemucsModel::sampleRate);
+
+        for (int c = 0; c < 2; ++c)
+            for (int i = edge; i < length - edge; ++i)
+            {
+                err += juce::square ((double) out[(size_t) c][(size_t) i] - mix.getSample (c, i));
+                ref += juce::square ((double) mix.getSample (c, i));
+                other += juce::square ((double) out[2 + (size_t) c][(size_t) i]);
+            }
+
+        const auto relError = std::sqrt (err / ref);
+        check (result.wasOk() && model.calls == 4 && inOrder && nextStart[0] == length && lastProgress == 1.0f,
+               "separation runs 4 overlapping segments for 20 s, stems delivered in order (" + juce::String (model.calls) + " segments)");
+        check (relError < 0.01, "pass-through network: stem 0 = the mix (error " + juce::String (relError * 100.0, 3) + " %)");
+        check (other < 1.0e-3 * ref, "pass-through network: the other stems are silent (except the mean)");
+
+        // Cancel from the progress callback.
+        PassThroughModel model2;
+        const auto cancelled = dsp.separate (mix, model2, [] (int, const float*, const float*, int, int) { return true; },
+                                             [] (float p) { return p < 0.4f; });
+        check (cancelled.failed() && model2.calls < 4, "separation can be cancelled");
+    }
+
+    // The player plays the stems with their gains (before speed / pitch), the song itself when all are at 1.
+    {
+        constexpr double rate = 48000.0;
+        auto song = std::make_shared<LoadedSong>();
+        song->sampleRate = rate;
+        song->audio.setSize (2, (int) (6 * rate));
+
+        for (int i = 0; i < song->audio.getNumSamples(); ++i)
+        {
+            const auto v = 0.5f * std::sin (juce::MathConstants<float>::twoPi * 440.0f * (float) i / (float) rate);
+            song->audio.setSample (0, i, v);
+            song->audio.setSample (1, i, v);
+        }
+
+        // Stem "drums" = the song, "bass" = the song too, the rest silent.
+        auto stems = std::make_shared<PlayerProcessor::StemSet>();
+        stems->numSamples = song->audio.getNumSamples();
+
+        for (int st = 0; st < Stems::count; ++st)
+        {
+            stems->scale[(size_t) st] = 0.5f / 32767.0f;
+
+            for (int c = 0; c < 2; ++c)
+            {
+                auto& d = stems->samples[(size_t) (st * 2 + c)];
+                d.assign ((size_t) stems->numSamples, 0);
+
+                if (st == Stems::drums || st == Stems::bass)
+                    for (int i = 0; i < stems->numSamples; ++i)
+                        d[(size_t) i] = (juce::int16) juce::roundToInt (song->audio.getSample (c, i) / 0.5f * 32767.0f);
+            }
+        }
+
+        PlayerProcessor player;
+        player.prepareToPlay (rate, 512);
+        player.setSong (song);
+        player.setStems (stems, song.get());
+        player.play();
+        juce::AudioBuffer<float> buffer (2, 512);
+        juce::MidiBuffer midi;
+
+        auto rmsOver = [&] (double seconds)
+        {
+            double sum = 0.0;
+            int n = 0;
+
+            for (int b = 0; b < (int) (seconds * rate / 512); ++b)
+            {
+                player.processBlock (buffer, midi);
+
+                if (b >= 45)    // after the gains have glided and the stretcher caught up
+                    for (int i = 0; i < 512; ++i, ++n)
+                        sum += juce::square ((double) buffer.getSample (0, i));
+            }
+
+            return std::sqrt (sum / juce::jmax (1, n));
+        };
+
+        const auto original = rmsOver (1.5);
+        player.stemGains[Stems::bass] = 0.0f;           // drums alone = the song
+        const auto oneStem = rmsOver (1.5);
+        player.stemGains[Stems::drums] = 0.5f;          // half
+        const auto half = rmsOver (1.5);
+        player.stemGains[Stems::drums] = 0.0f;          // everything muted
+        const auto muted = rmsOver (1.0);
+
+        check (original > 0.3 && std::abs (oneStem / original - 1.0) < 0.05 && std::abs (half / original - 0.5) < 0.05 && muted < 0.01,
+               "player mixes stems: as is " + juce::String (original, 3) + ", one stem " + juce::String (oneStem, 3) + ", half "
+                   + juce::String (half, 3) + ", all muted " + juce::String (muted, 4));
+
+        player.setSong (song);
+        check (! player.hasStems(), "loading a song drops the previous song's stems");
+        player.setStems (stems, nullptr);
+        check (! player.hasStems(), "stems for another song are ignored");
+    }
+
+    // Where stems are kept.
+    {
+        const auto root = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("pv-stem-lib");
+        const auto song = root.getChildFile ("Topic/Song A.mp3");
+        check (Stems::folderFor (song, root) == root.getChildFile ("Topic/.stems/Song A.mp3"), "stems of a library song sit next to it in .stems");
+        const auto outside = Stems::folderFor (juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("x/Song A.mp3"), root);
+        check (outside.getParentDirectory().getFileName() == "Stems" && outside.getFileName().startsWith ("Song A "),
+               "stems of other songs go to the app's Stems folder: " + outside.getFileName());
+    }
+
+    // The real network, when this machine has it (developer machines; CI has no model).
+    if (StemSeparator::isSupported() && StemSeparator::hasModel())
+    {
+        juce::String error;
+        auto model = StemSeparator::openModel (error);
+        check (model != nullptr, "ONNX model opens" + (error.isEmpty() ? juce::String() : ": " + error));
+
+        if (model != nullptr)
+        {
+            const int length = (int) (8.0 * DemucsModel::sampleRate);
+            juce::AudioBuffer<float> mix (2, length);
+            juce::Random random (5);
+
+            for (int i = 0; i < length; ++i)        // a bass note + a hi-hat-like noise burst every 0.25 s
+            {
+                const auto t = (float) i / DemucsModel::sampleRate;
+                const auto hat = (i % 11025) < 1500 ? (random.nextFloat() - 0.5f) * 0.4f * (1.0f - (float) (i % 11025) / 1500.0f) : 0.0f;
+                const auto v = 0.4f * std::sin (juce::MathConstants<float>::twoPi * 55.0f * t) + hat;
+                mix.setSample (0, i, v);
+                mix.setSample (1, i, v);
+            }
+
+            DemucsDsp dsp;
+            std::vector<float> sum ((size_t) length, 0.0f);
+            const auto started = juce::Time::getMillisecondCounterHiRes();
+            const auto result = dsp.separate (mix, *model, [&] (int, const float* l, const float*, int start, int count)
+            {
+                for (int k = 0; k < count; ++k)
+                    sum[(size_t) (start + k)] += l[k];
+
+                return true;
+            }, {});
+            const auto seconds = (juce::Time::getMillisecondCounterHiRes() - started) / 1000.0;
+
+            double err = 0.0, ref = 0.0;
+
+            for (int i = 0; i < length; ++i)
+            {
+                err += juce::square ((double) sum[(size_t) i] - mix.getSample (0, i));
+                ref += juce::square ((double) mix.getSample (0, i));
+            }
+
+            const auto snr = 10.0 * std::log10 (ref / juce::jmax (1.0e-12, err));
+            check (result.wasOk() && snr > 10.0, "real network: the stems add up to the mix (" + juce::String (snr, 1) + " dB), "
+                                                     + juce::String (seconds, 1) + " s for 8 s of audio" + (result.wasOk() ? juce::String() : ": " + result.getErrorMessage()));
+        }
+    }
+    else
+    {
+        std::cout << "  (real separation network not installed here: skipped)" << std::endl;
+    }
+}
+
+/** Developer check against the reference Python Demucs: PV_STEMS_DEV="<audio file>|<output folder>" writes
+    clip.raw (the 44.1 kHz stereo clip, planar float32) and cpp.raw (6 x 2 x samples) there. */
+static void stemsDeveloperRun()
+{
+    const auto arg = juce::SystemStats::getEnvironmentVariable ("PV_STEMS_DEV", {});
+
+    if (arg.isEmpty())
+        return;
+
+    const juce::File input (arg.upToFirstOccurrenceOf ("|", false, false)), outDir (arg.fromFirstOccurrenceOf ("|", false, false));
+    outDir.createDirectory();
+    juce::AudioBuffer<float> audio;
+    double rate = 0.0;
+
+    if (input.hasFileExtension ("m4a") || input.hasFileExtension ("mp3"))
+    {
+        const auto r = MediaFoundationAudio::decodeFile (input, audio, rate);
+        std::cout << "decode: " << (r.wasOk() ? "ok" : r.getErrorMessage()) << std::endl;
+    }
+
+    if (audio.getNumSamples() == 0)
+        return;
+
+    const auto from = (int) (30.0 * rate), count = juce::jmin ((int) (20.0 * rate), audio.getNumSamples() - from);
+    juce::AudioBuffer<float> clip (2, count);
+
+    for (int c = 0; c < 2; ++c)
+        clip.copyFrom (c, 0, audio, juce::jmin (c, audio.getNumChannels() - 1), from, count);
+
+    if (rate != 44100.0)
+        clip = AacFile::resample (clip, rate, 44100.0);
+
+    const auto n = clip.getNumSamples();
+    {
+        juce::FileOutputStream out (outDir.getChildFile ("clip.raw"));
+        out.setPosition (0);
+        out.truncate();
+
+        for (int c = 0; c < 2; ++c)
+            out.write (clip.getReadPointer (c), (size_t) n * sizeof (float));
+    }
+
+    juce::String error;
+    auto model = StemSeparator::openModel (error);
+
+    if (model == nullptr)
+    {
+        std::cout << "model: " << error << std::endl;
+        return;
+    }
+
+    std::vector<float> stems ((size_t) 12 * n, 0.0f);
+    DemucsDsp dsp;
+    const auto started = juce::Time::getMillisecondCounterHiRes();
+    const auto result = dsp.separate (clip, *model, [&] (int s, const float* l, const float* r, int start, int cnt)
+    {
+        std::copy_n (l, cnt, stems.data() + ((size_t) s * 2) * n + start);
+        std::copy_n (r, cnt, stems.data() + ((size_t) s * 2 + 1) * n + start);
+        return true;
+    }, {});
+    std::cout << "separate: " << (result.wasOk() ? "ok" : result.getErrorMessage()) << " in "
+              << (juce::Time::getMillisecondCounterHiRes() - started) / 1000.0 << " s" << std::endl;
+
+    juce::FileOutputStream out (outDir.getChildFile ("cpp.raw"));
+    out.setPosition (0);
+    out.truncate();
+    out.write (stems.data(), stems.size() * sizeof (float));
+}
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI juceInit;
+
+    if (juce::SystemStats::getEnvironmentVariable ("PV_STEMS_DEV", {}).isNotEmpty())
+    {
+        stemsDeveloperRun();
+        return 0;
+    }
 
     testPlayer();
     testFileLoading();
@@ -2948,6 +3293,7 @@ int main()
     testPracticePlanner();
     testTakes();
     testStorage();
+    testStems();
 
     std::cout << (failures == 0 ? "ALL TESTS PASSED" : juce::String (failures) + " TEST(S) FAILED") << std::endl;
     return failures == 0 ? 0 : 1;

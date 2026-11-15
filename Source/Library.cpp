@@ -1,4 +1,5 @@
 #include "Library.h"
+#include "Stems.h"
 #include "Take.h"
 #include "AppPaths.h"
 
@@ -690,6 +691,16 @@ Resource* Library::moveInboxFile (Topic& topic, const juce::File& inboxFile)
         info.moveFileTo (TakeInfo::infoFileFor (target));
     }
 
+    // So do a song's stems.
+    const auto stems = Stems::folderFor (inboxFile, root);
+
+    if (stems.isDirectory())
+    {
+        const auto newStems = Stems::folderFor (target, root);
+        newStems.getParentDirectory().createDirectory();
+        stems.moveFileTo (newStems);
+    }
+
     Resource r;
     r.id = r.fileName = target.getFileName();
     r.title = target.getFileNameWithoutExtension();
@@ -732,7 +743,10 @@ bool Library::removeResource (Topic& topic, const juce::String& resourceId)
         return false;
 
     if (! it->isLink())
+    {
         TakeInfo::infoFileFor (topic.getFile (*it)).deleteFile();
+        moveToBin (Stems::folderFor (topic.getFile (*it), root));
+    }
 
     topic.resources.erase (it);
     return saveTopic (topic);

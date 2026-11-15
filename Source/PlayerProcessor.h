@@ -3,6 +3,7 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <signalsmith-stretch/signalsmith-stretch.h>
+#include "Stems.h"
 #include "Take.h"
 
 namespace pv
@@ -141,11 +142,35 @@ public:
 
     std::atomic<float> takeGain { 1.0f };
 
+    //==============================================================================
+    /** A song's stems (see Stems.h), 16-bit in memory, at the song's sample rate. While any stem gain isn't 1, the
+        player plays the stems mixed with those gains instead of the song (before speed / pitch: everything else
+        works the same). */
+    struct StemSet
+    {
+        int numSamples = 0;
+        std::array<std::vector<juce::int16>, Stems::count * 2> samples;    // stem * 2 + channel
+        std::array<float, Stems::count> scale {};                          // int16 -> float
+    };
+
+    /** Decodes a complete stems folder at `sampleRate` (any thread; a few seconds). */
+    static std::shared_ptr<StemSet> loadStems (const juce::File& folder, double sampleRate, juce::String& error);
+
+    /** Message thread. Ignored unless `forSong` is the song loaded now. nullptr removes them. Loading a song does too. */
+    void setStems (std::shared_ptr<const StemSet>, const LoadedSong* forSong);
+    bool hasStems() const noexcept                      { return stems != nullptr; }
+    std::shared_ptr<const StemSet> getStems() const     { return stems; }
+
+    /** Per stem (Stems::Index), 0..2; 1 = as separated. */
+    std::array<std::atomic<float>, Stems::count> stemGains;
+
     /** Renders a take replayed over its song, as heard in take mode, into `out` (stereo, at the take's sample
         rate; scaled down if it would clip). Any thread, faster than real time. `cancel` may stop it early. */
     static juce::Result renderTakeMix (std::shared_ptr<const LoadedSong>, std::shared_ptr<const Take>, float songGain,
                                        float takeGain, juce::AudioBuffer<float>& out, double& sampleRate,
-                                       const std::atomic<bool>* cancel = nullptr);
+                                       const std::atomic<bool>* cancel = nullptr,
+                                       std::shared_ptr<const StemSet> stems = nullptr,
+                                       std::array<float, Stems::count> stemGains = { 1, 1, 1, 1, 1, 1 });
 
     /** The speed / pitch actually used (a replaying take's timeline overrides setSpeed / setSemitones). */
     double getEffectiveSpeed() const noexcept           { return effectiveSpeed.load(); }
@@ -204,6 +229,10 @@ private:
     std::atomic<double> speed { 1.0 }, semitones { 0.0 }, positionSeconds { 0.0 };
     std::atomic<bool> loopEnabled { false };
     std::atomic<juce::int64> loopStart { 0 }, loopEnd { 0 };
+
+    // Stems (swapped under songLock, like the song)
+    std::shared_ptr<const StemSet> stems;
+    std::array<float, Stems::count> currentStemGains {};
 
     // Take replay (the take is swapped under songLock, like the song)
     std::shared_ptr<const Take> take;

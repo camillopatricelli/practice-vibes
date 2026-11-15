@@ -1,4 +1,5 @@
 #include "PlayerProcessor.h"
+#include "AacFile.h"
 #include "MediaFoundationAudio.h"
 
 namespace pv
@@ -12,6 +13,8 @@ namespace
     struct SongReader
     {
         const LoadedSong* song = nullptr;
+        const PlayerProcessor::StemSet* stems = nullptr;   // set: play the stems mixed with stemGain instead
+        std::array<float, Stems::count> stemGain {};       // includes the int16 scale
         juce::int64 start = 0;
         bool looping = false;
         juce::int64 loopStart = 0, loopEnd = 0;
@@ -29,17 +32,33 @@ namespace
             const SongReader& reader;
             const float* data;
             juce::int64 length;
+            int channel;
 
             float operator[] (int index) const noexcept
             {
                 const auto position = reader.map (reader.start + index);
-                return (position >= 0 && position < length) ? data[position] : 0.0f;
+
+                if (position < 0 || position >= length)
+                    return 0.0f;
+
+                if (reader.stems == nullptr)
+                    return data[position];
+
+                if (position >= reader.stems->numSamples)
+                    return 0.0f;
+
+                auto sum = 0.0f;
+
+                for (int s = 0; s < Stems::count; ++s)
+                    sum += reader.stemGain[(size_t) s] * (float) reader.stems->samples[(size_t) (s * 2 + channel)][(size_t) position];
+
+                return sum;
             }
         };
 
         Channel operator[] (int channel) const noexcept
         {
-            return { *this, song->audio.getReadPointer (channel), (juce::int64) song->audio.getNumSamples() };
+            return { *this, song->audio.getReadPointer (channel), (juce::int64) song->audio.getNumSamples(), channel };
         }
     };
 
@@ -187,6 +206,11 @@ PlayerProcessor::PlayerProcessor()
 {
     formatManager.registerBasicFormats();
     stretch.presetDefault (2, (float) deviceSampleRate);
+
+    for (auto& g : stemGains)
+        g = 1.0f;
+
+    currentStemGains.fill (1.0f);
 }
 
 PlayerProcessor::~PlayerProcessor()
@@ -238,15 +262,89 @@ void PlayerProcessor::setSong (std::shared_ptr<const LoadedSong> newSong)
     takePlaying = false;
     std::shared_ptr<const LoadedSong> old;
     std::shared_ptr<const Take> oldTake;
+    std::shared_ptr<const StemSet> oldStems;
 
     {
         const juce::SpinLock::ScopedLockType lock (songLock);
         old = std::exchange (song, std::move (newSong));
         oldTake = std::exchange (take, nullptr);
+        oldStems = std::exchange (stems, nullptr);
         seekTarget = 0;
     }
 
     // `old` is released here, on the message thread, never on the audio thread.
+}
+
+//==============================================================================
+std::shared_ptr<PlayerProcessor::StemSet> PlayerProcessor::loadStems (const juce::File& folder, double sampleRate, juce::String& error)
+{
+    if (! Stems::isComplete (folder))
+    {
+        error = "no stems";
+        return {};
+    }
+
+    // Per-stem gains the separator applied to fit a loud stem into the file.
+    std::array<float, Stems::count> fileGain;
+    fileGain.fill (1.0f);
+
+    if (auto xml = juce::XmlDocument::parse (Stems::infoFile (folder)))
+        for (auto* e : xml->getChildWithTagNameIterator ("STEM"))
+            for (int s = 0; s < Stems::count; ++s)
+                if (e->getStringAttribute ("name") == Stems::fileStem (s))
+                    fileGain[(size_t) s] = (float) e->getDoubleAttribute ("gain", 1.0);
+
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    auto set = std::make_shared<StemSet>();
+
+    for (int s = 0; s < Stems::count; ++s)
+    {
+        auto decoded = decodeSong (formats, juce::URL (Stems::stemFile (folder, s)), error);
+
+        if (decoded == nullptr)
+            return {};
+
+        auto audio = std::move (decoded->audio);
+
+        if (decoded->sampleRate != sampleRate)
+            audio = AacFile::resample (audio, decoded->sampleRate, sampleRate);
+
+        const auto n = audio.getNumSamples();
+
+        if (s == 0)
+            set->numSamples = n;
+
+        const auto length = juce::jmin (n, set->numSamples);
+        const auto peak = juce::jmax (1.0e-6f, audio.getMagnitude (0, length));
+        set->scale[(size_t) s] = peak * fileGain[(size_t) s] / 32767.0f;
+
+        for (int c = 0; c < 2; ++c)
+        {
+            auto& dst = set->samples[(size_t) (s * 2 + c)];
+            dst.assign ((size_t) set->numSamples, 0);
+            const auto* src = audio.getReadPointer (juce::jmin (c, audio.getNumChannels() - 1));
+
+            for (int i = 0; i < length; ++i)
+                dst[(size_t) i] = (juce::int16) juce::roundToInt (src[i] / peak * 32767.0f);
+        }
+    }
+
+    return set;
+}
+
+void PlayerProcessor::setStems (std::shared_ptr<const StemSet> newStems, const LoadedSong* forSong)
+{
+    std::shared_ptr<const StemSet> old;
+
+    {
+        const juce::SpinLock::ScopedLockType lock (songLock);
+
+        if (song.get() != forSong && newStems != nullptr)
+            return;
+
+        old = std::exchange (stems, std::move (newStems));
+    }
 }
 
 //==============================================================================
@@ -297,7 +395,8 @@ void PlayerProcessor::setTake (std::shared_ptr<const Take> newTake)
 
 juce::Result PlayerProcessor::renderTakeMix (std::shared_ptr<const LoadedSong> song, std::shared_ptr<const Take> take,
                                              float songGain, float takeGain, juce::AudioBuffer<float>& out,
-                                             double& sampleRate, const std::atomic<bool>* cancel)
+                                             double& sampleRate, const std::atomic<bool>* cancel,
+                                             std::shared_ptr<const StemSet> stems, std::array<float, Stems::count> stemGains)
 {
     if (song == nullptr || take == nullptr || take->audio.audio.getNumSamples() == 0)
         return juce::Result::fail ("nothing to export");
@@ -310,6 +409,14 @@ juce::Result PlayerProcessor::renderTakeMix (std::shared_ptr<const LoadedSong> s
     renderer.prepareToPlay (sampleRate, block);
     renderer.setSong (song);
     renderer.setTake (take);
+    renderer.setStems (stems, song.get());
+
+    for (int s = 0; s < Stems::count; ++s)
+    {
+        renderer.stemGains[(size_t) s] = stemGains[(size_t) s];
+        renderer.currentStemGains[(size_t) s] = stemGains[(size_t) s];
+    }
+
     renderer.gain = songGain;
     renderer.lastGain = songGain;
     renderer.takeGain = takeGain;
@@ -549,6 +656,26 @@ void PlayerProcessor::renderBlock (juce::AudioBuffer<float>& buffer)
 
     SongReader reader;
     reader.song = song.get();
+
+    // Stems: gains glide (about 0.2 s from 0 to 1) so muting doesn't click.
+    {
+        auto allOne = true;
+
+        for (int s = 0; s < Stems::count; ++s)
+        {
+            const auto goal = stems != nullptr ? stemGains[(size_t) s].load() : 1.0f;
+            auto& g = currentStemGains[(size_t) s];
+            const auto step = 0.05f * (float) numSamples / 512.0f;
+            g = g < goal ? juce::jmin (goal, g + step) : juce::jmax (goal, g - step);
+            allOne = allOne && g == 1.0f;
+
+            if (stems != nullptr)
+                reader.stemGain[(size_t) s] = g * stems->scale[(size_t) s];
+        }
+
+        if (stems != nullptr && ! allOne)
+            reader.stems = stems.get();
+    }
     reader.loopStart = loopStartNow;
     reader.loopEnd = loopEndNow;
     reader.looping = loopOn && reader.loopEnd - reader.loopStart > 256;

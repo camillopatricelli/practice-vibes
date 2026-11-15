@@ -9,10 +9,10 @@ namespace pv
 /** What the clean-up overlay can offer for removal. */
 struct StorageItem
 {
-    enum class Kind { take, loops, webCache };
+    enum class Kind { take, loops, stems, webCache };
 
     Kind kind = Kind::take;
-    juce::File file;                    // the take's audio file, the loop session's folder, the cache folder
+    juce::File file;                    // the take's audio file, the loop session's / song's stems folder, the cache folder
     juce::String title, detail;
     juce::Time when;
     juce::int64 bytes = 0;
@@ -22,8 +22,8 @@ struct StorageItem
 /** Sizes of everything the app keeps, and the items that can be removed. Built by StorageScan::run. */
 struct StorageReport
 {
-    juce::int64 libraryBytes = 0, takeBytes = 0, practiceLogBytes = 0, loopBytes = 0, appDataBytes = 0, webCacheBytes = 0;
-    std::vector<StorageItem> items;     // takes (newest first), then loop sessions, then the web cache
+    juce::int64 libraryBytes = 0, takeBytes = 0, practiceLogBytes = 0, loopBytes = 0, stemBytes = 0, appDataBytes = 0, webCacheBytes = 0;
+    std::vector<StorageItem> items;     // takes (newest first), loop sessions, stems, then the web cache
 
     /** Indices of the takes / loop sessions older than `age` (relative to `now`); age 0 = all of them. */
     std::vector<int> olderThan (StorageItem::Kind, juce::RelativeTime age, juce::Time now) const;
