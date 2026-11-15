@@ -154,8 +154,12 @@ private:
 struct LibraryLocation
 {
     static juce::File getDefaultFolder();
-    static juce::File load();                 // empty File if the user hasn't chosen yet
+    static juce::File load();                 // empty File if the user hasn't chosen yet (or the folder is gone)
     static void save (const juce::File& folder);
+
+    /** A folder picked with a FileChooser. iPad: keeps the permission to use it (folders in cloud drives).
+        Returns the folder, or an empty File if it can't be used. */
+    static juce::File saveChosen (const juce::URL& chosenFolder);
 };
 
 } // namespace pv

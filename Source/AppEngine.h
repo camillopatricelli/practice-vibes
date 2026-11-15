@@ -59,6 +59,7 @@ public:
     // Records takes: the processed guitar (from the looper's after-FX node) + what the song player did.
     std::unique_ptr<Recorder> recorder;
     std::function<void()> onToggleRecording;    // UI: start / stop a take (footswitch action)
+    std::function<void()> onToggleGuitarStem;   // UI: mute / unmute the song's guitar stem (footswitch action)
 
     // Listens to the guitar input stage while the tuner is open.
     std::unique_ptr<Tuner> tuner;

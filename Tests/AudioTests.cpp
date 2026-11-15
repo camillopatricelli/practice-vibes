@@ -14,6 +14,7 @@
 #include "../Source/PracticeLog.h"
 #include "../Source/PracticePlanner.h"
 #include "../Source/Recorder.h"
+#include "../Source/StemMixer.h"
 #include "../Source/StoragePanel.h"
 #include "../Source/Stems.h"
 #include "../Source/AacFile.h"
@@ -1651,6 +1652,8 @@ namespace
 
         check (FootswitchAction::fromString (FootswitchAction { FootswitchAction::Kind::tuner, 0 }.toString()).kind
                    == FootswitchAction::Kind::tuner, "footswitch tuner action round trip");
+        check (FootswitchAction::fromString (FootswitchAction { FootswitchAction::Kind::guitarStem, 0 }.toString()).kind
+                   == FootswitchAction::Kind::guitarStem, "footswitch guitar stem action round trip");
     }
 
     /** Six plucked strings, string i starting 15 ms after string i-1, after `silence` seconds. */
@@ -2127,6 +2130,21 @@ static void testPracticeLog()
         check (r.songPath == s.songPath && std::abs (r.speed - 0.85) < 1.0e-9 && r.semitones == -2.0 && r.loopStart == 12.5
                    && r.loopEnd == 20.0 && r.loopOn && r.metronome && r.bpm == 112.0 && r.beatsPerBar == 3 && r.subdivision == 2,
                "setup survives XML");
+        check (r.stems.isEmpty() && ! e.hasAttribute ("stems"), "a setup without a stem mix writes none");
+
+        StemControls mix;
+        mix.mute[(size_t) Stems::guitar] = true;
+        mix.volume[(size_t) Stems::bass] = 0.5f;
+        s.stems = mix.toString();
+        juce::XmlElement e2 ("SETUP");
+        s.toXml (e2);
+        const auto back = StemControls::fromString (PracticeSetup::fromXml (e2).stems);
+        check (back.mute[(size_t) Stems::guitar] && ! back.solo[(size_t) Stems::guitar] && std::abs (back.volume[(size_t) Stems::bass] - 0.5f) < 1.0e-3f
+                   && back.gainFor (Stems::guitar) == 0.0f && back.gainFor (Stems::vocals) == 1.0f && ! back.isNeutral(),
+               "stem mix survives the practice setup (" + s.stems + ")");
+        check (StemControls().toString().isEmpty() && StemControls::fromString ({}).isNeutral()
+                   && StemControls::fromString ("nonsense guitar:x:m").gainFor (Stems::guitar) == 0.0f,
+               "neutral stem mix = empty string; junk is ignored");
 
         const auto inside = root.getChildFile ("Topic A").getChildFile ("song.mp3");
         const auto portable = PracticeSetup::portablePath (inside, root);

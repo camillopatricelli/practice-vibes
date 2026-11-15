@@ -268,6 +268,11 @@ void AppEngine::performFootswitchAction (FootswitchAction action, double pressSe
                 onToggleRecording();
             break;
 
+        case Kind::guitarStem:
+            if (onToggleGuitarStem)
+                onToggleGuitarStem();
+            break;
+
         case Kind::none:
             break;
     }

@@ -10,6 +10,7 @@
 #include "Theme.h"
 #include "WebView.h"
 #include "AppPaths.h"
+#include <AppIconData.h>
 
 namespace pv
 {
@@ -188,6 +189,14 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     titleLabel.setColour (juce::Label::textColourId, juce::Colours::white);
     addAndMakeVisible (titleLabel);
 
+    // Scaled down once (high-quality resampling) to 4x the drawn size: sharp on every display density.
+    {
+        auto full = juce::ImageCache::getFromMemory (AppIconData::AppIcondesktop1024_png, AppIconData::AppIcondesktop1024_pngSize);
+        const int px = iconSize * 4;
+        if (full.isValid())
+            appIcon = full.rescaled (px, px, juce::Graphics::highResamplingQuality);
+    }
+
     for (auto* b : { &recordButton, &tunerButton, &audioSettingsButton, &bluetoothButton, &saveButton, &practisingButton })
         addAndMakeVisible (*b);
 
@@ -202,6 +211,11 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     recordButton.setTooltip ("Record yourself (the guitar after the rig) into the topic you're practising. "
                              "Open the take later to hear it over the song, in step. A footswitch can do this too.");
     engine.onToggleRecording = [this] { toggleRecording(); };
+    engine.onToggleGuitarStem = [this]
+    {
+        if (practicePanel != nullptr)
+            juce::Logger::writeToLog ("Footswitch: " + practicePanel->toggleGuitarStem());
+    };
     engine.onSaveState = [this]
     {
         if (libraryPanel != nullptr)
@@ -337,6 +351,7 @@ MainComponent::~MainComponent()
         stopRecording (true);   // keep what was recorded
 
     engine.onToggleRecording = nullptr;
+    engine.onToggleGuitarStem = nullptr;
     tracker.finish();
     tracker.onSaved = nullptr;
     tracker.captureSetup = nullptr;
@@ -353,6 +368,12 @@ MainComponent::~MainComponent()
 void MainComponent::paint (juce::Graphics& g)
 {
     g.fillAll (theme::background);
+
+    if (appIcon.isValid() && ! iconBounds.isEmpty())
+    {
+        g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
+        g.drawImage (appIcon, iconBounds.toFloat(), juce::RectanglePlacement::centred);
+    }
 }
 
 void MainComponent::resized()
@@ -373,6 +394,7 @@ void MainComponent::resized()
     tunerButton.setBounds (top.removeFromRight (90).reduced (4));
     recordButton.setBounds (top.removeFromRight (juce::jlimit (90, 140, top.getWidth() / 6)).reduced (4));
     practisingButton.setBounds (top.removeFromRight (juce::jlimit (150, 320, top.getWidth() - 180)).reduced (4));
+    iconBounds = top.removeFromLeft (iconSize + 6).withSizeKeepingCentre (iconSize, iconSize);
     titleLabel.setBounds (top);
 
     tabs.setBounds (area);

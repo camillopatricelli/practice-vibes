@@ -52,6 +52,10 @@ struct StemControls
     bool isNeutral() const;
     juce::String describe() const;              // "guitar off", "vocals solo", "" when neutral
     void reset()                                { *this = {}; }
+
+    /** For the practice setup: "guitar:0:m vocals:0.5" (stems left as they are are not listed; "" = neutral). */
+    juce::String toString() const;
+    static StemControls fromString (const juce::String&);
 };
 
 /** The pop-up behind the Practice tab's "Stems" button. */

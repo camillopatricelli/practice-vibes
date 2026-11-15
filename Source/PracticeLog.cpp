@@ -22,6 +22,9 @@ void PracticeSetup::toXml (juce::XmlElement& e) const
             e.setAttribute ("loopEnd", loopEnd);
             e.setAttribute ("loopOn", loopOn);
         }
+
+        if (stems.isNotEmpty())
+            e.setAttribute ("stems", stems);
     }
 
     if (metronome)
@@ -44,6 +47,7 @@ PracticeSetup PracticeSetup::fromXml (const juce::XmlElement& e)
     s.loopStart = juce::jmax (0.0, e.getDoubleAttribute ("loopStart", 0.0));
     s.loopEnd = juce::jmax (s.loopStart, e.getDoubleAttribute ("loopEnd", 0.0));
     s.loopOn = e.getBoolAttribute ("loopOn", false);
+    s.stems = e.getStringAttribute ("stems");
     s.metronome = e.getBoolAttribute ("metronome", false);
     s.bpm = juce::jlimit (0.0, 400.0, e.getDoubleAttribute ("bpm", 0.0));
     s.beatsPerBar = juce::jlimit (1, 16, e.getIntAttribute ("beats", 4));

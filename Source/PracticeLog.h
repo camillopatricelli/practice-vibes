@@ -16,6 +16,7 @@ struct PracticeSetup
     double speed = 1.0, semitones = 0.0;
     double loopStart = 0.0, loopEnd = 0.0;
     bool loopOn = false;
+    juce::String stems;                 // stem mix (StemControls::toString), empty = all stems as they are
 
     bool metronome = false;             // the metronome was running
     double bpm = 0.0;

@@ -1,5 +1,6 @@
 #include "LibraryPanel.h"
 #include "AppPaths.h"
+#include "FolderAccess.h"
 #include "LoopFiles.h"
 #include "StoragePanel.h"
 #include "Theme.h"
@@ -700,9 +701,10 @@ LibraryPanel::LibraryPanel()
     addChildComponent (useDefaultButton);
 
     chooseFolderButton.onClick = [this] { chooseFolder(); };
-   #if ! JUCE_IOS   // iPad: cloud folders come with the folder-access work (bookmarks)
-    addChildComponent (chooseFolderButton);
+   #if JUCE_IOS
+    chooseFolderButton.setButtonText ("Choose a folder (iCloud Drive, Google Drive, OneDrive...)");
    #endif
+    addChildComponent (chooseFolderButton);
 
     searchBox.setTextToShowWhenEmpty ("Search topics", juce::Colours::white.withAlpha (0.4f));
     searchBox.setFont (juce::FontOptions (15.0f));
@@ -761,6 +763,28 @@ void LibraryPanel::openLibrary (const juce::File& folder)
 
     if (onLibraryOpened)
         onLibraryOpened();
+
+    requestDownloads();
+}
+
+void LibraryPanel::requestDownloads()
+{
+   #if JUCE_IOS
+    static std::atomic<bool> busy { false };
+
+    if (library == nullptr || busy.exchange (true))
+        return;
+
+    lastDownloadCheck = juce::Time::getMillisecondCounter();
+
+    juce::Thread::launch ([root = library->getRoot()]
+    {
+        if (const auto n = FolderAccess::requestDownloads (root); n > 0)
+            juce::Logger::writeToLog ("Library: asked the cloud drive to download " + juce::String (n) + " file(s)");
+
+        busy = false;
+    });
+   #endif
 }
 
 void LibraryPanel::chooseFolder()
@@ -771,12 +795,19 @@ void LibraryPanel::chooseFolder()
     fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                               [this] (const juce::FileChooser& chooser)
     {
-        const auto folder = chooser.getResult();
+        const auto url = chooser.getURLResult();
 
-        if (folder == juce::File() || ! folder.isDirectory())
+        if (url.isEmpty())
             return;
 
-        LibraryLocation::save (folder);
+        const auto folder = LibraryLocation::saveChosen (url);
+
+        if (folder == juce::File())
+        {
+            showError ("Practice Vibes can't use that folder. Try another one, or keep the topics on this device.");
+            return;
+        }
+
         openLibrary (folder);
     });
 }
@@ -788,19 +819,27 @@ void LibraryPanel::showFolderMenu()
 
     juce::PopupMenu menu;
     menu.addSectionHeader (library->getRoot().getFullPathName());
+    const auto isDefault = library->getRoot() == LibraryLocation::getDefaultFolder();
    #if ! JUCE_IOS
     menu.addItem ("Show the folder", [this] { library->getRoot().revealToUser(); });
+   #else
+    if (isDefault)
+        menu.addItem ("Files app: On My iPad > Practice Vibes > Library", false, false, [] {});
+   #endif
     menu.addItem ("Use a different folder...", [this] { chooseFolder(); });
 
-    if (library->getRoot() != LibraryLocation::getDefaultFolder())
-        menu.addItem ("Use the default folder", [this]
+    if (! isDefault)
+        menu.addItem (
+                     #if JUCE_IOS
+                      "Use the folder on this iPad",
+                     #else
+                      "Use the default folder",
+                     #endif
+                      [this]
         {
             LibraryLocation::save (LibraryLocation::getDefaultFolder());
             openLibrary (LibraryLocation::getDefaultFolder());
         });
-   #else
-    menu.addItem ("Files app: On My iPad > Practice Vibes > Library", false, false, [] {});
-   #endif
     menu.addItem ("Check for changes now", [this]
     {
         flush();
@@ -1173,6 +1212,9 @@ void LibraryPanel::timerCallback()
 
     if (! isShowing() || (lastPoll != 0 && now - lastPoll < 3000))
         return;
+
+    if (now - lastDownloadCheck > 30000)
+        requestDownloads();
 
     lastPoll = now;
     const auto newSignature = library->computeSignature();

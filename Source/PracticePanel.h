@@ -43,6 +43,12 @@ public:
     /** Speed, pitch, loop (for the song or video showing now) and metronome settings of a saved setup. */
     void applySetup (const PracticeSetup&);
 
+    /** Footswitch action: mutes / unmutes the guitar stem (returns a short message for the log). */
+    juce::String toggleGuitarStem();
+
+    /** Shows a short note in place of the hint line for a few seconds (e.g. "Metronome set to 84 bpm..."). */
+    void showNote (const juce::String&);
+
     juce::File getSongFile() const                      { return songFile; }   // the loaded song's file, if local
     bool isMediaPlaying() const;                        // the song or the video is playing
     double getMediaSpeed() const                        { return speedSlider.getValue() / 100.0; }
@@ -146,7 +152,8 @@ private:
     std::shared_ptr<std::atomic<bool>> chordCancel;
 
     juce::Slider speedSlider, pitchSlider, songVolumeSlider;
-    juce::Label speedLabel, pitchLabel, songVolumeLabel, hintLabel;
+    juce::Label speedLabel, pitchLabel, songVolumeLabel, hintLabel, noteLabel;
+    juce::uint32 noteUntilMs = 0;
 
     // Metronome
     juce::Label metronomeHeader, bpmDisplay;

@@ -51,8 +51,17 @@ else()
     set(PV_HOST_AU FALSE)
 endif()
 
+# App icon: iOS wants a full square without alpha (it rounds the corners itself), desktop a rounded transparent one.
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(PV_APP_ICON ${CMAKE_CURRENT_SOURCE_DIR}/Resources/AppIcon/AppIcon-ios-1024.png)
+else()
+    set(PV_APP_ICON ${CMAKE_CURRENT_SOURCE_DIR}/Resources/AppIcon/AppIcon-desktop-1024.png)
+endif()
+
 juce_add_gui_app(PracticeVibes
     PRODUCT_NAME                   "Practice Vibes"
+    ICON_BIG                       ${PV_APP_ICON}
+    ICON_SMALL                     ${PV_APP_ICON}
     COMPANY_NAME                   "Practice Vibes"
     BUNDLE_ID                      io.github.joefrezza.practicevibes
     VERSION                        ${PROJECT_VERSION}
@@ -78,6 +87,7 @@ target_sources(PracticeVibes PRIVATE
     Source/AppLog.cpp
     Source/ChordAnalyzer.cpp
     Source/ChordView.cpp
+    Source/FolderAccess.cpp
     Source/Footswitch.cpp
     Source/FootswitchPanel.cpp
     Source/Library.cpp
@@ -118,8 +128,9 @@ target_compile_definitions(PracticeVibes PRIVATE
     JUCE_STRICT_REFCOUNTEDPOINTER=1
     JUCE_SILENCE_XCODE_15_LINKER_WARNING=1)
 
-# iPad: exported mixes go out through the share sheet.
+# iPad: exported mixes go out through the share sheet; library folders in cloud drives need folder access (bookmarks).
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    target_sources(PracticeVibes PRIVATE Source/FolderAccess_ios.mm)
     target_compile_definitions(PracticeVibes PRIVATE JUCE_CONTENT_SHARING=1)
 endif()
 
@@ -145,12 +156,19 @@ endfunction()
 
 pv_use_onnxruntime(PracticeVibes)
 
+# The icon drawn in the app's own top bar.
+juce_add_binary_data(PracticeVibesIcons
+    HEADER_NAME AppIconData.h
+    NAMESPACE   AppIconData
+    SOURCES     Resources/AppIcon/AppIcon-desktop-1024.png)
+
 target_link_libraries(PracticeVibes
     PRIVATE
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_extra
         signalsmith-stretch
+        PracticeVibesIcons
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -164,7 +182,8 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         Tests/AudioTests.cpp
         Source/AacFile.cpp
         Source/ChordAnalyzer.cpp
-        Source/Footswitch.cpp
+        Source/FolderAccess.cpp
+    Source/Footswitch.cpp
         Source/Library.cpp
         Source/LoopFiles.cpp
         Source/Looper.cpp
@@ -175,6 +194,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         Source/PracticePlanner.cpp
         Source/Recorder.cpp
         Source/OnnxDemucs.cpp
+        Source/StemMixer.cpp
         Source/StoragePanel.cpp
         Source/Stems.cpp
         Source/Take.cpp

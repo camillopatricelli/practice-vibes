@@ -403,6 +403,9 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
 
     styleLabel (hintLabel, "Tap the waveform to jump, drag to loop, drag a loop edge to adjust it. Zoom: pinch, or Ctrl+wheel. Double-click a slider to reset it.", 0.45f);
     hintLabel.setMinimumHorizontalScale (0.5f);
+    noteLabel.setColour (juce::Label::textColourId, theme::highlight);
+    noteLabel.setMinimumHorizontalScale (0.5f);
+    addChildComponent (noteLabel);
 
     updateLoopButtons();
 
@@ -767,6 +770,27 @@ void PracticePanel::applyStemGains()
         player.stemGains[(size_t) s] = stemControls.gainFor (s);
 }
 
+juce::String PracticePanel::toggleGuitarStem()
+{
+    auto& muted = stemControls.mute[(size_t) Stems::guitar];
+    muted = ! muted;
+    stemControls.solo[(size_t) Stems::guitar] = false;
+    applyStemGains();
+
+    auto text = juce::String ("Guitar stem ") + (muted ? "muted" : "unmuted")
+                  + (player.hasStems() ? juce::String() : juce::String (" (this song has no stems yet)"));
+    showNote (text);
+    return text;
+}
+
+void PracticePanel::showNote (const juce::String& text)
+{
+    noteLabel.setText (text, juce::dontSendNotification);
+    noteLabel.setVisible (true);
+    hintLabel.setVisible (false);
+    noteUntilMs = juce::Time::getMillisecondCounter() + 6000;
+}
+
 void PracticePanel::separateCurrentSong()
 {
     if (stemsSong != nullptr && stemFolder != juce::File())
@@ -1042,6 +1066,9 @@ PracticeSetup PracticePanel::captureSetup() const
             s.loopEnd = loopEndSeconds();
             s.loopOn = loopIsEnabled();
         }
+
+        if (s.songPath.isNotEmpty())
+            s.stems = stemControls.toString();
     }
 
     if (metronome.isRunning())
@@ -1074,6 +1101,13 @@ void PracticePanel::applySetup (const PracticeSetup& s)
             pendingLoopStart = -1.0;
             updateLoopButtons();
         }
+
+        // The stem mix goes with the song (an older setup without one = all stems as they are).
+        if (! youTubeMode)
+        {
+            stemControls = StemControls::fromString (s.stems);
+            applyStemGains();
+        }
     }
 
     // The tempo stays put while the looper holds loops or the metronome follows the song.
@@ -1085,6 +1119,8 @@ void PracticePanel::applySetup (const PracticeSetup& s)
         metronome.tempoChangedByUser();
         subdivisionBox.setSelectedId (s.subdivision + 1, juce::dontSendNotification);
         updateSubdivisionControls();
+        showNote ("Metronome set to " + juce::String (juce::roundToInt (metronome.startBpm.load())) + " bpm, "
+                  + juce::String (metronome.beatsPerBar.load()) + " beats from your last session on this topic");
     }
 }
 
@@ -1182,6 +1218,12 @@ bool PracticePanel::keyPressed (const juce::KeyPress& key)
 void PracticePanel::timerCallback()
 {
     updateStems();
+
+    if (noteLabel.isVisible() && juce::Time::getMillisecondCounter() > noteUntilMs)
+    {
+        noteLabel.setVisible (false);
+        hintLabel.setVisible (true);
+    }
 
     if (auto song = player.getSong(); song != shownSong)
     {
@@ -1417,6 +1459,7 @@ void PracticePanel::resized()
     sliderRow (left, pitchLabel, pitchSlider);
     sliderRow (left, songVolumeLabel, songVolumeSlider);
     hintLabel.setBounds (left.removeFromTop (30));
+    noteLabel.setBounds (hintLabel.getBounds());
     left.removeFromTop (6);
     chordView.setBounds (left.withHeight (juce::jmin (left.getHeight(), 220)));
 

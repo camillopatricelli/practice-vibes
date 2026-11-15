@@ -280,6 +280,50 @@ juce::String StemControls::describe() const
     return "custom mix";
 }
 
+juce::String StemControls::toString() const
+{
+    juce::StringArray parts;
+
+    for (int s = 0; s < Stems::count; ++s)
+    {
+        const auto i = (size_t) s;
+
+        if (volume[i] == 1.0f && ! mute[i] && ! solo[i])
+            continue;
+
+        auto part = Stems::fileStem (s) + ":" + juce::String (volume[i], 3);
+
+        if (mute[i]) part << ":m";
+        if (solo[i]) part << ":s";
+        parts.add (part);
+    }
+
+    return isNeutral() ? juce::String() : parts.joinIntoString (" ");
+}
+
+StemControls StemControls::fromString (const juce::String& text)
+{
+    StemControls c;
+
+    for (auto& part : juce::StringArray::fromTokens (text, " ", {}))
+    {
+        auto fields = juce::StringArray::fromTokens (part, ":", {});
+
+        for (int s = 0; s < Stems::count; ++s)
+        {
+            if (fields.size() < 2 || fields[0] != Stems::fileStem (s))
+                continue;
+
+            const auto i = (size_t) s;
+            c.volume[i] = juce::jlimit (0.0f, 2.0f, fields[1].getFloatValue());
+            c.mute[i] = fields.contains ("m");
+            c.solo[i] = fields.contains ("s");
+        }
+    }
+
+    return c;
+}
+
 //==============================================================================
 StemMixer::StemMixer (Host& h) : host (h)
 {
@@ -398,7 +442,12 @@ void StemMixer::update()
     }
 
     if (newMode == mode)
+    {
+        if (mode == Mode::mixer)
+            syncFromControls();     // a footswitch may have muted a stem meanwhile
+
         return;
+    }
 
     mode = newMode;
     const auto mixer = mode == Mode::mixer;

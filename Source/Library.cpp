@@ -2,6 +2,7 @@
 #include "Stems.h"
 #include "Take.h"
 #include "AppPaths.h"
+#include "FolderAccess.h"
 
 namespace pv
 {
@@ -790,6 +791,22 @@ juce::File LibraryLocation::load()
         if (xml->getBoolAttribute ("default"))
             return getDefaultFolder();
 
+        // iPad: a folder outside the app (cloud drive) is opened through its bookmark.
+        if (const auto bookmark = xml->getStringAttribute ("bookmark"); bookmark.isNotEmpty())
+        {
+            juce::String refreshed;
+            const auto folder = FolderAccess::resolve (bookmark, refreshed);
+
+            if (refreshed.isNotEmpty() && folder != juce::File())
+            {
+                xml->setAttribute ("bookmark", refreshed);
+                xml->setAttribute ("folder", folder.getFullPathName());
+                xml->writeTo (getLibrarySettingsFile());
+            }
+
+            return folder;
+        }
+
         const auto path = xml->getStringAttribute ("folder");
 
         if (juce::File::isAbsolutePath (path))
@@ -809,6 +826,42 @@ void LibraryLocation::save (const juce::File& folder)
         xml.setAttribute ("folder", folder.getFullPathName());
 
     xml.writeTo (getLibrarySettingsFile());
+}
+
+juce::File LibraryLocation::saveChosen (const juce::URL& chosenFolder)
+{
+   #if JUCE_IOS
+    const auto bookmark = FolderAccess::makeBookmark (chosenFolder);
+
+    if (bookmark.isEmpty())
+        return {};
+
+    juce::String refreshed;
+    const auto folder = FolderAccess::resolve (bookmark, refreshed);
+
+    if (! folder.isDirectory())
+        return {};
+
+    if (folder == getDefaultFolder())
+    {
+        save (folder);
+        return folder;
+    }
+
+    juce::XmlElement xml ("LIBRARY");
+    xml.setAttribute ("folder", folder.getFullPathName());     // for the log / menu only
+    xml.setAttribute ("bookmark", refreshed.isNotEmpty() ? refreshed : bookmark);
+    xml.writeTo (getLibrarySettingsFile());
+    return folder;
+   #else
+    const auto folder = chosenFolder.getLocalFile();
+
+    if (! folder.isDirectory())
+        return {};
+
+    save (folder);
+    return folder;
+   #endif
 }
 
 } // namespace pv

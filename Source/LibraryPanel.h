@@ -93,7 +93,8 @@ private:
     juce::String tagFilter;                    // show only topics with this tag (on the topic or a resource)
     std::vector<juce::String> rowIds;
     bool dirty = false, rebuilding = false;
-    juce::uint32 lastEdit = 0, lastPoll = 0;
+    juce::uint32 lastEdit = 0, lastPoll = 0, lastDownloadCheck = 0;
+    void requestDownloads();                   // cloud folders: fetch files that are only placeholders (background)
 
     // Shown until the user has picked a library folder.
     juce::Label setupLabel;

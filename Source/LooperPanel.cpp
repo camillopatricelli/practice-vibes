@@ -640,7 +640,8 @@ void LooperPanel::loadLoops (const juce::File& folder)
     (set.source == Looper::Source::beforeFx ? beforeFxButton : afterFxButton).setToggleState (true, juce::dontSendNotification);
     saveSettings();
     juce::Logger::writeToLog ("Loaded loops from " + folder.getFullPathName());
-    showFileMessage ("Loaded \"" + folder.getFileName() + "\": the loops play from the metronome's first downbeat.");
+    showFileMessage ("Loaded \"" + folder.getFileName() + "\": metronome set to " + juce::String (set.getBpm(), 1).trimCharactersAtEnd ("0").trimCharactersAtEnd (".")
+                     + " bpm, " + juce::String (set.beatsPerBar) + " beats; the loops play from its first downbeat.");
 }
 
 //==============================================================================

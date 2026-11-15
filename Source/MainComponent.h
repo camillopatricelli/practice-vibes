@@ -76,6 +76,9 @@ private:
     AppEngine& engine;
 
     juce::Label titleLabel;
+    static constexpr int iconSize = 30;
+    juce::Image appIcon;                // top bar, left of the title
+    juce::Rectangle<int> iconBounds;
     juce::TextButton recordButton        { "Rec" },
                      tunerButton         { "Tuner" },
                      audioSettingsButton { "Audio settings" },
