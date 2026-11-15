@@ -362,6 +362,7 @@ bool Library::loadTopic (const juce::File& folder, Topic& topic)
         topic.created = juce::Time::fromISO8601 (xml->getStringAttribute ("created"));
         topic.tags = parseTags (xml->getStringAttribute ("tags"));
         topic.inRotation = xml->getBoolAttribute ("rotation", false);
+        topic.noGuitar = xml->getBoolAttribute ("noGuitar", false);
 
         if (auto* d = xml->getChildByName ("DESCRIPTION"))
             topic.description = d->getAllSubText();
@@ -594,6 +595,9 @@ bool Library::saveTopic (const Topic& t)
 
     if (t.inRotation)
         xml.setAttribute ("rotation", true);
+
+    if (t.noGuitar)
+        xml.setAttribute ("noGuitar", true);
 
     xml.createNewChildElement ("DESCRIPTION")->addTextElement (t.description);
 

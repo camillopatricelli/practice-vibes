@@ -88,6 +88,11 @@ public:
         rotationToggle.onClick = [this] { owner.setRotation (topicId, rotationToggle.getToggleState()); };
         addAndMakeVisible (rotationToggle);
 
+        noGuitarToggle.setTooltip ("For ear training, theory...: while you practise this topic the time is counted on the clock "
+                                   "(with Pause on the Today tab) instead of from the guitar input");
+        noGuitarToggle.onClick = [this] { owner.setNoGuitar (topicId, noGuitarToggle.getToggleState()); };
+        addAndMakeVisible (noGuitarToggle);
+
         addAndMakeVisible (styleCaption (notesLabel, "Notes"));
         descriptionEditor.setMultiLine (true, true);
         descriptionEditor.setReturnKeyStartsNewLine (true);
@@ -141,6 +146,7 @@ public:
 
         createdLabel.setText ("Created " + formatDate (topic.created), juce::dontSendNotification);
         rotationToggle.setToggleState (topic.inRotation, juce::dontSendNotification);
+        noGuitarToggle.setToggleState (topic.noGuitar, juce::dontSendNotification);
 
         conflictLabel.setVisible (! topic.conflictFiles.isEmpty());
         conflictLabel.setText ("Another device saved a different version of this topic at the same time: "
@@ -197,7 +203,8 @@ public:
         area.removeFromTop (6);
         auto tagsRow = area.removeFromTop (30);
         historyButton.setBounds (tagsRow.removeFromRight (90).reduced (0, 1));
-        rotationToggle.setBounds (tagsRow.removeFromRight (200).withTrimmedLeft (12));
+        rotationToggle.setBounds (tagsRow.removeFromRight (190).withTrimmedLeft (12));
+        noGuitarToggle.setBounds (tagsRow.removeFromRight (220).withTrimmedLeft (12));
         tagsEditor.setBounds (tagsRow);
         area.removeFromTop (4);
         notesLabel.setBounds (area.removeFromTop (26));
@@ -262,7 +269,7 @@ private:
     juce::Label createdLabel, notesLabel, resourcesLabel, conflictLabel, noResourcesLabel;
     juce::TextButton deleteButton { "Delete topic" }, addFilesButton { "Add files..." }, addLinkButton { "Add link..." },
                      practiseButton { "Practise" }, historyButton { "History" };
-    juce::ToggleButton rotationToggle { "In practice rotation" };
+    juce::ToggleButton rotationToggle { "In practice rotation" }, noGuitarToggle { "Timed without the guitar" };
     juce::Viewport viewport;
     juce::Component rowHolder;
     std::vector<std::unique_ptr<ResourceRow>> rows;
@@ -853,6 +860,25 @@ void LibraryPanel::setRotation (const juce::String& topicId, bool inRotation)
 
     flush();
     t->inRotation = inRotation;
+
+    if (! library->saveTopic (*t))
+        showError ("Could not save " + t->folder.getChildFile (Library::topicFileName).getFullPathName());
+
+    signature = library->computeSignature();
+
+    if (onTopicsChanged)
+        onTopicsChanged();
+}
+
+void LibraryPanel::setNoGuitar (const juce::String& topicId, bool noGuitar)
+{
+    auto* t = library != nullptr ? library->findTopic (topicId) : nullptr;
+
+    if (t == nullptr || t->noGuitar == noGuitar)
+        return;
+
+    flush();
+    t->noGuitar = noGuitar;
 
     if (! library->saveTopic (*t))
         showError ("Could not save " + t->folder.getChildFile (Library::topicFileName).getFullPathName());

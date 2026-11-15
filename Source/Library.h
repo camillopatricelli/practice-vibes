@@ -66,6 +66,7 @@ struct Topic
     juce::String description;
     juce::StringArray tags;
     bool inRotation = false;    // offered on the Today tab ("haven't practised since...")
+    bool noGuitar = false;      // ear training, theory...: practice time runs on the clock, not the guitar input
     std::vector<Resource> resources;
 
     juce::File folder;

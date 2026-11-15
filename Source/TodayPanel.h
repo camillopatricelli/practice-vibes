@@ -25,6 +25,7 @@ public:
     std::function<void()> onBecameVisible;          // re-read the library and the log (other devices)
     std::function<void (const juce::String& topicId)> onShowHistory;
     std::function<void (const juce::String& entryId)> onEditEntry;  // a "Last two weeks" entry was tapped
+    std::function<void (const juce::String& topicId)> onAddTime;    // "+ Add time..." (empty id: choose the topic)
 
     // Dice and sessions
     std::function<std::vector<PlanCandidate> (const juce::String& tag)> getCandidates;
@@ -57,7 +58,7 @@ private:
     juce::Label titleLabel, totalsLabel;
     juce::Label nowTitle, nowStatus;
     juce::TextEditor noteEditor;
-    juce::TextButton stopButton { "Stop" };
+    juce::TextButton stopButton { "Stop" }, pauseButton { "Pause" }, addTimeButton { "+ Add time..." };
     juce::Rectangle<int> nowCard;
 
     juce::Label rotationHeader, rotationEmpty, recentHeader;

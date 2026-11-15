@@ -629,6 +629,8 @@ public:
             if (e.maxBpm > 0.0)    detail.add (juce::String (juce::roundToInt (e.maxBpm)) + " bpm");
             if (e.maxSpeed > 0.0)  detail.add (juce::String (juce::roundToInt (e.maxSpeed * 100.0)) + " %");
             if (e.looper)          detail.add ("looper");
+            if (e.noGuitar)        detail.add ("no guitar");
+            if (e.manual)          detail.add ("added by hand");
 
             g.setFont (juce::FontOptions (14.0f));
             g.setColour (axisText);
@@ -782,6 +784,10 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId,
     sessionList = std::make_unique<SessionList> (std::move (entries), std::move (takes),
                                                  [this] (const juce::File& f) { if (onOpenTake) onOpenTake (f); });
     sessionList->onEdit = [this] (const juce::String& id) { if (onEditEntry) onEditEntry (id); };
+
+    addTimeButton.setTooltip ("Add practice time by hand (e.g. theory done away from the app)");
+    addTimeButton.onClick = [this] { if (onAddTime) onAddTime(); };
+    addAndMakeVisible (addTimeButton);
     sessionViewport.setViewedComponent (sessionList.get(), false);
     sessionViewport.setScrollBarsShown (true, false);
     addAndMakeVisible (sessionViewport);
@@ -797,7 +803,9 @@ void TopicHistory::paint (juce::Graphics& g)
 void TopicHistory::resized()
 {
     auto area = getLocalBounds().reduced (8);
-    statsLabel.setBounds (area.removeFromTop (32));
+    auto statsRow = area.removeFromTop (32);
+    addTimeButton.setBounds (statsRow.removeFromRight (130).reduced (0, 1));
+    statsLabel.setBounds (statsRow);
     area.removeFromTop (8);
     emptyLabel.setBounds (area.withHeight (juce::jmin (area.getHeight(), 120)));
 
@@ -840,6 +848,7 @@ void TopicHistory::resized()
 
 //==============================================================================
 EntryEditor::EntryEditor (const PracticeEntry& entry, bool stillRunning)
+    : ownTopicId (entry.topicId), ownTopicTitle (entry.topicTitle)
 {
     auto what = entry.isFree() ? juce::String ("Free practice") : entry.topicTitle;
 
@@ -849,6 +858,61 @@ EntryEditor::EntryEditor (const PracticeEntry& entry, bool stillRunning)
     summaryLabel.setText (what + "\n" + entry.start.formatted ("%a %d %b %Y, %H:%M") + " - " + entry.end.formatted ("%H:%M")
                               + ",  " + formatPracticeDuration (entry.playedSeconds) + " played",
                           juce::dontSendNotification);
+    setUpFields (entry);
+
+    if (stillRunning)
+    {
+        errorLabel.setText ("This session is still being recorded: stop it first (Stop on the Today tab), then correct it.",
+                            juce::dontSendNotification);
+
+        for (juce::Component* c : { (juce::Component*) &startEditor, (juce::Component*) &minutesEditor,
+                                    (juce::Component*) &noteEditor, (juce::Component*) &saveButton, (juce::Component*) &deleteButton })
+            c->setEnabled (false);
+    }
+}
+
+EntryEditor::EntryEditor (NewEntry, const PracticeEntry& defaults, std::vector<std::pair<juce::String, juce::String>> topics)
+    : topicChoices (std::move (topics)), ownTopicId (defaults.topicId), ownTopicTitle (defaults.topicTitle)
+{
+    summaryLabel.setText (topicChoices.empty() ? "Add time to \"" + defaults.topicTitle + "\"" : juce::String ("Add practice time"),
+                          juce::dontSendNotification);
+    setUpFields (defaults);
+    minutesEditor.clear();
+    minutesEditor.setTextToShowWhenEmpty ("e.g. 20", juce::Colours::white.withAlpha (0.35f));
+    deleteButton.setVisible (false);
+    saveButton.setButtonText ("Add");
+
+    if (! topicChoices.empty())
+    {
+        addAndMakeVisible (styleCaption (topicLabel, "Topic"));
+
+        for (size_t i = 0; i < topicChoices.size(); ++i)
+            topicBox.addItem (topicChoices[i].first.isEmpty() ? juce::String ("Free practice") : topicChoices[i].second, (int) i + 1);
+
+        topicBox.setSelectedItemIndex (0, juce::dontSendNotification);
+
+        for (size_t i = 0; i < topicChoices.size(); ++i)
+            if (topicChoices[i].first == defaults.topicId)
+                topicBox.setSelectedItemIndex ((int) i, juce::dontSendNotification);
+
+        addAndMakeVisible (topicBox);
+    }
+}
+
+juce::String EntryEditor::getTopicId() const
+{
+    const auto i = topicBox.getSelectedItemIndex();
+    return juce::isPositiveAndBelow (i, (int) topicChoices.size()) ? topicChoices[(size_t) i].first : ownTopicId;
+}
+
+juce::String EntryEditor::getTopicTitle() const
+{
+    const auto i = topicBox.getSelectedItemIndex();
+    return juce::isPositiveAndBelow (i, (int) topicChoices.size()) ? topicChoices[(size_t) i].second : ownTopicTitle;
+}
+
+void EntryEditor::setUpFields (const PracticeEntry& entry)
+{
     summaryLabel.setFont (juce::FontOptions (16.0f));
     summaryLabel.setColour (juce::Label::textColourId, primaryText);
     summaryLabel.setJustificationType (juce::Justification::topLeft);
@@ -900,16 +964,6 @@ EntryEditor::EntryEditor (const PracticeEntry& entry, bool stillRunning)
     addAndMakeVisible (saveButton);
     addAndMakeVisible (cancelButton);
     addAndMakeVisible (deleteButton);
-
-    if (stillRunning)
-    {
-        errorLabel.setText ("This session is still being recorded: stop it first (Stop on the Today tab), then correct it.",
-                            juce::dontSendNotification);
-
-        for (juce::Component* c : { (juce::Component*) &startEditor, (juce::Component*) &minutesEditor,
-                                    (juce::Component*) &noteEditor, (juce::Component*) &saveButton, (juce::Component*) &deleteButton })
-            c->setEnabled (false);
-    }
 }
 
 void EntryEditor::save()
@@ -924,7 +978,7 @@ void EntryEditor::save()
         return;
     }
 
-    if (! minutes.has_value() || *minutes > 24.0 * 60.0)
+    if (! minutes.has_value() || *minutes <= 0.0 || *minutes > 24.0 * 60.0)
     {
         errorLabel.setText ("Type the minutes played as a number, e.g. 25 (or 1:10 for an hour and ten minutes).",
                             juce::dontSendNotification);
@@ -951,8 +1005,15 @@ void EntryEditor::resized()
     deleteButton.setBounds (buttons.removeFromLeft (140).reduced (3));
     errorLabel.setBounds (area.removeFromBottom (40));
 
-    summaryLabel.setBounds (area.removeFromTop (48));
+    summaryLabel.setBounds (area.removeFromTop (topicBox.isVisible() ? 26 : 48));
     area.removeFromTop (8);
+
+    if (topicBox.isVisible())
+    {
+        topicLabel.setBounds (area.removeFromTop (28));
+        topicBox.setBounds (area.removeFromTop (34));
+        area.removeFromTop (10);
+    }
 
     auto row = area.removeFromTop (62);
     auto left = row.removeFromLeft (row.getWidth() * 2 / 3).withTrimmedRight (12);

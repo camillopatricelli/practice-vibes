@@ -46,6 +46,8 @@ struct PracticeEntry
     double maxBpm = 0.0;                // fastest metronome tempo played along to (0 = metronome not used)
     double maxSpeed = 0.0;              // fastest song/video speed played along to (0 = no song)
     bool looper = false;
+    bool noGuitar = false;              // timed on the clock (ear training, theory...), not from the guitar input
+    bool manual = false;                // added by hand ("Add time...")
     juce::String note;
     PracticeSetup setup;
 
@@ -218,7 +220,17 @@ public:
     /** The open entry, or nullptr. */
     const PracticeEntry* getCurrent() const noexcept                { return current ? &*current : nullptr; }
 
-    bool isPlaying() const noexcept                                 { return detector.isPlaying(); }
+    bool isPlaying() const noexcept                                 { return clockMode() ? ! paused : detector.isPlaying(); }
+
+    /** Tells whether a topic is "timed without the guitar" (ear training, theory...). For those, time counts on the
+        clock while the topic is active and not paused, instead of from the guitar input. */
+    std::function<bool (const juce::String& topicId)> isNoGuitarTopic;
+
+    /** True while the active topic is timed without the guitar. */
+    bool clockMode() const                                          { return topicId.isNotEmpty() && isNoGuitarTopic != nullptr
+                                                                             && isNoGuitarTopic (topicId); }
+    void setPaused (bool shouldPause) noexcept                      { paused = shouldPause; }
+    bool isPaused() const noexcept                                  { return paused; }
 
     /** Seconds counted as played in the last tick() (drives the practice session's clock). */
     double getLastTickPlayedSeconds() const noexcept                { return lastTickPlayed; }
@@ -249,6 +261,7 @@ private:
 
     std::optional<PracticeEntry> lastFinished;           // the entry that just ended (still takes a note)
     double sinceFinished = 0.0, sinceNoteEdit = 0.0, lastTickPlayed = 0.0;
+    bool paused = false;                                 // clock mode only
     bool noteDirty = false;
 };
 

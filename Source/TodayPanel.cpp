@@ -161,6 +161,8 @@ public:
             if (it->maxBpm > 0.0)    detail.add (juce::String (juce::roundToInt (it->maxBpm)) + " bpm");
             if (it->maxSpeed > 0.0)  detail.add (juce::String (juce::roundToInt (it->maxSpeed * 100.0)) + " %");
             if (it->looper)          detail.add ("looper");
+            if (it->noGuitar)        detail.add ("no guitar");
+            if (it->manual)          detail.add ("added by hand");
 
             lines.push_back ({ Line::entry, what, detail.joinIntoString ("  -  "), it->id });
 
@@ -337,6 +339,18 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
         refresh();
     };
     addAndMakeVisible (stopButton);
+
+    pauseButton.setTooltip ("This topic is timed without the guitar: pause the clock while you're away");
+    pauseButton.onClick = [this]
+    {
+        tracker.setPaused (! tracker.isPaused());
+        updateNow();
+    };
+    addChildComponent (pauseButton);
+
+    addTimeButton.setTooltip ("Add practice time by hand (e.g. theory done away from the app)");
+    addTimeButton.onClick = [this] { if (onAddTime) onAddTime ({}); };
+    addAndMakeVisible (addTimeButton);
 
     for (auto* l : { &rotationHeader, &recentHeader })
     {
@@ -539,7 +553,9 @@ void TodayPanel::updateSession()
             const auto n = (int) session.getSlots().size();
             sessionTitle.setText (session.isTimeUp() ? juce::String ("Time's up!")
                                                      : "Session: topic " + juce::String (session.getIndex() + 1) + " of " + juce::String (n)
-                                                         + (session.isPaused() ? "  -  the clock runs while you play" : ""),
+                                                         + (! session.isPaused() ? juce::String()
+                                                              : tracker.clockMode() ? juce::String ("  -  paused: press Resume")
+                                                                                    : juce::String ("  -  the clock runs while you play")),
                                   juce::dontSendNotification);
             sessionTitle.setColour (juce::Label::textColourId, session.isTimeUp() ? theme::highlight : juce::Colours::white);
             nextButton.setButtonText (session.getNext() != nullptr ? "Next topic" : "Finish");
@@ -604,7 +620,9 @@ void TodayPanel::updateNow()
     const auto active = tracker.getActiveTopicId().isNotEmpty();
     nowTitle.setText (active ? "Practising: " + tracker.getActiveTopicTitle() : juce::String ("Free practice"), juce::dontSendNotification);
 
-    juce::String status = tracker.isPlaying() ? "Playing now" : "Not playing";
+    const auto onClock = tracker.clockMode();
+    juce::String status = onClock ? (tracker.isPaused() ? "Paused (timed without the guitar)" : "Timing (without the guitar)")
+                                  : (tracker.isPlaying() ? "Playing now" : "Not playing");
 
     if (active)
         status << "  -  " << formatPracticeDuration (tracker.getActiveSeconds()) << " on this topic so far";
@@ -614,6 +632,14 @@ void TodayPanel::updateNow()
     nowStatus.setText (status, juce::dontSendNotification);
     nowStatus.setColour (juce::Label::textColourId, tracker.isPlaying() ? juce::Colour (0xff7bd88f) : juce::Colours::white.withAlpha (0.65f));
     stopButton.setVisible (active);
+
+    if (pauseButton.isVisible() != onClock)
+    {
+        pauseButton.setVisible (onClock);
+        resized();
+    }
+
+    pauseButton.setButtonText (tracker.isPaused() ? "Resume" : "Pause");
 
     if (! noteEditor.hasKeyboardFocus (true) && noteEditor.getText().trim() != tracker.getNote())
         noteEditor.setText (tracker.getNote(), false);
@@ -744,6 +770,10 @@ void TodayPanel::resized()
     auto card = nowCard.reduced (14, 10);
     auto cardTop = card.removeFromTop (28);
     stopButton.setBounds (cardTop.removeFromRight (90).reduced (0, 1));
+
+    if (pauseButton.isVisible())
+        pauseButton.setBounds (cardTop.removeFromRight (96).reduced (3, 1));
+
     nowTitle.setBounds (cardTop);
     nowStatus.setBounds (card.removeFromTop (26));
     card.removeFromTop (8);
@@ -796,7 +826,9 @@ void TodayPanel::resized()
     for (size_t i = 0; i < rows.size(); ++i)
         rows[i]->setBounds (0, (int) i * (rowHeight + gap), rotationHolder.getWidth(), rowHeight);
 
-    recentHeader.setBounds (right.removeFromTop (30));
+    auto recentTop = right.removeFromTop (30);
+    addTimeButton.setBounds (recentTop.removeFromRight (110).reduced (0, 2));
+    recentHeader.setBounds (recentTop);
     recentViewport.setBounds (right);
     recentView->setSize (juce::jmax (1, recentViewport.getMaximumVisibleWidth()), recentView->getContentHeight());
 }

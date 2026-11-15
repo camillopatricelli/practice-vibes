@@ -275,6 +275,15 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     todayPanel->onPractise = [this] (const juce::String& id) { practiseTopic (id); };
     todayPanel->onShowHistory = [this] (const juce::String& id) { showTopicHistory (id); };
     todayPanel->onEditEntry = [this] (const juce::String& id) { editLogEntry (id, {}); };
+    todayPanel->onAddTime = [this] (const juce::String& id) { addLogTime (id, {}); };
+
+    // Ear training, theory...: those topics are timed on the clock instead of from the guitar input.
+    tracker.isNoGuitarTopic = [this] (const juce::String& id)
+    {
+        auto* lib = libraryPanel->getLibrary();
+        auto* t = lib != nullptr ? lib->findTopic (id) : nullptr;
+        return t != nullptr && t->noGuitar;
+    };
     todayPanel->getCandidates = [this] (const juce::String& tag) { return rotationCandidates (tag); };
     todayPanel->getRotationTags = [this] { return rotationTags(); };
     todayPanel->onPlanSession = [this] (const juce::String& tag) { openSessionPlanner (tag); };
@@ -569,14 +578,21 @@ void MainComponent::updatePractisingButton()
         const auto n = (int) session.getSlots().size();
         text = juce::String (session.getIndex() + 1) + "/" + juce::String (n) + "  " + slot->title + "  -  "
              + formatClock (juce::jmax (0.0, session.getRemainingSeconds()))
-             + (session.isPaused() ? "  (paused: play to continue)" : "");
+             + (session.isPaused() ? (tracker.clockMode() ? "  (paused: Resume on the Today tab)" : "  (paused: play to continue)") : "");
 
         if (session.isTimeUp())
             text = session.getNext() != nullptr ? "Time's up - next: " + session.getNext()->title
                                                 : juce::String ("Time's up - finish the session");
     }
 
-    practisingButton.setButtonText ((tracker.isPlaying() && ! session.isTimeUp() ? juce::String ("(playing) ") : juce::String()) + text);
+    juce::String prefix;
+
+    if (tracker.clockMode())
+        prefix = tracker.isPaused() ? "(paused) " : "(timing) ";
+    else if (tracker.isPlaying() && ! session.isTimeUp())
+        prefix = "(playing) ";
+
+    practisingButton.setButtonText (prefix + text);
 
     if (session.isRunning() && session.isTimeUp())
     {
@@ -818,6 +834,14 @@ void MainComponent::showTopicHistory (const juce::String& topicId)
                 safe->editLogEntry (entryId, topicId);
         });
     };
+    history->onAddTime = [this, topicId]
+    {
+        juce::MessageManager::callAsync ([safe = SafePointer<MainComponent> (this), topicId]
+        {
+            if (safe != nullptr)
+                safe->addLogTime (topicId, topicId);
+        });
+    };
     showOverlay ("History: " + topic->title, std::move (history));
 }
 
@@ -870,6 +894,87 @@ void MainComponent::editLogEntry (const juce::String& entryId, const juce::Strin
     };
 
     showOverlay ("Practice entry", std::move (editor));
+}
+
+void MainComponent::addLogTime (const juce::String& topicId, const juce::String& historyTopicId)
+{
+    auto* lib = libraryPanel->getLibrary();
+
+    if (practiceLog == nullptr || lib == nullptr)
+        return;
+
+    PracticeEntry defaults;
+    const auto now = juce::Time::getCurrentTime();
+    defaults.start = juce::Time (now.getYear(), now.getMonth(), now.getDayOfMonth(), now.getHours(), now.getMinutes(), 0, 0, true);
+    std::vector<std::pair<juce::String, juce::String>> choices;
+
+    if (topicId.isNotEmpty())
+    {
+        if (auto* t = lib->findTopic (topicId))
+        {
+            defaults.topicId = t->id;
+            defaults.topicTitle = t->title;
+        }
+    }
+    else
+    {
+        defaults.topicId = tracker.getActiveTopicId();
+        choices.push_back ({ {}, "Free practice" });
+
+        std::vector<std::pair<juce::String, juce::String>> topics;
+
+        for (auto& t : lib->getTopics())
+            topics.push_back ({ t.id, t.title.isNotEmpty() ? t.title : juce::String ("(untitled)") });
+
+        std::sort (topics.begin(), topics.end(), [] (const auto& a, const auto& b) { return a.second.compareNatural (b.second) < 0; });
+        choices.insert (choices.end(), topics.begin(), topics.end());
+    }
+
+    auto editor = std::make_unique<EntryEditor> (EntryEditor::NewEntry {}, defaults, std::move (choices));
+    auto* editorPtr = editor.get();
+
+    auto done = [this, historyTopicId]
+    {
+        juce::MessageManager::callAsync ([safe = SafePointer<MainComponent> (this), historyTopicId]
+        {
+            if (safe == nullptr)
+                return;
+
+            safe->todayPanel->refresh();
+
+            if (historyTopicId.isNotEmpty())
+                safe->showTopicHistory (historyTopicId);
+            else
+                safe->closeOverlay();
+        });
+    };
+
+    editor->onCancel = done;
+    editor->onSave = [this, editorPtr, done] (juce::Time start, double played, const juce::String& note)
+    {
+        PracticeEntry e;
+        e.id = juce::Uuid().toDashedString();
+        e.topicId = editorPtr->getTopicId();
+        e.topicTitle = e.topicId.isNotEmpty() ? editorPtr->getTopicTitle() : juce::String();
+        e.start = start;
+        e.end = start + juce::RelativeTime::seconds (played);
+        e.playedSeconds = played;
+        e.note = note;
+        e.manual = true;
+
+        if (auto* lib = libraryPanel->getLibrary())
+            if (auto* t = lib->findTopic (e.topicId))
+                e.noGuitar = t->noGuitar;
+
+        if (practiceLog != nullptr)
+            practiceLog->save (e);
+
+        juce::Logger::writeToLog ("Practice log: " + formatPracticeDuration (played) + " added by hand"
+                                  + (e.topicTitle.isNotEmpty() ? " to " + e.topicTitle : juce::String()));
+        done();
+    };
+
+    showOverlay ("Add practice time", std::move (editor));
 }
 
 void MainComponent::layoutYouTube()

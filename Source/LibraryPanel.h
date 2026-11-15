@@ -74,6 +74,7 @@ private:
     void deleteTopic (const juce::String& topicId);
     void editedTopic();                        // a title/description keystroke: save soon
     void setRotation (const juce::String& topicId, bool inRotation);
+    void setNoGuitar (const juce::String& topicId, bool noGuitar);
     void addFiles (const juce::String& topicId);
     void addUrls (const juce::String& topicId, const juce::Array<juce::URL>&);
     void showTagMenu();

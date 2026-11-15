@@ -2193,6 +2193,97 @@ static void testLogCorrections()
     folder.deleteRecursively();
 }
 
+static void testNoGuitarTopics()
+{
+    std::cout << "\n[Topics timed without the guitar, time added by hand]\n";
+
+    const auto root = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("pv-noguitar-test");
+    root.deleteRecursively();
+    root.createDirectory();
+
+    juce::String earId;
+
+    {
+        Library lib (root);
+        auto* t = lib.createTopic ("Ear training");
+        t->noGuitar = true;
+        lib.saveTopic (*t);
+        earId = t->id;
+    }
+
+    Library lib (root);
+    check (lib.findTopic (earId) != nullptr && lib.findTopic (earId)->noGuitar, "\"timed without the guitar\" is saved in topic.xml");
+
+    PracticeLog log (root.getChildFile (".practice"), "pc");
+    PracticeTracker tracker;
+    tracker.setLog (&log);
+    tracker.isNoGuitarTopic = [&] (const juce::String& id) { auto* t = lib.findTopic (id); return t != nullptr && t->noGuitar; };
+
+    PracticeSession session;
+    session.start ({ { earId, "Ear training", 5 } });
+    tracker.setActiveTopic (earId, "Ear training");
+    check (tracker.clockMode(), "an ear-training topic runs on the clock");
+
+    PracticeTracker::Activity a;
+    auto clock = juce::Time (2026, 10, 15, 18, 0, 0, 0, true);
+
+    auto run = [&] (double seconds)
+    {
+        for (double t = 0.0; t < seconds - 1.0e-9; t += 0.1)
+        {
+            clock = clock + juce::RelativeTime::milliseconds (100);
+            tracker.tick (0.1, 0.0f, a, clock);    // silent input: the guitar isn't touched
+            session.tick (tracker.getLastTickPlayedSeconds());
+        }
+    };
+
+    run (120.0);
+    check (std::abs (session.getRemainingSeconds() - 180.0) < 0.5, "silent input, but the session clock runs: 3:00 left");
+
+    tracker.setPaused (true);
+    run (240.0);
+    check (std::abs (session.getRemainingSeconds() - 180.0) < 0.5 && session.isPaused() && ! tracker.isPlaying(),
+           "Pause stops the clock (a 4-minute call)");
+
+    tracker.setPaused (false);
+    run (60.0);
+    tracker.setActiveTopic ({}, {});   // Stop
+    check (! tracker.isPaused(), "changing topic clears Pause");
+
+    double total = 0.0;
+    bool marked = true;
+
+    for (auto& e : log.getEntries())
+    {
+        total += e.playedSeconds;
+        marked = marked && e.noGuitar && e.topicId == earId;
+    }
+
+    check (std::abs (total - 180.0) < 1.0 && marked, "the log gets 3 minutes, marked \"no guitar\" ("
+                                                      + juce::String (total, 1) + " s in " + juce::String ((int) log.getEntries().size()) + " entries)");
+
+    // Free practice with silent input still logs nothing.
+    run (60.0);
+    check (std::abs (session.getRemainingSeconds() - 120.0) < 0.5, "back on free practice: silence doesn't count");
+
+    // Added by hand: a manual entry is kept like any other and counts in the totals.
+    PracticeEntry manual;
+    manual.id = juce::Uuid().toDashedString();
+    manual.topicId = earId;
+    manual.topicTitle = "Ear training";
+    manual.start = juce::Time (2026, 10, 14, 8, 0, 0, 0, true);
+    manual.end = manual.start + juce::RelativeTime::minutes (20);
+    manual.playedSeconds = 1200.0;
+    manual.manual = true;
+    log.save (manual);
+
+    PracticeLog other (root.getChildFile (".practice"), "ipad");
+    check (other.find (manual.id) != nullptr && other.find (manual.id)->manual && other.summarise (earId).totalSeconds > 1370.0,
+           "time added by hand: saved, marked, in the totals");
+
+    root.deleteRecursively();
+}
+
 static void testPracticeLog()
 {
     std::cout << "Practice log (played time, entries, setups)" << std::endl;
@@ -3482,6 +3573,7 @@ int main()
     testLinks();
     testPracticeLog();
     testLogCorrections();
+    testNoGuitarTopics();
     testPracticePlanner();
     testTakes();
     testStorage();

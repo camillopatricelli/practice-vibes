@@ -51,16 +51,29 @@ public:
     /** `stillRunning`: the entry is the one being recorded right now (it can't be changed until it ends). */
     EntryEditor (const PracticeEntry&, bool stillRunning);
 
+    /** "Add time": a new entry. `topics` (id, title) offers a topic choice ("" = free practice); empty = keep the
+        entry's own topic. */
+    struct NewEntry {};
+    EntryEditor (NewEntry, const PracticeEntry& defaults, std::vector<std::pair<juce::String, juce::String>> topics);
+
     std::function<void (juce::Time start, double playedSeconds, const juce::String& note)> onSave;
     std::function<void()> onDelete, onCancel;
+
+    /** The topic picked in "Add time" mode (the entry's own topic otherwise). */
+    juce::String getTopicId() const;
+    juce::String getTopicTitle() const;
 
     void paint (juce::Graphics&) override;
     void resized() override;
 
 private:
+    void setUpFields (const PracticeEntry&);
     void save();
 
-    juce::Label summaryLabel, startLabel, minutesLabel, noteLabel, errorLabel;
+    std::vector<std::pair<juce::String, juce::String>> topicChoices;
+    juce::String ownTopicId, ownTopicTitle;
+    juce::ComboBox topicBox;
+    juce::Label summaryLabel, topicLabel, startLabel, minutesLabel, noteLabel, errorLabel;
     juce::TextEditor startEditor, minutesEditor, noteEditor;
     juce::TextButton saveButton { "Save" }, cancelButton { "Cancel" }, deleteButton { "Delete entry" };
 };
@@ -83,6 +96,7 @@ public:
 
     std::function<void (const juce::File&)> onOpenTake;
     std::function<void (const juce::String& entryId)> onEditEntry;     // a session row was tapped
+    std::function<void()> onAddTime;                                   // "+ Add time..."
     ~TopicHistory() override;
 
     void paint (juce::Graphics&) override;
@@ -94,6 +108,7 @@ private:
     class SessionList;
 
     juce::Label statsLabel, emptyLabel, sessionsHeader;
+    juce::TextButton addTimeButton { "+ Add time..." };
     std::unique_ptr<LineChart> tempoChart, speedChart;
     std::unique_ptr<WeekBars> weekBars;
     std::unique_ptr<SessionList> sessionList;

@@ -104,6 +104,8 @@ namespace
         if (p.maxBpm > 0.0)    e->setAttribute ("maxBpm", juce::String (p.maxBpm, 1));
         if (p.maxSpeed > 0.0)  e->setAttribute ("maxSpeed", juce::String (p.maxSpeed, 3));
         if (p.looper)          e->setAttribute ("looper", true);
+        if (p.noGuitar)        e->setAttribute ("noGuitar", true);
+        if (p.manual)          e->setAttribute ("manual", true);
 
         if (! p.setup.isEmpty())
             p.setup.toXml (*e->createNewChildElement ("SETUP"));
@@ -128,6 +130,8 @@ namespace
         p.maxBpm = juce::jmax (0.0, e.getDoubleAttribute ("maxBpm"));
         p.maxSpeed = juce::jmax (0.0, e.getDoubleAttribute ("maxSpeed"));
         p.looper = e.getBoolAttribute ("looper");
+        p.noGuitar = e.getBoolAttribute ("noGuitar");
+        p.manual = e.getBoolAttribute ("manual");
 
         if (auto* s = e.getChildByName ("SETUP"))
             p.setup = PracticeSetup::fromXml (*s);
@@ -581,6 +585,7 @@ void PracticeTracker::setActiveTopic (const juce::String& newId, const juce::Str
     topicTitle = title;
     activeSeconds = 0.0;
     pendingNote = {};
+    paused = false;
 }
 
 void PracticeTracker::open (juce::Time now)
@@ -605,7 +610,9 @@ void PracticeTracker::open (juce::Time now)
 void PracticeTracker::tick (double seconds, float inputPeak, const Activity& activity, juce::Time now)
 {
     seconds = juce::jlimit (0.0, 5.0, seconds);   // the app was suspended: don't count the gap
-    const auto played = detector.process (inputPeak, seconds);
+    const auto onClock = clockMode();
+    const auto heard = detector.process (inputPeak, seconds);   // keeps its noise floor up to date either way
+    const auto played = onClock ? (paused ? 0.0 : seconds) : heard;
     lastTickPlayed = played;
 
     sinceFinished += seconds;
@@ -646,6 +653,7 @@ void PracticeTracker::tick (double seconds, float inputPeak, const Activity& act
         e.songName = activity.songName;
 
     e.looper = e.looper || activity.looperActive;
+    e.noGuitar = e.noGuitar || onClock;
 
     if (captureSetup != nullptr)
         e.setup = captureSetup();
