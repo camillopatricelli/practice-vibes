@@ -274,6 +274,7 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     todayPanel->getLibrary = [this] { return libraryPanel->getLibrary(); };
     todayPanel->onPractise = [this] (const juce::String& id) { practiseTopic (id); };
     todayPanel->onShowHistory = [this] (const juce::String& id) { showTopicHistory (id); };
+    todayPanel->onEditEntry = [this] (const juce::String& id) { editLogEntry (id, {}); };
     todayPanel->getCandidates = [this] (const juce::String& tag) { return rotationCandidates (tag); };
     todayPanel->getRotationTags = [this] { return rotationTags(); };
     todayPanel->onPlanSession = [this] (const juce::String& tag) { openSessionPlanner (tag); };
@@ -807,7 +808,67 @@ void MainComponent::showTopicHistory (const juce::String& topicId)
             }
         });
     };
+    history->onEditEntry = [this, topicId] (const juce::String& entryId)
+    {
+        // Not from inside the history's own click: showing the editor deletes the history overlay.
+        juce::MessageManager::callAsync ([safe = SafePointer<MainComponent> (this), entryId, topicId]
+        {
+            if (safe != nullptr)
+                safe->editLogEntry (entryId, topicId);
+        });
+    };
     showOverlay ("History: " + topic->title, std::move (history));
+}
+
+void MainComponent::editLogEntry (const juce::String& entryId, const juce::String& historyTopicId)
+{
+    if (practiceLog == nullptr)
+        return;
+
+    tracker.flush();
+    const auto* entry = practiceLog->find (entryId);
+
+    if (entry == nullptr)
+        return;
+
+    const auto* current = tracker.getCurrent();
+    auto editor = std::make_unique<EntryEditor> (*entry, current != nullptr && current->id == entryId);
+
+    auto done = [this, historyTopicId]
+    {
+        juce::MessageManager::callAsync ([safe = SafePointer<MainComponent> (this), historyTopicId]
+        {
+            if (safe == nullptr)
+                return;
+
+            safe->todayPanel->refresh();
+
+            if (historyTopicId.isNotEmpty())
+                safe->showTopicHistory (historyTopicId);
+            else
+                safe->closeOverlay();
+        });
+    };
+
+    editor->onCancel = done;
+    editor->onSave = [this, entryId, done] (juce::Time start, double played, const juce::String& note)
+    {
+        if (practiceLog != nullptr)
+            practiceLog->editEntry (entryId, start, played, note);
+
+        juce::Logger::writeToLog ("Practice log: entry corrected (" + formatPracticeDuration (played) + ")");
+        done();
+    };
+    editor->onDelete = [this, entryId, done]
+    {
+        if (practiceLog != nullptr)
+            practiceLog->deleteEntry (entryId);
+
+        juce::Logger::writeToLog ("Practice log: entry deleted");
+        done();
+    };
+
+    showOverlay ("Practice entry", std::move (editor));
 }
 
 void MainComponent::layoutYouTube()

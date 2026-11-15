@@ -24,6 +24,7 @@ public:
     std::function<void (const juce::String& topicId)> onShowTopic;
     std::function<void()> onBecameVisible;          // re-read the library and the log (other devices)
     std::function<void (const juce::String& topicId)> onShowHistory;
+    std::function<void (const juce::String& entryId)> onEditEntry;  // a "Last two weeks" entry was tapped
 
     // Dice and sessions
     std::function<std::vector<PlanCandidate> (const juce::String& tag)> getCandidates;

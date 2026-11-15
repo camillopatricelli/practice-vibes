@@ -2,6 +2,7 @@
 
 #include <juce_core/juce_core.h>
 #include <deque>
+#include <map>
 #include <optional>
 #include <vector>
 
@@ -70,8 +71,19 @@ public:
     /** Names, sizes and dates of the log files: changes when any device writes. */
     juce::String computeSignature() const;
 
-    /** Adds the entry, or replaces the one with the same id, and writes this device's file for its year. */
+    /** Adds the entry, or replaces the one with the same id, and writes this device's file for its year.
+        Corrections made with editEntry / deleteEntry still apply to it. */
     bool save (const PracticeEntry&);
+
+    const PracticeEntry* find (const juce::String& id) const;
+
+    /** Corrects an entry from any device: start time (the end moves with it), played time and note.
+        Stored as a correction in this device's own edits file (edits-<device>.xml), so no file is ever written by
+        two devices; every device applies the newest correction for each entry when it reads the log. */
+    bool editEntry (const juce::String& id, juce::Time newStart, double playedSeconds, const juce::String& note);
+
+    /** Removes an entry from any device (also stored as a correction). */
+    bool deleteEntry (const juce::String& id);
 
     /** Oldest first. */
     const std::vector<PracticeEntry>& getEntries() const noexcept   { return entries; }
@@ -108,12 +120,28 @@ public:
     static juce::String getThisDeviceId();
 
 private:
+    struct Correction
+    {
+        juce::String id;            // the entry it corrects
+        juce::Time when;            // newest wins (across devices)
+        bool deleted = false;
+        juce::Time start;
+        double playedSeconds = 0.0;
+        juce::String note;
+    };
+
     juce::File fileFor (int year) const;
+    juce::File editsFile() const;
     bool writeYear (int year);
+    bool writeOwnCorrections() const;
+    bool addCorrection (const Correction&);
+    static void apply (const Correction&, PracticeEntry&);
 
     juce::File folder;
     juce::String device;
     std::vector<PracticeEntry> entries;
+    std::map<juce::String, Correction> corrections;       // newest per entry id, from every device
+    std::vector<Correction> ownCorrections;               // what this device's edits file holds
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PracticeLog)
 };
@@ -226,5 +254,12 @@ juce::String formatPracticeDuration (double seconds);
 
 /** "today", "yesterday", "5 days ago", "3 weeks ago", "never". */
 juce::String formatPracticeAgo (juce::Time when, juce::Time now);
+
+/** Entry times as typed in the editor: "15/11/2026 14:30" (local time). */
+juce::String formatEntryTime (juce::Time);
+std::optional<juce::Time> parseEntryTime (const juce::String&);
+
+/** Played minutes as typed: "12", "12.5", "12,5", "1:30" (h:mm). nullopt if not a number >= 0. */
+std::optional<double> parseMinutes (const juce::String&);
 
 } // namespace pv

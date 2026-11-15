@@ -582,6 +582,8 @@ public:
         std::stable_sort (items.begin(), items.end(), [] (const Item& x, const Item& y) { return x.when > y.when; });
     }
 
+    std::function<void (const juce::String& entryId)> onEdit;
+
     int contentHeight() const
     {
         int h = 0;
@@ -600,16 +602,17 @@ public:
         {
             const auto& item = items[i];
             auto r = juce::Rectangle<int> (4, y, getWidth() - 8, 26);
+
+            if ((int) i == hoverIndex)
+            {
+                g.setColour (juce::Colours::white.withAlpha (0.07f));
+                g.fillRoundedRectangle (r.withHeight (heightOf (item)).toFloat(), 4.0f);
+            }
+
             y += heightOf (item);
 
             if (item.isTake)
             {
-                if ((int) i == hoverIndex)
-                {
-                    g.setColour (juce::Colours::white.withAlpha (0.07f));
-                    g.fillRoundedRectangle (r.toFloat(), 4.0f);
-                }
-
                 g.setFont (juce::FontOptions (14.0f));
                 g.setColour (axisText);
                 g.drawText (formatTakeLength (item.take.seconds) + "  -  tap to replay", r, juce::Justification::centredRight, true);
@@ -645,12 +648,11 @@ public:
     void mouseMove (const juce::MouseEvent& e) override
     {
         const auto index = indexAt (e.y);
-        const auto take = index >= 0 && items[(size_t) index].isTake;
-        setMouseCursor (take ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        setMouseCursor (index >= 0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
 
-        if ((take ? index : -1) != hoverIndex)
+        if (index != hoverIndex)
         {
-            hoverIndex = take ? index : -1;
+            hoverIndex = index;
             repaint();
         }
     }
@@ -661,8 +663,20 @@ public:
     {
         const auto index = indexAt (e.y);
 
-        if (index >= 0 && items[(size_t) index].isTake && e.mouseWasClicked() && onOpen)
-            onOpen (items[(size_t) index].take.file);
+        if (index < 0 || ! e.mouseWasClicked())
+            return;
+
+        const auto& item = items[(size_t) index];
+
+        if (item.isTake)
+        {
+            if (onOpen)
+                onOpen (item.take.file);
+        }
+        else if (onEdit)
+        {
+            onEdit (item.entry.id);
+        }
     }
 
 private:
@@ -762,10 +776,12 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId,
     speedChart->setVisible (speedChart->hasData());
     weekBars->setVisible (! entries.empty());
 
-    addAndMakeVisible (styleCaption (sessionsHeader, takes.empty() ? "Sessions" : "Sessions and takes"));
+    addAndMakeVisible (styleCaption (sessionsHeader, juce::String (takes.empty() ? "Sessions" : "Sessions and takes")
+                                                         + (entries.empty() ? "" : "  (tap a session to correct or delete it)")));
     sessionsHeader.setVisible (! entries.empty() || ! takes.empty());
     sessionList = std::make_unique<SessionList> (std::move (entries), std::move (takes),
                                                  [this] (const juce::File& f) { if (onOpenTake) onOpenTake (f); });
+    sessionList->onEdit = [this] (const juce::String& id) { if (onEditEntry) onEditEntry (id); };
     sessionViewport.setViewedComponent (sessionList.get(), false);
     sessionViewport.setScrollBarsShown (true, false);
     addAndMakeVisible (sessionViewport);
@@ -820,6 +836,134 @@ void TopicHistory::resized()
     sessionsHeader.setBounds (list.removeFromTop (30));
     sessionViewport.setBounds (list);
     sessionList->setSize (juce::jmax (1, sessionViewport.getMaximumVisibleWidth()), sessionList->contentHeight());
+}
+
+//==============================================================================
+EntryEditor::EntryEditor (const PracticeEntry& entry, bool stillRunning)
+{
+    auto what = entry.isFree() ? juce::String ("Free practice") : entry.topicTitle;
+
+    if (entry.songName.isNotEmpty())
+        what << "  -  " << entry.songName;
+
+    summaryLabel.setText (what + "\n" + entry.start.formatted ("%a %d %b %Y, %H:%M") + " - " + entry.end.formatted ("%H:%M")
+                              + ",  " + formatPracticeDuration (entry.playedSeconds) + " played",
+                          juce::dontSendNotification);
+    summaryLabel.setFont (juce::FontOptions (16.0f));
+    summaryLabel.setColour (juce::Label::textColourId, primaryText);
+    summaryLabel.setJustificationType (juce::Justification::topLeft);
+    addAndMakeVisible (summaryLabel);
+
+    auto setUp = [this] (juce::Label& label, const juce::String& text, juce::TextEditor& editor)
+    {
+        addAndMakeVisible (styleCaption (label, text));
+        editor.setColour (juce::TextEditor::backgroundColourId, theme::panel);
+        editor.setColour (juce::TextEditor::outlineColourId, juce::Colours::white.withAlpha (0.15f));
+        editor.setColour (juce::TextEditor::focusedOutlineColourId, theme::accent);
+        editor.setFont (juce::FontOptions (15.0f));
+        addAndMakeVisible (editor);
+    };
+
+    setUp (startLabel, "Started (day/month/year hours:minutes)", startEditor);
+    startEditor.setText (formatEntryTime (entry.start), false);
+
+    setUp (minutesLabel, "Minutes played", minutesEditor);
+    const auto minutes = entry.playedSeconds / 60.0;
+    minutesEditor.setText (std::abs (minutes - std::round (minutes)) < 0.05 ? juce::String (juce::roundToInt (minutes))
+                                                                             : juce::String (minutes, 1), false);
+    minutesEditor.setInputRestrictions (8, "0123456789.,:");
+
+    setUp (noteLabel, "Note", noteEditor);
+    noteEditor.setMultiLine (true, true);
+    noteEditor.setReturnKeyStartsNewLine (true);
+    noteEditor.setText (entry.note, false);
+
+    errorLabel.setColour (juce::Label::textColourId, theme::highlight);
+    addAndMakeVisible (errorLabel);
+
+    saveButton.onClick = [this] { save(); };
+    cancelButton.onClick = [this] { if (onCancel) onCancel(); };
+    deleteButton.onClick = [this]
+    {
+        auto options = juce::MessageBoxOptions{}.withIconType (juce::MessageBoxIconType::WarningIcon)
+                                                .withTitle ("Delete entry")
+                                                .withMessage ("Delete this practice entry? Totals and charts are updated on every device.")
+                                                .withButton ("Delete", 1).withButton ("Cancel", 0)
+                                                .withAssociatedComponent (this);
+        juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<EntryEditor> (this)] (int result)
+        {
+            if (result == 1 && safe != nullptr && safe->onDelete)
+                safe->onDelete();
+        });
+    };
+    deleteButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff8a2b2b));
+    addAndMakeVisible (saveButton);
+    addAndMakeVisible (cancelButton);
+    addAndMakeVisible (deleteButton);
+
+    if (stillRunning)
+    {
+        errorLabel.setText ("This session is still being recorded: stop it first (Stop on the Today tab), then correct it.",
+                            juce::dontSendNotification);
+
+        for (juce::Component* c : { (juce::Component*) &startEditor, (juce::Component*) &minutesEditor,
+                                    (juce::Component*) &noteEditor, (juce::Component*) &saveButton, (juce::Component*) &deleteButton })
+            c->setEnabled (false);
+    }
+}
+
+void EntryEditor::save()
+{
+    const auto start = parseEntryTime (startEditor.getText());
+    const auto minutes = parseMinutes (minutesEditor.getText());
+
+    if (! start.has_value())
+    {
+        errorLabel.setText ("Type the start like 15/11/2026 14:30.", juce::dontSendNotification);
+        startEditor.grabKeyboardFocus();
+        return;
+    }
+
+    if (! minutes.has_value() || *minutes > 24.0 * 60.0)
+    {
+        errorLabel.setText ("Type the minutes played as a number, e.g. 25 (or 1:10 for an hour and ten minutes).",
+                            juce::dontSendNotification);
+        minutesEditor.grabKeyboardFocus();
+        return;
+    }
+
+    if (onSave)
+        onSave (*start, *minutes * 60.0, noteEditor.getText().trim());
+}
+
+void EntryEditor::paint (juce::Graphics& g)
+{
+    g.setColour (theme::background);
+    g.fillRoundedRectangle (getLocalBounds().toFloat(), 8.0f);
+}
+
+void EntryEditor::resized()
+{
+    auto area = getLocalBounds().reduced (16);
+    auto buttons = area.removeFromBottom (44);
+    saveButton.setBounds (buttons.removeFromRight (120).reduced (3));
+    cancelButton.setBounds (buttons.removeFromRight (120).reduced (3));
+    deleteButton.setBounds (buttons.removeFromLeft (140).reduced (3));
+    errorLabel.setBounds (area.removeFromBottom (40));
+
+    summaryLabel.setBounds (area.removeFromTop (48));
+    area.removeFromTop (8);
+
+    auto row = area.removeFromTop (62);
+    auto left = row.removeFromLeft (row.getWidth() * 2 / 3).withTrimmedRight (12);
+    startLabel.setBounds (left.removeFromTop (28));
+    startEditor.setBounds (left.removeFromTop (34));
+    minutesLabel.setBounds (row.removeFromTop (28));
+    minutesEditor.setBounds (row.removeFromTop (34));
+
+    area.removeFromTop (10);
+    noteLabel.setBounds (area.removeFromTop (28));
+    noteEditor.setBounds (area.withTrimmedBottom (6));
 }
 
 } // namespace pv

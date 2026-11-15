@@ -161,9 +161,16 @@ juce::File PracticeLog::fileFor (int year) const
     return folder.getChildFile ("log-" + device + "-" + juce::String (year) + ".xml");
 }
 
+juce::File PracticeLog::editsFile() const
+{
+    return folder.getChildFile ("edits-" + device + ".xml");
+}
+
 void PracticeLog::reload()
 {
     entries.clear();
+    corrections.clear();
+    ownCorrections.clear();
 
     if (! folder.isDirectory())
         return;
@@ -183,7 +190,152 @@ void PracticeLog::reload()
                     entries.push_back (std::move (*entry));
     }
 
+    // Corrections (edits / deletions) from every device: the newest one for each entry wins.
+    for (auto& file : folder.findChildFiles (juce::File::findFiles, false, "edits-*.xml"))
+    {
+        auto xml = juce::parseXMLIfTagMatches (file, "PRACTICEEDITS");
+
+        if (xml == nullptr)
+            continue;
+
+        const auto own = file == editsFile();
+
+        for (auto* e : xml->getChildWithTagNameIterator ("EDIT"))
+        {
+            Correction c;
+            c.id = e->getStringAttribute ("id");
+            c.when = juce::Time::fromISO8601 (e->getStringAttribute ("when"));
+            c.deleted = e->getBoolAttribute ("deleted");
+            c.start = juce::Time::fromISO8601 (e->getStringAttribute ("start"));
+            c.playedSeconds = juce::jmax (0.0, e->getDoubleAttribute ("played"));
+
+            if (auto* n = e->getChildByName ("NOTE"))
+                c.note = n->getAllSubText();
+
+            if (c.id.isEmpty())
+                continue;
+
+            if (own)
+                ownCorrections.push_back (c);
+
+            auto it = corrections.find (c.id);
+
+            if (it == corrections.end() || it->second.when < c.when)
+                corrections[c.id] = c;
+        }
+    }
+
+    for (auto& [id, c] : corrections)
+        for (auto& e : entries)
+            if (e.id == id)
+                apply (c, e);
+
+    entries.erase (std::remove_if (entries.begin(), entries.end(), [this] (const PracticeEntry& e)
+    {
+        auto it = corrections.find (e.id);
+        return it != corrections.end() && it->second.deleted;
+    }), entries.end());
+
     std::stable_sort (entries.begin(), entries.end(), [] (const PracticeEntry& a, const PracticeEntry& b) { return a.start < b.start; });
+}
+
+void PracticeLog::apply (const Correction& c, PracticeEntry& e)
+{
+    if (c.deleted)
+        return;
+
+    if (c.start != juce::Time())
+    {
+        const auto length = e.end - e.start;
+        e.start = c.start;
+        e.end = c.start + length;
+    }
+
+    e.playedSeconds = c.playedSeconds;
+    e.note = c.note;
+}
+
+const PracticeEntry* PracticeLog::find (const juce::String& id) const
+{
+    for (auto& e : entries)
+        if (e.id == id)
+            return &e;
+
+    return nullptr;
+}
+
+bool PracticeLog::addCorrection (const Correction& c)
+{
+    ownCorrections.erase (std::remove_if (ownCorrections.begin(), ownCorrections.end(),
+                                          [&] (const Correction& x) { return x.id == c.id; }), ownCorrections.end());
+    ownCorrections.push_back (c);
+    corrections[c.id] = c;
+
+    auto it = std::find_if (entries.begin(), entries.end(), [&] (const PracticeEntry& e) { return e.id == c.id; });
+
+    if (it != entries.end())
+    {
+        if (c.deleted)
+            entries.erase (it);
+        else
+            apply (c, *it);
+    }
+
+    std::stable_sort (entries.begin(), entries.end(), [] (const PracticeEntry& a, const PracticeEntry& b) { return a.start < b.start; });
+    return writeOwnCorrections();
+}
+
+bool PracticeLog::writeOwnCorrections() const
+{
+    juce::XmlElement xml ("PRACTICEEDITS");
+    xml.setAttribute ("device", device);
+
+    for (auto& c : ownCorrections)
+    {
+        auto* e = xml.createNewChildElement ("EDIT");
+        e->setAttribute ("id", c.id);
+        e->setAttribute ("when", c.when.toISO8601 (true));
+
+        if (c.deleted)
+        {
+            e->setAttribute ("deleted", true);
+            continue;
+        }
+
+        e->setAttribute ("start", c.start.toISO8601 (true));
+        e->setAttribute ("played", juce::roundToInt (c.playedSeconds));
+
+        if (c.note.isNotEmpty())
+            e->createNewChildElement ("NOTE")->addTextElement (c.note);
+    }
+
+    return folder.createDirectory() && xml.writeTo (editsFile());
+}
+
+bool PracticeLog::editEntry (const juce::String& id, juce::Time newStart, double playedSeconds, const juce::String& note)
+{
+    if (find (id) == nullptr)
+        return false;
+
+    Correction c;
+    c.id = id;
+    c.when = juce::Time::getCurrentTime();
+    c.start = newStart;
+    c.playedSeconds = juce::jmax (0.0, playedSeconds);
+    c.note = note;
+    return addCorrection (c);
+}
+
+bool PracticeLog::deleteEntry (const juce::String& id)
+{
+    if (find (id) == nullptr)
+        return false;
+
+    Correction c;
+    c.id = id;
+    c.when = juce::Time::getCurrentTime();
+    c.deleted = true;
+    return addCorrection (c);
 }
 
 juce::String PracticeLog::computeSignature() const
@@ -191,7 +343,7 @@ juce::String PracticeLog::computeSignature() const
     juce::String sig;
 
     if (folder.isDirectory())
-        for (auto& file : folder.findChildFiles (juce::File::findFiles, false, "log-*.xml"))
+        for (auto& file : folder.findChildFiles (juce::File::findFiles, false, "*.xml"))
             sig << file.getFileName() << '|' << file.getSize() << '|' << file.getLastModificationTime().toMilliseconds() << '\n';
 
     return juce::String::toHexString (sig.hashCode64());
@@ -201,6 +353,14 @@ bool PracticeLog::save (const PracticeEntry& entry)
 {
     auto copy = entry;
     copy.device = device;
+
+    if (auto c = corrections.find (copy.id); c != corrections.end())
+    {
+        if (c->second.deleted)
+            return true;    // deleted by the user: stays deleted
+
+        apply (c->second, copy);
+    }
 
     auto it = std::find_if (entries.begin(), entries.end(), [&] (const PracticeEntry& x) { return x.id == copy.id; });
     int oldYear = 0;
@@ -581,6 +741,65 @@ void PracticeTracker::saveNote()
 }
 
 //==============================================================================
+juce::String formatEntryTime (juce::Time t)
+{
+    return t.formatted ("%d/%m/%Y %H:%M");
+}
+
+std::optional<juce::Time> parseEntryTime (const juce::String& text)
+{
+    juce::StringArray parts;
+    parts.addTokens (text.trim(), " /.-:", {});
+    parts.removeEmptyStrings();
+
+    if (parts.size() != 5)
+        return std::nullopt;
+
+    for (auto& p : parts)
+        if (! p.containsOnly ("0123456789"))
+            return std::nullopt;
+
+    const auto day = parts[0].getIntValue(), month = parts[1].getIntValue(), hour = parts[3].getIntValue(),
+               minute = parts[4].getIntValue();
+    auto year = parts[2].getIntValue();
+
+    if (year < 100)
+        year += 2000;
+
+    if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || year < 2000 || year > 2200)
+        return std::nullopt;
+
+    const juce::Time t (year, month - 1, day, hour, minute, 0, 0, true);
+
+    if (t.getDayOfMonth() != day || t.getMonth() != month - 1)     // 31/02 and the like
+        return std::nullopt;
+
+    return t;
+}
+
+std::optional<double> parseMinutes (const juce::String& text)
+{
+    const auto s = text.trim().replaceCharacter (',', '.');
+
+    if (s.isEmpty() || ! s.containsOnly ("0123456789.:"))
+        return std::nullopt;
+
+    if (s.containsChar (':'))
+    {
+        const auto h = s.upToFirstOccurrenceOf (":", false, false), m = s.fromFirstOccurrenceOf (":", false, false);
+
+        if (h.isEmpty() || m.isEmpty() || m.containsAnyOf (":.") || h.containsChar ('.') || m.getIntValue() > 59)
+            return std::nullopt;
+
+        return h.getIntValue() * 60.0 + m.getIntValue();
+    }
+
+    if (s.indexOfChar ('.') != s.lastIndexOfChar ('.') || s == ".")
+        return std::nullopt;
+
+    return s.getDoubleValue();
+}
+
 juce::String formatPracticeDuration (double seconds)
 {
     const auto minutes = juce::roundToInt (seconds / 60.0);

@@ -62,6 +62,8 @@ private:
     void sessionExtend();
     void sessionEnd();
     void showTopicHistory (const juce::String& topicId);
+    /** Correct / delete a log entry; `historyTopicId` = reopen that topic's History afterwards (empty: just close). */
+    void editLogEntry (const juce::String& entryId, const juce::String& historyTopicId);
 
     // Takes
     void toggleRecording();

@@ -118,7 +118,8 @@ private:
 
 //==============================================================================
 /** The last two weeks, newest first, grouped by day. */
-class TodayPanel::RecentView final : public juce::Component
+class TodayPanel::RecentView final : public juce::Component,
+                                     public juce::SettableTooltipClient
 {
 public:
     void setEntries (const std::vector<PracticeEntry>& all)
@@ -161,10 +162,10 @@ public:
             if (it->maxSpeed > 0.0)  detail.add (juce::String (juce::roundToInt (it->maxSpeed * 100.0)) + " %");
             if (it->looper)          detail.add ("looper");
 
-            lines.push_back ({ Line::entry, what, detail.joinIntoString ("  -  ") });
+            lines.push_back ({ Line::entry, what, detail.joinIntoString ("  -  "), it->id });
 
             if (it->note.isNotEmpty())
-                lines.push_back ({ Line::note, it->note.replaceCharacters ("\r\n", "  "), {} });
+                lines.push_back ({ Line::note, it->note.replaceCharacters ("\r\n", "  "), {}, it->id });
         }
 
         setSize (getWidth(), getContentHeight());
@@ -200,6 +201,12 @@ public:
             auto r = juce::Rectangle<int> (0, y, getWidth(), h).reduced (4, 0);
             y += h;
 
+            if (l.entryId.isNotEmpty() && l.entryId == hoverId)
+            {
+                g.setColour (juce::Colours::white.withAlpha (0.07f));
+                g.fillRect (r);
+            }
+
             switch (l.kind)
             {
                 case Line::day:
@@ -234,16 +241,60 @@ public:
         }
     }
 
+    /** Tap an entry (or its note) to correct or delete it. */
+    std::function<void (const juce::String& entryId)> onEdit;
+
+    void mouseMove (const juce::MouseEvent& e) override
+    {
+        const auto id = idAt (e.y);
+        setMouseCursor (id.isNotEmpty() ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+
+        if (id != hoverId)
+        {
+            hoverId = id;
+            repaint();
+        }
+    }
+
+    void mouseExit (const juce::MouseEvent&) override       { hoverId = {}; repaint(); }
+
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        const auto id = idAt (e.y);
+
+        if (id.isNotEmpty() && e.mouseWasClicked() && onEdit)
+            onEdit (id);
+    }
+
 private:
     struct Line
     {
         enum Kind { day, entry, note } kind;
         juce::String text, detail;
+        juce::String entryId;
     };
 
     static int heightOf (const Line& l)     { return l.kind == Line::day ? 34 : (l.kind == Line::entry ? 24 : 20); }
 
+    juce::String idAt (int y) const
+    {
+        int top = 4;
+
+        for (auto& l : lines)
+        {
+            const auto h = heightOf (l);
+
+            if (y >= top && y < top + h)
+                return l.entryId;
+
+            top += h;
+        }
+
+        return {};
+    }
+
     std::vector<Line> lines;
+    juce::String hoverId;
 };
 
 //==============================================================================
@@ -353,6 +404,8 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
     addAndMakeVisible (rotationViewport);
 
     recentView = std::make_unique<RecentView>();
+    recentView->onEdit = [this] (const juce::String& id) { if (onEditEntry) onEditEntry (id); };
+    recentView->setTooltip ("Tap an entry to correct or delete it");
     recentViewport.setViewedComponent (recentView.get(), false);
     recentViewport.setScrollBarsShown (true, false);
     addAndMakeVisible (recentViewport);

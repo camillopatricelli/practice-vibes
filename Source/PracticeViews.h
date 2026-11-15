@@ -44,6 +44,27 @@ private:
     std::vector<std::unique_ptr<SlotRow>> rows;
 };
 
+/** Overlay form: correct or delete one practice log entry (start time, played minutes, note). */
+class EntryEditor final : public juce::Component
+{
+public:
+    /** `stillRunning`: the entry is the one being recorded right now (it can't be changed until it ends). */
+    EntryEditor (const PracticeEntry&, bool stillRunning);
+
+    std::function<void (juce::Time start, double playedSeconds, const juce::String& note)> onSave;
+    std::function<void()> onDelete, onCancel;
+
+    void paint (juce::Graphics&) override;
+    void resized() override;
+
+private:
+    void save();
+
+    juce::Label summaryLabel, startLabel, minutesLabel, noteLabel, errorLabel;
+    juce::TextEditor startEditor, minutesEditor, noteEditor;
+    juce::TextButton saveButton { "Save" }, cancelButton { "Cancel" }, deleteButton { "Delete entry" };
+};
+
 /** A recorded take listed in a topic's history. */
 struct TakeRow
 {
@@ -61,6 +82,7 @@ public:
     TopicHistory (const PracticeLog&, const juce::String& topicId, std::vector<TakeRow> takes = {});
 
     std::function<void (const juce::File&)> onOpenTake;
+    std::function<void (const juce::String& entryId)> onEditEntry;     // a session row was tapped
     ~TopicHistory() override;
 
     void paint (juce::Graphics&) override;

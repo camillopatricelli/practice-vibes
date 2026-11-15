@@ -2121,6 +2121,78 @@ static void testLinks()
     root.deleteRecursively();
 }
 
+static void testLogCorrections()
+{
+    std::cout << "\n[Practice log corrections]\n";
+
+    const auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("pv-log-edits-test");
+    folder.deleteRecursively();
+
+    const juce::Time day (2026, 10, 15, 18, 0, 0, 0, true);
+
+    auto makeEntry = [&] (const juce::String& id, int hourOffset, double played)
+    {
+        PracticeEntry e;
+        e.id = id;
+        e.topicId = "t1";
+        e.topicTitle = "Scales";
+        e.start = day + juce::RelativeTime::hours (hourOffset);
+        e.end = e.start + juce::RelativeTime::minutes (30);
+        e.playedSeconds = played;
+        return e;
+    };
+
+    {
+        PracticeLog ipad (folder, "ipad");
+        ipad.save (makeEntry ("a", 0, 600.0));
+        ipad.save (makeEntry ("b", 1, 900.0));
+        ipad.save (makeEntry ("c", 2, 300.0));
+    }
+
+    PracticeLog pc (folder, "pc");
+    check (pc.getEntries().size() == 3, "the PC reads the iPad's entries");
+
+    // The PC corrects an iPad entry and deletes another: written only to the PC's own edits file.
+    const auto newStart = day + juce::RelativeTime::hours (-2);
+    check (pc.editEntry ("b", newStart, 25.0 * 60.0, "Fixed: was counted twice"), "edit an entry from another device");
+    check (pc.deleteEntry ("c"), "delete an entry from another device");
+    check (! pc.deleteEntry ("nope"), "unknown entry -> false");
+
+    check (pc.getEntries().size() == 2 && pc.getEntries().front().id == "b"
+               && pc.find ("b")->end == newStart + juce::RelativeTime::minutes (30)
+               && pc.find ("b")->playedSeconds == 1500.0 && pc.find ("c") == nullptr,
+           "applied at once: re-sorted by the new start, end moved with it, played time, deleted entry gone");
+    check (folder.getChildFile ("edits-pc.xml").existsAsFile()
+               && ! folder.getChildFile ("log-pc-2026.xml").existsAsFile(),
+           "the iPad's log file is untouched; the correction sits in edits-pc.xml");
+    check (pc.summarise ("t1").sessions == 2 && pc.summarise ("t1").totalSeconds == 2100.0, "totals follow the corrections");
+
+    // The iPad sees the corrections; its tracker re-saving entry b (e.g. a late note) doesn't undo them.
+    PracticeLog ipad (folder, "ipad");
+    check (ipad.getEntries().size() == 2 && ipad.find ("b")->note == "Fixed: was counted twice", "other devices apply the corrections");
+    ipad.save (makeEntry ("b", 1, 900.0));
+    ipad.save (makeEntry ("c", 2, 300.0));
+    check (ipad.find ("b")->playedSeconds == 1500.0 && ipad.find ("c") == nullptr, "re-saving keeps corrections and deletions");
+
+    // A newer correction from the iPad wins over the PC's.
+    juce::Thread::sleep (5);
+    ipad.editEntry ("b", newStart, 20.0 * 60.0, {});
+    pc.reload();
+    check (pc.find ("b")->playedSeconds == 1200.0 && pc.find ("b")->note.isEmpty(), "the newest correction wins on every device");
+
+    check (parseEntryTime ("15/11/2026 14:30") == juce::Time (2026, 10, 15, 14, 30, 0, 0, true)
+               && parseEntryTime (formatEntryTime (day)) == day && parseEntryTime ("5.3.26 9:05").has_value()
+               && ! parseEntryTime ("31/02/2026 10:00").has_value() && ! parseEntryTime ("15/11/2026").has_value()
+               && ! parseEntryTime ("15/13/2026 10:00").has_value(),
+           "entry times: typed forms, bad dates refused");
+    check (parseMinutes ("25") == 25.0 && parseMinutes ("12,5") == 12.5 && parseMinutes ("1:10") == 70.0
+               && ! parseMinutes ("").has_value() && ! parseMinutes ("abc").has_value() && ! parseMinutes ("1.2.3").has_value()
+               && ! parseMinutes ("1:75").has_value(),
+           "minutes: 25, 12,5, 1:10; junk refused");
+
+    folder.deleteRecursively();
+}
+
 static void testPracticeLog()
 {
     std::cout << "Practice log (played time, entries, setups)" << std::endl;
@@ -3362,6 +3434,7 @@ int main()
     testLibrary();
     testLinks();
     testPracticeLog();
+    testLogCorrections();
     testPracticePlanner();
     testTakes();
     testStorage();
