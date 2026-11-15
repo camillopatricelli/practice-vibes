@@ -653,12 +653,12 @@ bool Library::deleteTopic (const juce::String& topicId)
     return true;
 }
 
-Resource* Library::addFile (Topic& topic, const juce::URL& source)
+juce::File Library::copyIn (const juce::URL& source, const juce::File& folder)
 {
     const auto sourceName = source.isLocalFile() ? source.getLocalFile().getFileName()
                                                  : juce::URL::removeEscapeChars (source.getFileName());
-    auto target = uniqueChild (topic.folder, sourceName);
-    topic.folder.createDirectory();
+    auto target = uniqueChild (folder, sourceName);
+    folder.createDirectory();
 
     bool copied = false;
 
@@ -677,8 +677,50 @@ Resource* Library::addFile (Topic& topic, const juce::URL& source)
     if (! copied)
     {
         target.deleteFile();
-        return nullptr;
+        return {};
     }
+
+    // Stems already made for the original (kept in the app's data while it was outside the library) move along,
+    // so the song doesn't have to be separated again.
+    if (source.isLocalFile())
+        adoptStems (source.getLocalFile(), target);
+
+    return target;
+}
+
+bool Library::adoptStems (const juce::File& fromSong, const juce::File& toSong)
+{
+    const auto from = Stems::folderFor (fromSong, root);
+    const auto to = Stems::folderFor (toSong, root);
+
+    if (from == to || ! Stems::isComplete (from) || to.exists())
+        return false;
+
+    to.getParentDirectory().createDirectory();
+    const auto ok = from.moveFileTo (to) || (from.copyDirectoryTo (to) && from.deleteRecursively());
+
+    if (ok)
+        juce::Logger::writeToLog ("Stems moved with the song: " + to.getFullPathName());
+
+    return ok;
+}
+
+juce::File Library::addToInbox (const juce::URL& source)
+{
+    auto target = copyIn (source, root);
+
+    if (target != juce::File())
+        inbox.addIfNotAlreadyThere (target);
+
+    return target;
+}
+
+Resource* Library::addFile (Topic& topic, const juce::URL& source)
+{
+    const auto target = copyIn (source, topic.folder);
+
+    if (target == juce::File())
+        return nullptr;
 
     Resource r;
     r.id = r.fileName = target.getFileName();

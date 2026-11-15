@@ -2284,6 +2284,77 @@ static void testNoGuitarTopics()
     root.deleteRecursively();
 }
 
+static void testOutsideSongs()
+{
+    std::cout << "\n[Songs from outside the library -> Inbox, stems follow]\n";
+
+    const auto temp = juce::File::getSpecialLocation (juce::File::tempDirectory);
+    const auto root = temp.getChildFile ("pv-inbox-test-library");
+    const auto outside = temp.getChildFile ("pv-inbox-test-outside");
+    root.deleteRecursively();
+    outside.deleteRecursively();
+    root.createDirectory();
+    outside.createDirectory();
+
+    auto makeSong = [&] (const juce::String& name)
+    {
+        auto f = outside.getChildFile (name);
+        f.replaceWithText ("not really audio");
+        return f;
+    };
+
+    auto makeStems = [&] (const juce::File& folder, bool complete)
+    {
+        folder.createDirectory();
+
+        for (int i = 0; i < Stems::count; ++i)
+            Stems::stemFile (folder, i).replaceWithText ("stem");
+
+        if (complete)
+            Stems::infoFile (folder).replaceWithText ("<STEMS/>");
+    };
+
+    Library lib (root);
+
+    // A song with finished stems in app data goes to the Inbox, and its stems to the library's .stems.
+    const auto song = makeSong ("pv test song 7f3a.mp3");
+    const auto oldStems = Stems::folderFor (song, root);
+    makeStems (oldStems, true);
+
+    const auto copy = lib.addToInbox (juce::URL (song));
+    check (copy == root.getChildFile (song.getFileName()) && copy.existsAsFile() && song.existsAsFile()
+               && lib.getInbox().contains (copy),
+           "copied into the Inbox (the original stays where it was)");
+    check (Stems::isComplete (Stems::folderFor (copy, root)) && ! oldStems.exists()
+               && Stems::folderFor (copy, root) == root.getChildFile (".stems").getChildFile (song.getFileName()),
+           "finished stems moved from app data to <library>/.stems/<song>");
+
+    // Same file again: a second copy with a new name; nothing left to move.
+    const auto copy2 = lib.addToInbox (juce::URL (song));
+    check (copy2.getFileName() == "pv test song 7f3a (2).mp3" && ! Stems::folderFor (copy2, root).exists(),
+           "adding it again makes \"(2)\", no stems to move");
+
+    // Stems still being made (no stems.xml) stay where they are.
+    const auto busy = makeSong ("pv test busy 7f3a.wav");
+    const auto busyStems = Stems::folderFor (busy, root);
+    makeStems (busyStems, false);
+    const auto busyCopy = lib.addToInbox (juce::URL (busy));
+    check (busyStems.isDirectory() && ! Stems::folderFor (busyCopy, root).exists(), "unfinished stems are not moved");
+    busyStems.deleteRecursively();
+
+    // A topic's "Add files..." brings the stems along too.
+    auto* topic = lib.createTopic ("Songs");
+    const auto other = makeSong ("pv test other 7f3a.flac");
+    makeStems (Stems::folderFor (other, root), true);
+    auto* r = lib.addFile (*topic, juce::URL (other));
+    check (r != nullptr && Stems::isComplete (Stems::folderFor (topic->getFile (*r), root))
+               && ! Stems::folderFor (other, root).exists(),
+           "Add files... to a topic: stems move next to the copy");
+
+    root.deleteRecursively();
+    outside.deleteRecursively();
+}
+
 static void testPracticeLog()
 {
     std::cout << "Practice log (played time, entries, setups)" << std::endl;
@@ -3574,6 +3645,7 @@ int main()
     testPracticeLog();
     testLogCorrections();
     testNoGuitarTopics();
+    testOutsideSongs();
     testPracticePlanner();
     testTakes();
     testStorage();

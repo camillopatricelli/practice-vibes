@@ -827,8 +827,20 @@ void PracticePanel::openFile()
         const auto url = chooser.getURLResult();
 
         if (! url.isEmpty())
-            loadSong (url);
+            loadSong (url, std::nullopt, [this, url] { if (onSongPicked) onSongPicked (url); });
     });
+}
+
+void PracticePanel::songCopiedTo (const juce::File& newFile)
+{
+    songFile = newFile;
+    stemsSong = nullptr;          // updateStems() works out the stem folder again, for the copy
+    stemsSongOfFile = nullptr;
+}
+
+bool PracticePanel::isSeparatingStems() const
+{
+    return stemService.isBusy();
 }
 
 void PracticePanel::loadSong (const juce::URL& url, std::optional<PracticeSetup> then, std::function<void()> onLoaded)

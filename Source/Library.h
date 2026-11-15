@@ -123,8 +123,16 @@ public:
     bool saveTopic (const Topic&);
     bool deleteTopic (const juce::String& topicId);
 
-    /** Copies a file (or reads a URL, e.g. from the iOS document picker) into the topic's folder. */
+    /** Copies a file (or reads a URL, e.g. from the iOS document picker) into the topic's folder.
+        Finished stems of the original (from outside the library) move along. */
     Resource* addFile (Topic&, const juce::URL& source);
+
+    /** Copies a file into the Inbox (the library's top folder); its finished stems move along. Empty File on failure. */
+    juce::File addToInbox (const juce::URL& source);
+
+    /** Moves a song's finished stems to where another copy of it keeps them (e.g. app data -> the library's
+        ".stems"). False if there were none, they're incomplete, or the target already has some. */
+    bool adoptStems (const juce::File& fromSong, const juce::File& toSong);
 
     /** Moves a file from the Inbox into the topic. */
     Resource* moveInboxFile (Topic&, const juce::File& inboxFile);
@@ -149,6 +157,7 @@ private:
     static bool loadTopic (const juce::File& folder, Topic&);
     void sortTopics();
     juce::File uniqueChild (const juce::File& folder, const juce::String& fileName) const;
+    juce::File copyIn (const juce::URL& source, const juce::File& folder);
 
     juce::File root;
     std::vector<Topic> topics;

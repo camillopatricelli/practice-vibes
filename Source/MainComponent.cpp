@@ -276,6 +276,7 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     todayPanel->onShowHistory = [this] (const juce::String& id) { showTopicHistory (id); };
     todayPanel->onEditEntry = [this] (const juce::String& id) { editLogEntry (id, {}); };
     todayPanel->onAddTime = [this] (const juce::String& id) { addLogTime (id, {}); };
+    practicePanel->onSongPicked = [this] (const juce::URL& url) { offerAddToInbox (url); };
 
     // Ear training, theory...: those topics are timed on the clock instead of from the guitar input.
     tracker.isNoGuitarTopic = [this] (const juce::String& id)
@@ -894,6 +895,73 @@ void MainComponent::editLogEntry (const juce::String& entryId, const juce::Strin
     };
 
     showOverlay ("Practice entry", std::move (editor));
+}
+
+void MainComponent::offerAddToInbox (const juce::URL& song)
+{
+    auto* lib = libraryPanel->getLibrary();
+
+    if (lib == nullptr)
+        return;
+
+    const auto original = song.isLocalFile() ? song.getLocalFile() : juce::File();
+
+    if (original != juce::File() && original.isAChildOf (lib->getRoot()))
+        return;   // already in the library
+
+    const auto key = song.toString (false);
+
+    if (inboxDeclined.contains (key))
+        return;
+
+    const auto name = original != juce::File() ? original.getFileName() : juce::URL::removeEscapeChars (song.getFileName());
+    auto options = juce::MessageBoxOptions{}
+                       .withIconType (juce::MessageBoxIconType::QuestionIcon)
+                       .withTitle ("Add to your library?")
+                       .withMessage ("\"" + name + "\" isn't in your library folder.\n\n"
+                                     "Add a copy to the Topics Inbox? It then syncs to your other devices, and its stems "
+                                     "are kept next to it (stems you already made for it move along).")
+                       .withButton ("Add to Inbox", 1)
+                       .withButton ("Not now", 0)
+                       .withAssociatedComponent (this);
+
+    juce::AlertWindow::showAsync (options, [safe = SafePointer<MainComponent> (this), song, original, key, name] (int result)
+    {
+        if (safe == nullptr)
+            return;
+
+        if (result != 1)
+        {
+            safe->inboxDeclined.add (key);
+            return;
+        }
+
+        auto* library = safe->libraryPanel->getLibrary();
+
+        if (library == nullptr)
+            return;
+
+        if (safe->practicePanel->isSeparatingStems())
+            juce::Logger::writeToLog ("Stems are still being made: they stay in the app's data folder for the original file");
+
+        const auto copy = library->addToInbox (song);
+
+        if (copy == juce::File())
+        {
+            juce::Logger::writeToLog ("Could not copy " + name + " into the library");
+            safe->practicePanel->showNote ("Could not copy the song into the library (see the Log tab)");
+            return;
+        }
+
+        juce::Logger::writeToLog ("Song added to the Inbox: " + copy.getFullPathName());
+
+        // The loaded song now is the copy (unless another song was opened meanwhile).
+        if (safe->practicePanel->getSongFile() == original)
+            safe->practicePanel->songCopiedTo (copy);
+
+        safe->practicePanel->showNote ("Added to the Inbox: move it into a topic from the Topics tab");
+        safe->libraryPanel->checkForChanges();
+    });
 }
 
 void MainComponent::addLogTime (const juce::String& topicId, const juce::String& historyTopicId)

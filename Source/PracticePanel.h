@@ -50,6 +50,15 @@ public:
     void showNote (const juce::String&);
 
     juce::File getSongFile() const                      { return songFile; }   // the loaded song's file, if local
+
+    /** A song chosen with "Open song..." has loaded (the URL it came from). */
+    std::function<void (const juce::URL&)> onSongPicked;
+
+    /** The loaded song was copied to `newFile` (e.g. into the library's Inbox): from now on it is that file
+        (stems, practice log and setups refer to the copy). Nothing is reloaded. */
+    void songCopiedTo (const juce::File& newFile);
+
+    bool isSeparatingStems() const;
     bool isMediaPlaying() const;                        // the song or the video is playing
     double getMediaSpeed() const                        { return speedSlider.getValue() / 100.0; }
     juce::String getMediaName() const;
