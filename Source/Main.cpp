@@ -22,10 +22,14 @@ public:
        #else
         setResizable (true, true);
         setResizeLimits (900, 600, 4000, 3000);
-        centreWithSize (1280, 800);
+        centreWithSize (1280, 800);     // the size "Restore" goes back to
        #endif
 
         setVisible (true);
+
+       #if ! (JUCE_IOS || JUCE_ANDROID)
+        setFullScreen (true);           // desktop: start maximised (title bar always on screen)
+       #endif
     }
 
     void closeButtonPressed() override
