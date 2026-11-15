@@ -109,8 +109,18 @@ RigPanel::RigPanel (AppEngine& e)
     addAndMakeVisible (catalogueStatus);
 
     addButton.onClick = [this] { addSelectedPlugin(); };
-    scanButton.onClick = [this] { engine.catalogue->startScan(); };
-    scanButton.setVisible (engine.catalogue->canScan());
+    if (engine.catalogue->canScan())
+    {
+        scanButton.onClick = [this] { engine.catalogue->startScan(); };
+    }
+    else
+    {
+        // iPad: AudioUnits are listed from the system; this re-reads that list (e.g. after installing a plugin app).
+        scanButton.setButtonText ("Refresh list");
+        scanButton.onClick = [this] { engine.catalogue->refresh(); };
+    }
+
+    scanButton.setVisible (true);
 
     // Chain ----------------------------------------------------------------
     chainModel = std::make_unique<ListModel>();

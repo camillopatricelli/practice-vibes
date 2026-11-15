@@ -683,9 +683,19 @@ LibraryPanel::LibraryPanel()
 {
     setupLabel.setJustificationType (juce::Justification::centred);
     setupLabel.setFont (juce::FontOptions (16.0f));
+    // iPadOS only lets apps use whole folders from iCloud Drive (Google Drive and others are greyed out in the
+    // picker), so iCloud Drive is the one way to share a library between an iPad/iPhone and another device.
     setupLabel.setText ("Where should Practice Vibes keep your topics?\n\n"
-                        "Pick a folder on this device, or a folder inside a cloud drive (OneDrive, Google Drive, "
-                        "Dropbox, iCloud Drive) to share the same topics with your other devices.",
+                       #if JUCE_IOS
+                        "Keep them on this iPad, or pick a folder in iCloud Drive to share the same topics with "
+                        "your other devices (on a Windows PC: install iCloud for Windows).\n"
+                        "iCloud Drive is the only cloud drive that can keep topics in sync with an iPad or iPhone.",
+                       #else
+                        "Pick a folder on this computer, or one inside a cloud drive (OneDrive, Google Drive, "
+                        "Dropbox, iCloud Drive) to share the same topics with your other computers.\n"
+                        "To share them with an iPad or iPhone too, use iCloud Drive (install iCloud for Windows): "
+                        "it is the only cloud drive iPadOS lets apps use for a whole folder.",
+                       #endif
                         juce::dontSendNotification);
     addChildComponent (setupLabel);
 
@@ -702,7 +712,7 @@ LibraryPanel::LibraryPanel()
 
     chooseFolderButton.onClick = [this] { chooseFolder(); };
    #if JUCE_IOS
-    chooseFolderButton.setButtonText ("Choose a folder (iCloud Drive, Google Drive, OneDrive...)");
+    chooseFolderButton.setButtonText ("Choose a folder in iCloud Drive");
    #endif
     addChildComponent (chooseFolderButton);
 
@@ -822,9 +832,12 @@ void LibraryPanel::showFolderMenu()
     const auto isDefault = library->getRoot() == LibraryLocation::getDefaultFolder();
    #if ! JUCE_IOS
     menu.addItem ("Show the folder", [this] { library->getRoot().revealToUser(); });
+    menu.addItem ("To share topics with an iPad or iPhone, use a folder in iCloud Drive", false, false, [] {});
    #else
     if (isDefault)
         menu.addItem ("Files app: On My iPad > Practice Vibes > Library", false, false, [] {});
+
+    menu.addItem ("Only iCloud Drive can keep topics in sync with your other devices", false, false, [] {});
    #endif
     menu.addItem ("Use a different folder...", [this] { chooseFolder(); });
 
@@ -886,8 +899,8 @@ void LibraryPanel::resized()
 
     if (! hasLibrary)
     {
-        auto box = area.withSizeKeepingCentre (juce::jmin (640, area.getWidth()), 260);
-        setupLabel.setBounds (box.removeFromTop (130));
+        auto box = area.withSizeKeepingCentre (juce::jmin (640, area.getWidth()), 300);
+        setupLabel.setBounds (box.removeFromTop (170));
         box.removeFromTop (10);
         useDefaultButton.setBounds (box.removeFromTop (44).reduced (40, 2));
         box.removeFromTop (8);
@@ -1413,9 +1426,10 @@ void LibraryPanel::showResourceMenu (const juce::String& topicId, const juce::St
    #if ! JUCE_IOS
     if (! isLink)
         menu.addItem ("Show in folder", file.existsAsFile(), false, [file] { file.revealToUser(); });
-    else
-        menu.addItem ("Open in the browser", [url = r->url] { juce::URL (url).launchInDefaultBrowser(); });
    #endif
+
+    if (isLink && kindOf (*r) == ResourceKind::youtube)
+        menu.addItem ("Open in the browser", [url = r->url] { juce::URL (url).launchInDefaultBrowser(); });
 
     menu.addSeparator();
     menu.addItem (isLink ? "Remove link" : "Remove (deletes the file)", [this, topicId, resourceId, isLink, title = r->title]
@@ -1504,10 +1518,8 @@ void LibraryPanel::openResource (const Topic& topic, const Resource& r)
         }
     }
 
-    if (webViewAvailable() && showOverlay != nullptr)
-        showOverlay (r.title, std::make_unique<Viewer> (url, [url] { juce::URL (url).launchInDefaultBrowser(); }));
-    else
-        juce::URL (url).launchInDefaultBrowser();
+    // Websites open in the system browser (owner's choice); only YouTube stays in the app.
+    juce::URL (url).launchInDefaultBrowser();
 }
 
 void LibraryPanel::openFile (const juce::File& file, const juce::String& title)

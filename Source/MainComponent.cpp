@@ -957,11 +957,16 @@ void MainComponent::stopRecording (bool waitForFile)
     if (engine.recorder->hasDroppedAudio())
         juce::Logger::writeToLog ("Warning: the disk didn't keep up while recording - the take has gaps");
 
-    if (result.seconds < 1.0)
+    // Very short takes are usually accidental presses: not worth a resource in the topic.
+    constexpr double minimumTakeSeconds = 10.0;
+
+    if (result.seconds < minimumTakeSeconds)
     {
         result.file.deleteFile();
-        recordMessage = "Too short";
-        recordMessageCountdown = 20;
+        recordMessage = "Too short: < " + juce::String ((int) minimumTakeSeconds) + " s";
+        recordMessageCountdown = 30;
+        juce::Logger::writeToLog ("Take not saved: " + juce::String (result.seconds, 1) + " s is under the "
+                                  + juce::String ((int) minimumTakeSeconds) + " s minimum");
         updateRecordButton();
         return;
     }

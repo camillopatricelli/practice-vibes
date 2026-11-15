@@ -5,7 +5,7 @@
 namespace pv::FolderAccess
 {
 
-/** iPad: a folder picked in the Files app (iCloud Drive, Google Drive, OneDrive...) may only be used while its
+/** iPad: a folder picked in the Files app (iCloud Drive; providers such as Google Drive do not allow picking folders) may only be used while its
     "security-scoped" access is open, and the permission is kept across restarts as a bookmark. Elsewhere these
     do nothing (folders are plain paths). */
 

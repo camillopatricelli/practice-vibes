@@ -1,6 +1,10 @@
 #include "PluginCatalogue.h"
 #include "AppPaths.h"
 
+#if JUCE_MAC || JUCE_IOS
+ #include <AudioToolbox/AudioToolbox.h>
+#endif
+
 namespace pv
 {
 
@@ -17,7 +21,65 @@ namespace
         if (category == "MidiEffects")  return "MIDI FX";
         return "Other";
     }
+
+   #if JUCE_MAC || JUCE_IOS
+    /** iOS registers third-party AUv3 extensions in the background, so the first list after launch can hold only
+        Apple's built-in units. The system posts this notification whenever the set of components changes. */
+    void registrationsChanged (CFNotificationCenterRef, void* observer, CFNotificationName, const void*, CFDictionaryRef)
+    {
+        auto* weak = static_cast<std::weak_ptr<std::function<void()>>*> (observer);
+
+        if (auto callback = weak->lock())
+            (*callback)();
+    }
+   #endif
 }
+
+/** Listens for AudioUnit registration changes (Apple only; a no-op elsewhere) and refreshes the catalogue,
+    coalescing bursts of notifications into one refresh on the message thread. */
+struct PluginCatalogue::RegistrationListener
+{
+    explicit RegistrationListener (PluginCatalogue& c)
+        : catalogue (c)
+    {
+       #if JUCE_MAC || JUCE_IOS
+        callback = std::make_shared<std::function<void()>> ([this, weakAlive = std::weak_ptr<bool> (catalogue.alive)]
+        {
+            if (pending.exchange (true))
+                return;
+
+            juce::Timer::callAfterDelay (500, [this, weakAlive]
+            {
+                if (weakAlive.expired())
+                    return;
+
+                pending = false;
+                juce::Logger::writeToLog ("AudioUnit registrations changed: refreshing the plugin list");
+                catalogue.refresh();
+            });
+        });
+
+        weakCallback = std::make_unique<std::weak_ptr<std::function<void()>>> (callback);
+        CFNotificationCenterAddObserver (CFNotificationCenterGetLocalCenter(), weakCallback.get(),
+                                         registrationsChanged, kAudioComponentRegistrationsChangedNotification,
+                                         nullptr, CFNotificationSuspensionBehaviorDeliverImmediately);
+       #endif
+    }
+
+    ~RegistrationListener()
+    {
+       #if JUCE_MAC || JUCE_IOS
+        CFNotificationCenterRemoveObserver (CFNotificationCenterGetLocalCenter(), weakCallback.get(),
+                                            kAudioComponentRegistrationsChangedNotification, nullptr);
+        callback.reset();
+       #endif
+    }
+
+    PluginCatalogue& catalogue;
+    std::atomic<bool> pending { false };
+    std::shared_ptr<std::function<void()>> callback;
+    std::unique_ptr<std::weak_ptr<std::function<void()>>> weakCallback;
+};
 
 PluginCatalogue::PluginCatalogue (juce::AudioPluginFormatManager& fm)
     : juce::Thread ("Plugin scanner"),
@@ -27,10 +89,12 @@ PluginCatalogue::PluginCatalogue (juce::AudioPluginFormatManager& fm)
         scannedList.recreateFromXml (*xml);
 
     refresh();
+    registrationListener = std::make_unique<RegistrationListener> (*this);
 }
 
 PluginCatalogue::~PluginCatalogue()
 {
+    registrationListener.reset();
     alive.reset();
     stopThread (5000);
 }
@@ -38,6 +102,7 @@ PluginCatalogue::~PluginCatalogue()
 void PluginCatalogue::refresh()
 {
     std::vector<Entry> result;
+    juce::StringArray audioUnitLog;
 
     for (auto* format : formatManager.getFormats())
     {
@@ -56,6 +121,7 @@ void PluginCatalogue::refresh()
             description.isInstrument = description.category == "Synths";
 
             result.push_back ({ description, kindFromAudioUnitCategory (description.category) });
+            audioUnitLog.add ("  " + description.name + "  [" + identifier + "]");
         }
     }
 
@@ -74,11 +140,22 @@ void PluginCatalogue::refresh()
         const juce::ScopedLock sl (lock);
         entries = std::move (result);
 
-        if (status.isEmpty())
+        if (status.isEmpty() || status.endsWith (" plugins available"))
             status = juce::String ((int) entries.size()) + " plugins available";
     }
 
     juce::Logger::writeToLog ("Plugin catalogue: " + juce::String ((int) getEntries().size()) + " plugins");
+
+    // Logged in full each time it changes, so a missing plugin can be diagnosed from the log (iPad especially).
+    auto joined = audioUnitLog.joinIntoString ("\n");
+
+    if (joined != lastAudioUnitLog)
+    {
+        lastAudioUnitLog = joined;
+        juce::Logger::writeToLog ("AudioUnits found (" + juce::String (audioUnitLog.size()) + ")"
+                                  + (joined.isEmpty() ? juce::String() : ":\n" + joined));
+    }
+
     sendChangeMessage();
 }
 

@@ -47,6 +47,10 @@ private:
     mutable juce::CriticalSection lock;
     std::vector<Entry> entries;
     juce::String status;
+    juce::String lastAudioUnitLog;
+
+    struct RegistrationListener;
+    std::unique_ptr<RegistrationListener> registrationListener;
 
     std::shared_ptr<bool> alive = std::make_shared<bool> (true);
 
