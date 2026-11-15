@@ -2,6 +2,7 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "BarClockPlayHead.h"
+#include "DrumSequencer.h"
 #include "Footswitch.h"
 #include "Looper.h"
 #include "MetronomeProcessor.h"
@@ -45,6 +46,7 @@ public:
     // Owned by the audio graph inside `chain`; valid while `chain` exists.
     PlayerProcessor* player = nullptr;
     MetronomeProcessor* metronome = nullptr;
+    DrumSequencer* drums = nullptr;             // plays with the metronome (Looper tab)
 
     // Uses the metronome; its two audio nodes live in the chain's graph.
     std::unique_ptr<Looper> looper;
@@ -80,7 +82,7 @@ private:
     // and true again when they pick the current default.
     bool followSystemOutput = true;
     juce::String lastOutputName;
-    juce::String savedMetronomeSettings;
+    juce::String savedMetronomeSettings, savedDrumSettings;
 
     std::shared_ptr<bool> alive = std::make_shared<bool> (true);
 

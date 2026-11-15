@@ -250,6 +250,7 @@ struct LoopSet
     int beatsPerBar = 4;
     Looper::Source source = Looper::Source::afterFx;
     std::array<Loop, Looper::numTracks> loops;
+    std::shared_ptr<juce::XmlElement> drums;    // the drum machine (DrumSequencer state), may be null
 
     double getBpm() const       { return barSamples > 0.0 ? 60.0 * sampleRate * beatsPerBar / barSamples : 0.0; }
     int getNumLoops() const     { int n = 0; for (auto& l : loops) n += l.bars > 0 ? 1 : 0; return n; }

@@ -45,8 +45,6 @@ PluginChain::PluginChain (juce::AudioDeviceManager& dm, juce::AudioPluginFormatM
     inputStageNode  = graph.addNode (std::make_unique<GainMeterProcessor> ("Input stage", 1));
     outputStageNode = graph.addNode (std::make_unique<GainMeterProcessor> ("Guitar output", 2));
     masterNode      = graph.addNode (std::make_unique<GainMeterProcessor> ("Master", 2));
-    drumStageNode   = graph.addNode (std::make_unique<GainMeterProcessor> ("Drums", 2));
-    getDrumStage().gain = 0.8f;
 
     // Start muted: on an iPad the built-in mic + speaker would otherwise howl.
     getOutputStage().muted = true;
@@ -66,8 +64,6 @@ PluginChain::~PluginChain()
     player.setProcessor (nullptr);
     slots.clear();
     sources.clear();
-    drums = {};
-    drumStageNode = nullptr;
     midiInNode = nullptr;
     looperBeforeNode = nullptr;
     looperAfterNode = nullptr;
@@ -119,92 +115,6 @@ GainMeterProcessor& PluginChain::getOutputStage() const
 GainMeterProcessor& PluginChain::getMasterStage() const
 {
     return *static_cast<GainMeterProcessor*> (masterNode->getProcessor());
-}
-
-GainMeterProcessor& PluginChain::getDrumStage() const
-{
-    return *static_cast<GainMeterProcessor*> (drumStageNode->getProcessor());
-}
-
-//==============================================================================
-void PluginChain::setDrumPlugin (const juce::PluginDescription& description, LoadCallback onDone)
-{
-    const auto request = ++drumRequest;
-
-    loadPlugin (description, [this, request, name = description.name, done = std::move (onDone)] (NodePtr node, const juce::String& error)
-    {
-        auto failure = error;
-
-        if (node != nullptr && request != drumRequest)
-        {
-            graph.removeNode (node->nodeID, UpdateKind::none);      // superseded by a later choice
-            node = nullptr;
-            failure = "replaced by a later choice";
-        }
-        else if (node != nullptr)
-        {
-            if (drums.node != nullptr)
-                graph.removeNode (drums.node->nodeID, UpdateKind::none);
-
-            auto* plugin = dynamic_cast<juce::AudioPluginInstance*> (node->getProcessor());
-            drums = { node, plugin != nullptr ? plugin->getPluginDescription() : juce::PluginDescription() };
-            rebuildConnections();
-            juce::Logger::writeToLog ("Drum machine: " + name);
-        }
-        else
-        {
-            juce::Logger::writeToLog ("Could not load " + name + " as drum machine: " + error);
-        }
-
-        notifyChange();
-
-        if (done)
-            done (node == nullptr ? (failure.isNotEmpty() ? failure : juce::String ("failed")) : juce::String());
-    });
-}
-
-void PluginChain::removeDrumPlugin()
-{
-    ++drumRequest;
-
-    if (drums.node == nullptr)
-        return;
-
-    juce::Logger::writeToLog ("Removed drum machine " + drums.description.name);
-    graph.removeNode (drums.node->nodeID, UpdateKind::none);
-    drums = {};
-    rebuildConnections();
-    notifyChange();
-}
-
-void PluginChain::sendDrumMidi (const juce::MidiMessage& message)
-{
-    if (! drumsTakeMidi.load() || ! audioRunning.load())
-        return;
-
-    // The collector places messages in the block by their timestamp (same clock as MIDI input).
-    auto copy = message;
-    const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
-
-    if (copy.getTimeStamp() <= 0.0 || copy.getTimeStamp() > now)
-        copy.setTimeStamp (now);
-
-    player.getMidiMessageCollector().addMessageToQueue (copy);
-}
-
-juce::AudioPluginInstance* PluginChain::getDrumPlugin() const
-{
-    return drums.node != nullptr ? dynamic_cast<juce::AudioPluginInstance*> (drums.node->getProcessor()) : nullptr;
-}
-
-juce::String PluginChain::getDrumPluginName() const
-{
-    return drums.node != nullptr ? drums.description.name : juce::String();
-}
-
-juce::String PluginChain::getDrumPluginIdentifier() const
-{
-    return drums.node != nullptr ? drums.description.createIdentifierString() : juce::String();
 }
 
 //==============================================================================
@@ -393,30 +303,6 @@ void PluginChain::rebuildConnections()
         }
     }
 
-    auto drumsTakeMidiNow = false;
-
-    if (drums.node != nullptr)
-    {
-        // Only the outputs: an instrument's (sidechain) inputs stay silent.
-        const auto outs = drums.node->getProcessor()->getMainBusNumOutputChannels();
-
-        for (int c = 0; c < 2 && outs > 0; ++c)
-            connect (drums.node->nodeID, juce::jmin (c, outs - 1), drumStageNode->nodeID, c);
-
-        // MIDI from the controllers goes to the drum plugin only (the guitar plugins get none).
-        if (drums.node->getProcessor()->acceptsMidi())
-        {
-            connect (midiInNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex,
-                     drums.node->nodeID, juce::AudioProcessorGraph::midiChannelIndex);
-            drumsTakeMidiNow = true;
-        }
-    }
-
-    drumsTakeMidi = drumsTakeMidiNow;
-
-    for (int c = 0; c < 2; ++c)
-        connect (drumStageNode->nodeID, c, masterNode->nodeID, c);
-
     for (auto& source : sources)
     {
         const auto outs = source->getProcessor()->getMainBusNumOutputChannels();
@@ -466,19 +352,6 @@ std::unique_ptr<juce::XmlElement> PluginChain::createStateXml() const
             element->addChildElement (description.release());
     }
 
-    auto* drumsElement = xml->createNewChildElement ("DRUMS");
-    drumsElement->setAttribute ("gain", (double) getDrumStage().gain.load());
-
-    if (drums.node != nullptr)
-    {
-        juce::MemoryBlock state;
-        drums.node->getProcessor()->getStateInformation (state);
-        drumsElement->setAttribute ("state", state.toBase64Encoding());
-
-        if (auto description = drums.description.createXml())
-            drumsElement->addChildElement (description.release());
-    }
-
     return xml;
 }
 
@@ -516,36 +389,9 @@ void PluginChain::restoreFromXml (const juce::XmlElement& xml, std::function<voi
 
     juce::Logger::writeToLog ("Restoring chain with " + juce::String ((int) pending->size()) + " plugin(s)");
 
-    if (auto* drumsElement = xml.getChildByName ("DRUMS"))
-        restoreDrums (*drumsElement);
-
     rebuildConnections();
     notifyChange();
     restoreNext (pending, 0, std::move (onDone));
-}
-
-void PluginChain::restoreDrums (const juce::XmlElement& element)
-{
-    getDrumStage().gain = (float) element.getDoubleAttribute ("gain", 0.8);
-
-    juce::PluginDescription description;
-    auto* descriptionXml = element.getChildByName ("PLUGIN");
-
-    if (descriptionXml == nullptr || ! description.loadFromXml (*descriptionXml))
-    {
-        removeDrumPlugin();
-        return;
-    }
-
-    auto state = std::make_shared<juce::MemoryBlock>();
-    state->fromBase64Encoding (element.getStringAttribute ("state"));
-
-    setDrumPlugin (description, [this, state] (const juce::String& error)
-    {
-        if (error.isEmpty() && state->getSize() > 0)
-            if (auto* plugin = getDrumPlugin())
-                plugin->setStateInformation (state->getData(), (int) state->getSize());
-    });
 }
 
 void PluginChain::restoreNext (std::shared_ptr<std::vector<PendingSlot>> pending, size_t index, std::function<void()> onDone)

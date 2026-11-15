@@ -45,7 +45,10 @@ It is built on [JUCE](https://juce.com).
   overdub with undo, recording before or after the effects, latency compensation
   with a calibration helper (play along with the clicks); loops can be saved as
   WAV files (one per track plus a mix) and loaded again
-- A drum-machine plugin can play along, following the metronome's tempo and bars
+- Built-in drum machine on the looper page: same tempo and bars as the loops, a
+  step editor (8ths, triplets or 16ths, with swing; accents and ghost notes),
+  an acoustic (sampled) or electronic (synthesised) kit, a dozen starter patterns,
+  your own patterns saved by name, and the pattern saved with each loop session
 - Guitar input -> chain of plugins -> output, with input/output gain and meters
 - AUv3 plugins on iPad, VST3 plugins on Windows, with their own interfaces
 - The chain (including each plugin's settings) is saved and restored
@@ -110,3 +113,6 @@ Third-party components keep their own licences: Signalsmith Stretch (MIT),
 ONNX Runtime (MIT; its licence and notices ship next to the Windows app),
 Demucs and its htdemucs_6s model (MIT, downloaded by the app on first use;
 exported to ONNX with [demucs.onnx](https://github.com/sevagh/demucs.onnx), MIT).
+The acoustic drum kit is made from
+[Big Rusty Drums](https://github.com/sfzinstruments/karoryfer.big-rusty-drums)
+by Karoryfer Samples (CC0, public domain).

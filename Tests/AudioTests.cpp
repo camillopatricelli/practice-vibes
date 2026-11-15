@@ -3,6 +3,7 @@
 
 #include "../Source/BarClockPlayHead.h"
 #include "../Source/ChordAnalyzer.h"
+#include "../Source/DrumSequencer.h"
 #include "../Source/Footswitch.h"
 #include "../Source/LatencyCalibrator.h"
 #include "../Source/Library.h"
@@ -1008,6 +1009,12 @@ namespace
         // Save and load again: identical audio and settings.
         const auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("pv-loops-test");
         folder.deleteRecursively();
+        {
+            MetronomeProcessor m;
+            DrumSequencer d (m);
+            d.setPattern (DrumPatterns::builtIn()[6]);
+            set.drums = std::shared_ptr<juce::XmlElement> (d.createStateXml().release());
+        }
         const auto saved = LoopFiles::save (set, folder);
         check (saved.wasOk() && folder.getChildFile ("mix.wav").existsAsFile() && folder.getChildFile ("track 2.wav").existsAsFile(),
                "session saved" + (saved.wasOk() ? juce::String() : ": " + saved.getErrorMessage()));
@@ -1023,6 +1030,9 @@ namespace
                     same = loaded.loops[(size_t) t].audio.getSample (c, i) == set.loops[(size_t) t].audio.getSample (c, i);
 
         check (same, "loaded session is identical" + (read.wasOk() ? juce::String() : ": " + read.getErrorMessage()));
+        check (loaded.drums != nullptr && loaded.drums->getChildByName ("DRUM_PATTERN") != nullptr
+                   && loaded.drums->getChildByName ("DRUM_PATTERN")->getStringAttribute ("name") == DrumPatterns::builtIn()[6].name,
+               "the session keeps its drum pattern");
         folder.deleteRecursively();
 
         // Load into a fresh looper: tempo set, loops start on the metronome's first downbeat.
@@ -1345,30 +1355,240 @@ namespace
         }
     }
 
-    void testDrumMidiFilter()
+    // Runs the metronome's clock and the drums together, as the app does (clock first, then the graph).
+    juce::AudioBuffer<float> renderDrums (MetronomeProcessor& metronome, DrumSequencer& drums, double rate, double seconds,
+                                          std::function<void (juce::int64)> beforeBlock = {})
     {
-        std::cout << "Drum MIDI filter" << std::endl;
-        auto cc = [] (int number, int value) { return juce::MidiMessage::controllerEvent (1, number, value); };
-        const auto note = juce::MidiMessage::noteOn (10, 36, (juce::uint8) 100);
+        constexpr int block = 512;
+        const auto total = (int) (seconds * rate);
+        juce::AudioBuffer<float> out (2, total), scratch (2, block);
+        juce::MidiBuffer midi;
+        out.clear();
 
-        Footswitch fs;
-        check (! fs.isFootswitchMessage (cc (20, 127)) && ! fs.isFootswitchMessage (note), "nothing learned: all MIDI reaches the drums");
+        for (int pos = 0; pos < total; pos += block)
+        {
+            const auto n = juce::jmin (block, total - pos);
+            scratch.setSize (2, n, false, false, true);
 
-        fs.startLearning (0);
-        check (fs.isFootswitchMessage (note), "while learning, the pedal's press stays away from the drums");
-        fs.handleMidi (cc (20, 127), 1.0);
-        check (fs.isFootswitchMessage (cc (20, 127)), "still checking for a release: held back");
-        fs.handleMidi (cc (20, 0), 1.1);
-        check (fs.isFootswitchMessage (cc (20, 127)) && fs.isFootswitchMessage (cc (20, 0)), "learned CC (press and release) is the pedal's");
-        check (! fs.isFootswitchMessage (cc (21, 127)) && ! fs.isFootswitchMessage (note), "other CCs and notes reach the drums");
-        check (! fs.isFootswitchMessage (juce::MidiMessage::pitchWheel (1, 9000)), "pitch bend reaches the drums");
+            metronome.advanceClock (pos, n);
 
-        Footswitch loaded;
-        loaded.fromXml (*fs.toXml());
-        check (loaded.isFootswitchMessage (cc (20, 127)), "filter works after loading the settings");
+            if (beforeBlock)
+                beforeBlock (pos);      // like the looper, after the clock
 
-        fs.forget (0);
-        check (! fs.isFootswitchMessage (cc (20, 127)), "forgotten switch: its CC reaches the drums again");
+            metronome.processBlock (scratch, midi);
+            drums.processBlock (scratch, midi);
+
+            for (int ch = 0; ch < 2; ++ch)
+                out.copyFrom (ch, pos, scratch, ch, 0, n);
+        }
+
+        return out;
+    }
+
+    // Sample positions where a hit starts: loud after at least `quiet` seconds of near silence.
+    std::vector<int> findOnsets (const juce::AudioBuffer<float>& audio, double rate, double quiet = 0.1)
+    {
+        std::vector<int> onsets;
+        int lastLoud = -1000000;
+
+        for (int i = 0; i < audio.getNumSamples(); ++i)
+        {
+            const auto level = std::abs (audio.getSample (0, i)) + std::abs (audio.getSample (1, i));
+
+            if (level > 0.01f)
+            {
+                if (i - lastLoud > (int) (quiet * rate))
+                    onsets.push_back (i);
+
+                lastLoud = i;
+            }
+        }
+
+        return onsets;
+    }
+
+    void testDrums()
+    {
+        std::cout << "Drums" << std::endl;
+        constexpr double rate = 48000.0;
+
+        // Patterns
+        {
+            const auto& builtIn = DrumPatterns::builtIn();
+            check (builtIn.size() >= 10 && builtIn.size() <= 16, "a dozen or so starter patterns: " + juce::String ((int) builtIn.size()));
+            juce::StringArray names;
+            bool allPlay = true, allRoundTrip = true;
+
+            for (const auto& p : builtIn)
+            {
+                names.addIfNotAlreadyThere (p.name);
+                allPlay = allPlay && ! p.isEmpty();
+                allRoundTrip = allRoundTrip && DrumPattern::fromXml (*p.toXml()).sameNotes (p);
+            }
+
+            check (names.size() == (int) builtIn.size(), "starter pattern names are unique");
+            check (allPlay, "every starter pattern has notes");
+            check (allRoundTrip, "every starter pattern survives saving and loading");
+
+            const auto& rockFill = builtIn[3];
+            check (rockFill.bars == 2 && rockFill.get (1, 12, Drum::tomHigh) == DrumPattern::accent
+                       && rockFill.get (0, 0, Drum::crash) == DrumPattern::accent,
+                   "text form: bars, steps and levels land where written");
+
+            DrumPattern p;
+            p.beatsPerBar = 4; p.ticks = 4; p.bars = 1;
+            p.rowFromText (Drum::closedHat, "xxxx xxxx xxxx xxxx");
+            p.rowFromText (Drum::kick, "X... .... g... ....");
+            p.reshape (4, 2, 2);
+            check (p.rowToText (Drum::closedHat) == "xx xx xx xx|xx xx xx xx", "16ths -> 8ths keeps the 8ths, new bar repeats: " + p.rowToText (Drum::closedHat));
+            check (p.rowToText (Drum::kick) == "X. .. g. ..|X. .. g. ..", "levels kept when reshaping: " + p.rowToText (Drum::kick));
+            p.reshape (3, 3, 1);
+            check (p.rowToText (Drum::kick) == "X.. ... g..", "8ths -> triplets keeps the downbeats, 4 -> 3 beats drops the 4th: " + p.rowToText (Drum::kick));
+            p.set (0, 4, Drum::snare, DrumPattern::normal);
+            p.reshape (3, 3, 2);
+            p.set (1, 0, Drum::kick, DrumPattern::off);
+            p.copyBarToAll (0);
+            check (p.get (1, 0, Drum::kick) == DrumPattern::accent && p.get (1, 4, Drum::snare) == DrumPattern::normal, "copy bar to all");
+        }
+
+        // Kits
+        {
+            const auto synth = synthesiseDrumKit (rate);
+            const auto sampled = loadSampledDrumKit (rate);
+            check (! synth.isEmpty() && ! sampled.isEmpty(), "both kits have every drum");
+            check (sampled.hits[(size_t) Drum::kick].size() == 4 && sampled.hits[(size_t) Drum::crash].size() == 3
+                       && sampled.hits[(size_t) Drum::kick][0].size() == 2,
+                   "sampled kit: 4 kick layers with 2 takes, 3 crash layers");
+
+            if (! sampled.isEmpty())
+            {
+                // The sampled kit is stored at 44.1 kHz: resampled, a 0.9 s kick stays 0.9 s long.
+                const auto kickSeconds = sampled.hits[(size_t) Drum::kick].back()[0].getNumSamples() / rate;
+                check (std::abs (kickSeconds - 0.9) < 0.02, "sampled kick resampled to 48 kHz: " + juce::String (kickSeconds, 3) + " s");
+            }
+
+            for (auto [kit, name] : { std::pair { &synth, "synthesised" }, std::pair { &sampled, "sampled" } })
+            {
+                if (kit->isEmpty())
+                    continue;
+
+                const auto& snare = kit->hits[(size_t) Drum::snare];
+                const auto softPeak = snare.front()[0].getMagnitude (0, snare.front()[0].getNumSamples());
+                const auto loudPeak = snare.back()[0].getMagnitude (0, snare.back()[0].getNumSamples());
+                check (softPeak < loudPeak * 0.8f && loudPeak > 0.5f && loudPeak <= 0.9f,
+                       juce::String (name) + " snare: soft layer quieter than loud (" + juce::String (softPeak, 2) + " / " + juce::String (loudPeak, 2) + ")");
+            }
+        }
+
+        auto setUp = [&] (MetronomeProcessor& metronome, DrumSequencer& drums, const juce::String& hats, int ticks, double swing = 0.5)
+        {
+            metronome.prepareToPlay (rate, 512);
+            metronome.startBpm = 120.0;
+            metronome.beatsPerBar = 4;
+            metronome.clicksMuted = true;
+            drums.setRateAndBufferSizeDetails (rate, 512);
+            drums.prepareToPlay (rate, 512);
+            drums.loadKitNow (DrumKitType::electronic, rate);
+            DrumPattern p;
+            p.ticks = ticks;
+            p.swing = swing;
+            p.bars = juce::StringArray::fromTokens (hats, "|", {}).size();
+            p.rowFromText (Drum::closedHat, hats);
+            drums.setPattern (p);
+            drums.enabled = true;
+            metronome.start();
+        };
+
+        auto describe = [rate] (const std::vector<int>& onsets)
+        {
+            juce::StringArray s;
+            for (auto o : onsets)
+                s.add (juce::String (o / rate, 3));
+            return s.joinIntoString (" ");
+        };
+
+        {
+            // Quarter notes at 120 bpm: a hit every 0.5 s, on the clock's sample.
+            MetronomeProcessor metronome;
+            DrumSequencer drums (metronome);
+            setUp (metronome, drums, "x. x. x. x.", 2);
+            const auto onsets = findOnsets (renderDrums (metronome, drums, rate, 2.2), rate);
+            bool onTime = onsets.size() == 5;
+
+            for (size_t i = 0; i < onsets.size() && onTime; ++i)
+                onTime = std::abs (onsets[i] - (int) i * 24000) <= 48;
+
+            check (onTime, "hits on every beat at 120 bpm, within 1 ms: " + describe (onsets));
+        }
+
+        {
+            // A two-bar pattern alternates bars: a hit on beat 1 of bar 1 only -> every 4 s.
+            MetronomeProcessor metronome;
+            DrumSequencer drums (metronome);
+            setUp (metronome, drums, "x. .. .. ..|.. .. .. ..", 2);
+            const auto onsets = findOnsets (renderDrums (metronome, drums, rate, 8.5), rate);
+            check (onsets.size() == 3 && std::abs (onsets[1] - 4 * 48000) <= 48 && std::abs (onsets[2] - 8 * 48000) <= 48,
+                   "two-bar pattern: bar 1 at 0, 4 and 8 s: " + describe (onsets));
+        }
+
+        {
+            // Swing moves the off-beat 8th: 0.75 -> 3/4 of the beat.
+            MetronomeProcessor metronome;
+            DrumSequencer drums (metronome);
+            setUp (metronome, drums, ".x .. .. ..", 2, 0.75);
+            const auto onsets = findOnsets (renderDrums (metronome, drums, rate, 1.0), rate);
+            check (onsets.size() == 1 && std::abs (onsets[0] - (int) (0.375 * rate)) <= 48, "swung 8th at 0.375 s: " + describe (onsets));
+        }
+
+        {
+            // Muted row, switched off, metronome stopped: silence.
+            MetronomeProcessor metronome;
+            DrumSequencer drums (metronome);
+            setUp (metronome, drums, "x. x. x. x.", 2);
+            drums.drumMuted[(size_t) Drum::closedHat] = true;
+            check (renderDrums (metronome, drums, rate, 1.0).getMagnitude (0, (int) rate) == 0.0f, "muted row is silent");
+            drums.drumMuted[(size_t) Drum::closedHat] = false;
+            drums.enabled = false;
+            check (renderDrums (metronome, drums, rate, 1.0).getMagnitude (0, (int) rate) == 0.0f, "switched off: silent");
+            drums.enabled = true;
+            metronome.stop();
+            renderDrums (metronome, drums, rate, 0.5);
+            check (renderDrums (metronome, drums, rate, 1.0).getMagnitude (0, (int) rate) == 0.0f, "metronome stopped: silent");
+            check (drums.getPlayingStep() == -1, "no step shown while stopped");
+        }
+
+        {
+            // The first loop restarts the pattern: bar counting starts again at the loop's first bar.
+            MetronomeProcessor metronome;
+            DrumSequencer drums (metronome);
+            setUp (metronome, drums, "x. .. .. ..|.. .. .. ..", 2);
+            const double barSamples = 2.0 * rate;
+            // Bars 0, 1, 2 play; the loop starts at bar 3 (6 s), where the 2-bar pattern would be in its 2nd bar.
+            const auto out = renderDrums (metronome, drums, rate, 8.5, [&] (juce::int64 pos)
+            {
+                if (pos + 512 > (juce::int64) (3 * barSamples))     // the looper locks in the block holding the bar line
+                    metronome.setLockedGrid (true, 3 * barSamples, barSamples, 4);
+            });
+            const auto onsets = findOnsets (out, rate);
+            check (onsets.size() == 3 && std::abs (onsets[1] - 4 * 48000) <= 48 && std::abs (onsets[2] - 6 * 48000) <= 48,
+                   "pattern restarts on the first loop's bar (6 s): " + describe (onsets));
+        }
+
+        {
+            // State (kit, mix, pattern) round trip.
+            MetronomeProcessor metronome;
+            DrumSequencer a (metronome), b (metronome);
+            a.setKitType (DrumKitType::electronic);
+            a.gain = 0.6f;
+            a.drumGains[(size_t) Drum::snare] = 0.3f;
+            a.drumMuted[(size_t) Drum::ride] = true;
+            a.setPattern (DrumPatterns::builtIn()[5]);
+            b.applyStateXml (*a.createStateXml());
+            check (b.getKitType() == DrumKitType::electronic && std::abs (b.gain.load() - 0.6f) < 1.0e-6f
+                       && std::abs (b.drumGains[(size_t) Drum::snare].load() - 0.3f) < 1.0e-6f && b.drumMuted[(size_t) Drum::ride].load()
+                       && b.getPattern().sameNotes (DrumPatterns::builtIn()[5]) && b.getPattern().name == DrumPatterns::builtIn()[5].name,
+                   "kit, volumes, mutes and pattern saved and restored");
+        }
     }
 
     void testMetronomeSettings()
@@ -3634,7 +3854,7 @@ int main()
     testLooper();
     testPlayHead();
     testFootswitch();
-    testDrumMidiFilter();
+    testDrums();
     testMetronomeSettings();
     testLatencyCalibration();
     testLoopFiles();

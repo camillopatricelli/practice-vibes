@@ -209,7 +209,8 @@ public:
 
     void resized() override
     {
-        auto area = getLocalBounds().reduced (8, 6);
+        const auto slim = getHeight() < 50;     // the drum pattern editor is open
+        auto area = getLocalBounds().reduced (8, slim ? 2 : 6);
         auto name = area.removeFromLeft (44);
 
         if (pedalLabel.getText().isNotEmpty())
@@ -218,11 +219,13 @@ public:
             pedalLabel.setBounds ({});
 
         nameLabel.setBounds (name);
-        pedalButton.setBounds (area.removeFromLeft (juce::jmin (260, area.getWidth() / 3)).reduced (3));
-        clearButton.setBounds (area.removeFromRight (80).reduced (3));
-        muteButton.setBounds (area.removeFromRight (90).reduced (3));
-        volumeSlider.setBounds (area.removeFromRight (juce::jmin (280, area.getWidth() / 3)).reduced (3, 0).withSizeKeepingCentre (juce::jmin (280, area.getWidth() / 3) - 6, 32));
-        progressArea = area.reduced (8, 6);
+        const auto gap = slim ? 1 : 3;
+        pedalButton.setBounds (area.removeFromLeft (juce::jmin (260, area.getWidth() / 3)).reduced (3, gap));
+        clearButton.setBounds (area.removeFromRight (80).reduced (3, gap));
+        muteButton.setBounds (area.removeFromRight (90).reduced (3, gap));
+        volumeSlider.setBounds (area.removeFromRight (juce::jmin (280, area.getWidth() / 3)).reduced (3, 0)
+                                    .withSizeKeepingCentre (juce::jmin (280, area.getWidth() / 3) - 6, juce::jmin (32, area.getHeight())));
+        progressArea = area.reduced (8, slim ? 1 : 6);
     }
 
 private:
@@ -384,35 +387,14 @@ LooperPanel::LooperPanel (AppEngine& e)
     }
 
     // Drum machine
-    styleLabel (drumsLabel, "Drums");
-    styleLabel (drumStatus, {}, 0.6f);
-    drumBox.setTooltip ("An instrument plugin with its own patterns (drum machine, groove player). "
-                        "It plays with the metronome: same tempo and bars, starts and stops with it. "
-                        "Notes from MIDI pads or keyboards go to it too (not the footswitch's own messages).");
-    drumBox.onChange = [this] { drumChosen(); };
-    drumEditButton.onClick = [this] { openDrumEditor(); };
+    drumSection = std::make_unique<DrumSection> (engine);
+    drumSection->onClicksMutedChange = [this] { saveSettings(); };
+    addAndMakeVisible (*drumSection);
 
-    drumVolume.setSliderStyle (juce::Slider::LinearHorizontal);
-    drumVolume.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-    drumVolume.setRange (0.0, 1.5, 0.01);
-    drumVolume.setValue (engine.chain->getDrumStage().gain.load(), juce::dontSendNotification);
-    drumVolume.setDoubleClickReturnValue (true, 0.8);
-    drumVolume.setTooltip ("Drum machine volume");
-    drumVolume.onValueChange = [this] { engine.chain->getDrumStage().gain = (float) drumVolume.getValue(); };
+    if (auto xml = juce::parseXML (getLooperSettingsFile()))
+        drumSection->setEditorShown (xml->getBoolAttribute ("drumEditorShown", false));
 
-    clicksMutedButton.setTooltip ("Silence the metronome clicks (the clock keeps running, so the drums and loops stay in time).");
-    clicksMutedButton.setToggleState (metronome.clicksMuted.load(), juce::dontSendNotification);
-    clicksMutedButton.onClick = [this]
-    {
-        metronome.clicksMuted = clicksMutedButton.getToggleState();
-        saveSettings();
-    };
-
-    for (auto* c : std::initializer_list<juce::Component*> { &drumsLabel, &drumBox, &drumEditButton, &drumVolume, &clicksMutedButton, &drumStatus })
-        addAndMakeVisible (*c);
-
-    engine.catalogue->addChangeListener (this);
-    refreshDrumList();
+    drumSection->onLayoutChange = [this] { resized(); saveSettings(); };
 
     startTimerHz (30);
 }
@@ -422,111 +404,10 @@ LooperPanel::~LooperPanel()
     if (calibrating)
         endCalibration();
 
-    engine.catalogue->removeChangeListener (this);
     saveSettings();
 }
 
 //==============================================================================
-void LooperPanel::changeListenerCallback (juce::ChangeBroadcaster*)
-{
-    refreshDrumList();
-}
-
-void LooperPanel::refreshDrumList()
-{
-    drumEntries.clear();
-
-    for (auto& entry : engine.catalogue->getEntries())
-        if (entry.kind == "Instrument" || entry.kind == "Generator")
-            drumEntries.push_back (entry);
-
-    // The loaded plugin stays selectable even when the catalogue does not list it (yet).
-    const auto current = engine.chain->getDrumPluginIdentifier();
-    bool listed = current.isEmpty();
-
-    for (auto& entry : drumEntries)
-        listed = listed || entry.description.createIdentifierString() == current;
-
-    if (! listed)
-        if (auto* plugin = engine.chain->getDrumPlugin())
-            drumEntries.insert (drumEntries.begin(), { plugin->getPluginDescription(), "Instrument" });
-
-    drumBox.clear (juce::dontSendNotification);
-    drumBox.addItem ("None", 1);
-
-    for (size_t i = 0; i < drumEntries.size(); ++i)
-    {
-        const auto& d = drumEntries[i].description;
-        drumBox.addItem (d.name + (d.manufacturerName.isNotEmpty() ? " (" + d.manufacturerName + ")" : juce::String()), (int) i + 2);
-    }
-
-    shownDrumIdentifier = "-";      // re-selected by the timer
-}
-
-void LooperPanel::drumChosen()
-{
-    const auto index = drumBox.getSelectedId() - 2;
-    drumStatus.setText ({}, juce::dontSendNotification);
-
-    if (index < 0)
-    {
-        if (hideOverlay && engine.chain->getDrumPlugin() != nullptr)
-            hideOverlay();      // the drum UI may be open
-
-        engine.chain->removeDrumPlugin();
-        drumLoading = false;
-        engine.saveState();
-        return;
-    }
-
-    if (! juce::isPositiveAndBelow (index, (int) drumEntries.size()))
-        return;
-
-    const auto description = drumEntries[(size_t) index].description;
-
-    if (description.createIdentifierString() == engine.chain->getDrumPluginIdentifier())
-        return;
-
-    if (hideOverlay && engine.chain->getDrumPlugin() != nullptr)
-        hideOverlay();      // the old plugin's editor must go before the plugin does
-
-    drumLoading = true;
-    engine.chain->setDrumPlugin (description, [safeThis = SafePointer<LooperPanel> (this)] (const juce::String& error)
-    {
-        if (safeThis == nullptr)
-            return;
-
-        safeThis->drumLoading = false;
-        safeThis->shownDrumIdentifier = "-";
-
-        if (error.isNotEmpty())
-            safeThis->drumStatus.setText ("Could not load: " + error, juce::dontSendNotification);
-        else
-            safeThis->engine.saveState();
-    });
-}
-
-void LooperPanel::openDrumEditor()
-{
-    auto* plugin = engine.chain->getDrumPlugin();
-
-    if (plugin == nullptr || ! showOverlay)
-        return;
-
-    if (hideOverlay)
-        hideOverlay();      // a plugin must never have two editors at once
-
-    std::unique_ptr<juce::Component> editor;
-
-    if (plugin->hasEditor())
-        editor.reset (plugin->createEditorAndMakeActive());
-
-    if (editor == nullptr)
-        editor = std::make_unique<juce::GenericAudioProcessorEditor> (*plugin);
-
-    showOverlay ("Drums: " + engine.chain->getDrumPluginName(), std::move (editor));
-}
-
 void LooperPanel::updatePedalBadges()
 {
     auto& footswitch = *engine.footswitch;
@@ -571,6 +452,7 @@ void LooperPanel::saveLoops()
         return;
     }
 
+    set.drums = std::shared_ptr<juce::XmlElement> (engine.drums->createStateXml().release());
     const auto folder = LoopFiles::createSessionFolder (set);
     const auto result = LoopFiles::save (set, folder);
 
@@ -636,7 +518,13 @@ void LooperPanel::loadLoops (const juce::File& folder)
         return;
     }
 
-    // Record mode and tempo come from the session.
+    // Record mode, tempo and drums come from the session.
+    if (set.drums != nullptr)
+    {
+        engine.drums->applyStateXml (*set.drums);
+        drumSection->patternChangedElsewhere();
+    }
+
     (set.source == Looper::Source::beforeFx ? beforeFxButton : afterFxButton).setToggleState (true, juce::dontSendNotification);
     saveSettings();
     juce::Logger::writeToLog ("Loaded loops from " + folder.getFullPathName());
@@ -748,6 +636,7 @@ void LooperPanel::saveSettings() const
     xml.setAttribute ("fixedBars", looper.fixedBars.load());
     xml.setAttribute ("latencyOffsetMs", (double) looper.latencyOffsetMs.load());
     xml.setAttribute ("clicksMuted", metronome.clicksMuted.load());
+    xml.setAttribute ("drumEditorShown", drumSection != nullptr && drumSection->isEditorShown());
     xml.writeTo (getLooperSettingsFile());
 }
 
@@ -855,55 +744,6 @@ void LooperPanel::timerCallback()
 
     hintLabel.setText (hint, juce::dontSendNotification);
 
-    // Drum machine: follow the chain (it is restored at start-up, after this panel exists).
-    const auto drumId = engine.chain->getDrumPluginIdentifier();
-
-    if (! drumLoading && drumId != shownDrumIdentifier && ! drumBox.isPopupActive())
-    {
-        int selected = drumId.isEmpty() ? 1 : 0;
-
-        for (size_t i = 0; i < drumEntries.size() && selected == 0; ++i)
-            if (drumEntries[i].description.createIdentifierString() == drumId)
-                selected = (int) i + 2;
-
-        if (selected == 0)
-        {
-            refreshDrumList();      // loaded but not listed: the next tick selects it
-        }
-        else
-        {
-            drumBox.setSelectedId (selected, juce::dontSendNotification);
-            shownDrumIdentifier = drumId;
-        }
-    }
-
-    const auto hasDrums = engine.chain->getDrumPlugin() != nullptr;
-    drumEditButton.setEnabled (hasDrums && ! drumLoading);
-    drumBox.setEnabled (! drumLoading);
-
-    if (! drumVolume.isMouseButtonDown())
-        drumVolume.setValue (engine.chain->getDrumStage().gain.load(), juce::dontSendNotification);
-
-    if (clicksMutedButton.getToggleState() != metronome.clicksMuted.load())
-        clicksMutedButton.setToggleState (metronome.clicksMuted.load(), juce::dontSendNotification);
-
-    juce::String status;
-
-    if (drumLoading)
-        status = "Loading...";
-    else if (drumStatus.getText().startsWith ("Could not"))
-        status = drumStatus.getText();
-    else if (hasDrums)
-    {
-        status = metronome.isRunning() ? "Playing along with the metronome" : "Starts and stops with the metronome";
-
-        if (engine.chain->getDrumPlugin()->acceptsMidi())
-            status << " - plays MIDI notes";
-    }
-    else if (drumEntries.empty())
-        status = engine.catalogue->canScan() ? "No instruments found: Scan VST3 in the Guitar rig tab" : "No instrument plugins found";
-
-    drumStatus.setText (status, juce::dontSendNotification);
 }
 
 //==============================================================================
@@ -940,14 +780,8 @@ void LooperPanel::resized()
     tempoSlider.setBounds (metro.reduced (0, 6));
 
     area.removeFromTop (4);
-    auto drumRow = area.removeFromTop (44);
-    drumsLabel.setBounds (drumRow.removeFromLeft (64));
-    drumBox.setBounds (drumRow.removeFromLeft (juce::jmin (300, drumRow.getWidth() / 3)).reduced (2, 6));
-    drumEditButton.setBounds (drumRow.removeFromLeft (100).reduced (2, 4));
-    drumVolume.setBounds (drumRow.removeFromLeft (juce::jmin (200, drumRow.getWidth() / 4)).reduced (6, 6));
-    clicksMutedButton.setBounds (drumRow.removeFromLeft (130).reduced (2, 4));
-    drumStatus.setBounds (drumRow.reduced (8, 0));
-
+    area.removeFromTop (4);
+    drumSection->setBounds (area.removeFromTop (drumSection->getPreferredHeight()));
     area.removeFromTop (8);
 
     auto bottom = area.removeFromBottom (36);
@@ -958,9 +792,10 @@ void LooperPanel::resized()
     saveButton.setBounds (bottom.removeFromRight (110).reduced (3));
     latencyLabel.setBounds (bottom.reduced (12, 0));
 
-    hintLabel.setBounds (area.removeFromBottom (54));
+    hintLabel.setBounds (area.removeFromBottom (drumSection->isEditorShown() ? 36 : 54));
 
-    const auto rowHeight = juce::jlimit (60, 110, area.getHeight() / Looper::numTracks);
+    // The pattern editor takes room from the tracks: they get slimmer, but all four stay visible.
+    const auto rowHeight = juce::jlimit (drumSection->isEditorShown() ? 34 : 60, 110, area.getHeight() / Looper::numTracks);
 
     for (auto& row : rows)
         row->setBounds (area.removeFromTop (rowHeight).reduced (0, 3));

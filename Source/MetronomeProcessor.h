@@ -101,6 +101,10 @@ public:
     double getClockBarPpq() const noexcept      { return barPpq; }              // beats from start() to barStart
     int getClockPreviousBarBeats() const noexcept { return previousBarBeats; }
     double getClockPreviousBeatSamples() const noexcept { return previousBeatSamples; }   // the bar before barStart
+    juce::int64 getClockBlockStart() const noexcept { return blockStartTime; }     // the block advanceClock() was given
+    /** Bars since start() (the bar at barStart). When the looper locks the grid, counting restarts
+        so that bar 0 is the first loop's first bar: the drum pattern starts with the loops. */
+    juce::int64 getClockBarIndex() const noexcept { return barIndex; }
 
     /** Audio thread: while locked (the looper holds loops) tempo and bar length are frozen to this
         grid, follow mode and the trainer pause, and start() lines the clicks up with the grid. */
@@ -181,7 +185,7 @@ private:
 
     // Bar clock (audio thread). Tick times are computed from the bar start, so they never drift.
     bool clockRunning = false, clockAdvanced = false, resetVoices = false;
-    juce::int64 nextBlockStart = 0;
+    juce::int64 nextBlockStart = 0, blockStartTime = 0, barIndex = 0;
     double barStart = 0.0, beatSamples = 24000.0, clockStartTime = 0.0;
     // For plugins' play head: beats counted from start() up to barStart, and the bar before it.
     double barPpq = 0.0, previousBeatSamples = 24000.0;

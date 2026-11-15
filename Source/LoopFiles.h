@@ -11,7 +11,7 @@ namespace pv
     A session is a folder holding one WAV per track (32-bit float, every loop starting on the
     same bar line, so they line up when dropped into a DAW), "mix.wav" (all unmuted tracks at
     their volumes, long enough for every loop to come round), and "session.xml" (tempo, meter,
-    bars, volume, mute, record mode).
+    bars, volume, mute, record mode, and the drum machine's pattern, kit and mix).
 */
 namespace LoopFiles
 {

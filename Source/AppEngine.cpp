@@ -33,6 +33,13 @@ AppEngine::AppEngine()
 
     savedMetronomeSettings = metronome->createSettingsXml()->toString();
 
+    drums = chain->addSource (std::make_unique<DrumSequencer> (*metronome));
+
+    if (auto xml = juce::parseXML (getDrumsFile()))
+        drums->applyStateXml (*xml);
+
+    savedDrumSettings = drums->createStateXml()->toString();
+
     tuner = std::make_unique<Tuner>();
 
     if (auto xml = juce::parseXML (getTunerFile()))
@@ -54,12 +61,7 @@ AppEngine::AppEngine()
     if (auto xml = juce::parseXML (getFootswitchFile()))
         footswitch->fromXml (*xml);
 
-    // MIDI thread: everything but the pedal's own messages goes straight to the drum plugin.
-    midi = std::make_unique<MidiMonitor> (deviceManager, [this] (const juce::MidiMessage& message)
-    {
-        if (! message.isSysEx() && ! footswitch->isFootswitchMessage (message))
-            chain->sendDrumMidi (message);
-    });
+    midi = std::make_unique<MidiMonitor> (deviceManager);
 
     footswitch->onChange = [this] { footswitch->toXml()->writeTo (getFootswitchFile()); };
     footswitch->perform = [this] (FootswitchAction action, double pressSeconds) { performFootswitchAction (action, pressSeconds); };
@@ -83,6 +85,7 @@ AppEngine::~AppEngine()
     catalogue.reset();
     player = nullptr;
     metronome = nullptr;
+    drums = nullptr;
     chain.reset();      // stops audio and deletes the looper's nodes before the looper
     looper.reset();
     recorder.reset();
@@ -145,6 +148,16 @@ void AppEngine::saveMetronomeIfChanged()
     if (settings != savedMetronomeSettings && settings.length() > 0)
         if (juce::File (getMetronomeFile()).replaceWithText (settings))
             savedMetronomeSettings = settings;
+
+    // Drums: pattern, kit and mix (edited on the Looper tab), saved the same way.
+    if (drums != nullptr)
+    {
+        const auto drumSettings = drums->createStateXml()->toString();
+
+        if (drumSettings != savedDrumSettings && drumSettings.length() > 0)
+            if (juce::File (getDrumsFile()).replaceWithText (drumSettings))
+                savedDrumSettings = drumSettings;
+    }
 }
 
 void AppEngine::saveState()

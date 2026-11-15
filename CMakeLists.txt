@@ -87,6 +87,11 @@ target_sources(PracticeVibes PRIVATE
     Source/AppLog.cpp
     Source/ChordAnalyzer.cpp
     Source/ChordView.cpp
+    Source/DrumEditor.cpp
+    Source/DrumKit.cpp
+    Source/DrumPattern.cpp
+    Source/DrumSequencer.cpp
+    Source/DrumSynth.cpp
     Source/FolderAccess.cpp
     Source/Footswitch.cpp
     Source/FootswitchPanel.cpp
@@ -164,6 +169,13 @@ juce_add_binary_data(PracticeVibesIcons
     NAMESPACE   AppIconData
     SOURCES     Resources/AppIcon/AppIcon-desktop-1024.png)
 
+# The sampled drum kit (made by Tools/DrumKitTool from Big Rusty Drums, CC0).
+file(GLOB PV_DRUM_SAMPLES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Resources/DrumKit/*.flac)
+juce_add_binary_data(PracticeVibesDrumKit
+    HEADER_NAME DrumKitData.h
+    NAMESPACE   DrumKitData
+    SOURCES     ${PV_DRUM_SAMPLES})
+
 target_link_libraries(PracticeVibes
     PRIVATE
         juce::juce_audio_utils
@@ -171,6 +183,7 @@ target_link_libraries(PracticeVibes
         juce::juce_gui_extra
         signalsmith-stretch
         PracticeVibesIcons
+        PracticeVibesDrumKit
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -184,6 +197,10 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         Tests/AudioTests.cpp
         Source/AacFile.cpp
         Source/ChordAnalyzer.cpp
+        Source/DrumKit.cpp
+        Source/DrumPattern.cpp
+        Source/DrumSequencer.cpp
+        Source/DrumSynth.cpp
         Source/FolderAccess.cpp
     Source/Footswitch.cpp
         Source/Library.cpp
@@ -215,6 +232,18 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
             juce::juce_audio_utils
             juce::juce_dsp
             signalsmith-stretch
+            PracticeVibesDrumKit
+        PUBLIC
+            juce::juce_recommended_config_flags
+            juce::juce_recommended_warning_flags)
+
+    # Developer tool: builds Resources/DrumKit from the Big Rusty Drums samples (CC0).
+    juce_add_console_app(DrumKitTool PRODUCT_NAME "DrumKitTool")
+    target_sources(DrumKitTool PRIVATE Tools/DrumKitTool.cpp Source/DrumSynth.cpp)
+    target_compile_definitions(DrumKitTool PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+    target_link_libraries(DrumKitTool
+        PRIVATE
+            juce::juce_audio_utils
         PUBLIC
             juce::juce_recommended_config_flags
             juce::juce_recommended_warning_flags)

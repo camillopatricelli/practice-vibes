@@ -168,6 +168,9 @@ juce::Result LoopFiles::save (const LoopSet& set, const juce::File& folder)
         track->setAttribute ("gain", (double) loop.gain);
     }
 
+    if (set.drums != nullptr)
+        xml.addChildElement (new juce::XmlElement (*set.drums));
+
     const auto mix = writeWav (folder.getChildFile ("mix.wav"), renderMix (set), set.sampleRate);
 
     if (mix.failed())
@@ -220,6 +223,9 @@ juce::Result LoopFiles::load (const juce::File& folder, LoopSet& set)
 
     if (set.getNumLoops() == 0)
         return juce::Result::fail ("The session has no loops.");
+
+    if (auto* drums = xml->getChildByName ("DRUMS"))
+        set.drums = std::make_shared<juce::XmlElement> (*drums);
 
     return juce::Result::ok();
 }

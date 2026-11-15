@@ -15,11 +15,10 @@ namespace pv
           -> guitar output stage (gain + mute + meter, stereo)  --+
           -> [looper, after FX: records the processed guitar,    |
               plays "after FX" loops]  ----------------------------+-> master (meter) -> device output
-        other sources (song player, metronome...)  ---------------+
-        MIDI input -> drum machine (instrument plugin) -> drums stage (gain) ---+
+        other sources (song player, metronome, drums...)  --------+
 
-    The drum machine sits outside the guitar path: monitoring off does not mute it and
-    the looper does not record it. Every plugin gets the play head set with setPlayHead().
+    Sources sit outside the guitar path: monitoring off does not mute them and the looper
+    does not record them. Every plugin gets the play head set with setPlayHead().
 
     All methods must be called on the message thread.
 */
@@ -62,19 +61,6 @@ public:
         rebuildConnections();
         return raw;
     }
-
-    /** The drum machine slot: one instrument plugin mixed straight into the master. */
-    void setDrumPlugin (const juce::PluginDescription&, LoadCallback onDone = {});
-    void removeDrumPlugin();
-    juce::AudioPluginInstance* getDrumPlugin() const;
-    juce::String getDrumPluginName() const;
-    juce::String getDrumPluginIdentifier() const;      // PluginDescription::createIdentifierString(), "" if none
-    GainMeterProcessor& getDrumStage() const;
-
-    /** Any thread (meant for the MIDI input thread): queues a message for the drum plugin, so sample
-        players (Sitala, Numa...) can be played from a pad or keyboard. Dropped when there is no
-        drum plugin, it does not take MIDI, or the audio device is not running. */
-    void sendDrumMidi (const juce::MidiMessage&);
 
     /** The transport every plugin sees (see BarClockPlayHead). Must outlive the chain. */
     void setPlayHead (juce::AudioPlayHead* playHead)   { graph.setPlayHead (playHead); }
@@ -123,7 +109,6 @@ private:
 
     void loadPlugin (const juce::PluginDescription&, NodeCallback);     // adds the node, unconnected
     void addSlot (NodePtr);
-    void restoreDrums (const juce::XmlElement&);
     void restoreNext (std::shared_ptr<std::vector<PendingSlot>>, size_t index, std::function<void()> onDone);
     void rebuildConnections();
     void notifyChange();
@@ -169,13 +154,11 @@ private:
     juce::AudioProcessorPlayer player;
     DeviceCallback deviceCallback { *this };
     std::atomic<BlockListener*> blockListener { nullptr };
-    std::atomic<bool> audioRunning { false }, drumsTakeMidi { false };
+    std::atomic<bool> audioRunning { false };
 
     NodePtr midiInNode, audioInNode, audioOutNode, inputStageNode, outputStageNode, masterNode;
-    NodePtr looperBeforeNode, looperAfterNode, drumStageNode;
+    NodePtr looperBeforeNode, looperAfterNode;
     std::vector<Slot> slots;
-    Slot drums;                         // node == nullptr when empty
-    int drumRequest = 0;                // only the latest setDrumPlugin() call wins
     std::vector<NodePtr> sources;
     int inputChannel = 0;
 

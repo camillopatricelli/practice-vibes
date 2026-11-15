@@ -234,7 +234,13 @@ void MetronomeProcessor::onTick (int beatInBar, int tickInBeat, int barLength)
 
 void MetronomeProcessor::setLockedGrid (bool locked, double anchor, double barSamples, int beats)
 {
+    const auto wasLocked = gridLocked;
     gridLocked = locked && barSamples > 0.0 && beats > 0;
+
+    // The first loop just started: count bars from its first bar (it starts on one of our bar lines).
+    if (gridLocked && ! wasLocked && clockRunning)
+        barIndex = (juce::int64) std::floor ((barStart - anchor) / barSamples + 0.5);
+
     lockedAnchor = anchor;
     lockedBarSamples = barSamples;
     lockedBeats = juce::jmax (1, beats);
@@ -274,6 +280,7 @@ void MetronomeProcessor::onBarLine()
 void MetronomeProcessor::advanceClock (juce::int64 blockStart, int numSamples)
 {
     clockAdvanced = true;
+    blockStartTime = blockStart;
     nextBlockStart = blockStart + numSamples;
     clockTicks.clear();
 
@@ -314,6 +321,7 @@ void MetronomeProcessor::advanceClock (juce::int64 blockStart, int numSamples)
             beatSamples = lockedBarSamples / barBeats;
             bpm = 60.0 * sampleRate / beatSamples;
             barStart = lockedAnchor + std::floor ((start - lockedAnchor) / lockedBarSamples) * lockedBarSamples;
+            barIndex = (juce::int64) std::floor ((barStart - lockedAnchor) / lockedBarSamples + 0.5);
             placeNextTick (start);
             clockStartTime = nextBeat == 0 && nextTick == 0 ? barStart : barStart + lockedBarSamples;
         }
@@ -323,6 +331,7 @@ void MetronomeProcessor::advanceClock (juce::int64 blockStart, int numSamples)
             barBeats = juce::jmax (1, beatsPerBar.load());
             beatSamples = sampleRate * 60.0 / bpm;
             barStart = start;
+            barIndex = 0;
             nextBeat = 0;
             nextTick = 0;
             clockStartTime = start;
@@ -374,6 +383,7 @@ void MetronomeProcessor::advanceClock (juce::int64 blockStart, int numSamples)
 
             barStart += barBeats * beatSamples;
             barPpq += barBeats;
+            ++barIndex;
             previousBarBeats = barBeats;
             previousBeatSamples = beatSamples;      // onBarLine() may change the tempo
             nextBeat = 0;
