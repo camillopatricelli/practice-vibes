@@ -1044,6 +1044,9 @@ void Looper::processBeforeFx (float* mono, int numSamples)
 
 void Looper::processAfterFx (float* left, float* right, int numSamples)
 {
+    if (auto* tap = afterFxTap.load())
+        tap->captureGuitar (left, right, numSamples);
+
     if (lockedSource == (int) Source::afterFx)
     {
         const float* input[] = { left, right };

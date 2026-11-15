@@ -6,6 +6,7 @@
 #include "Library.h"
 #include "PracticeLog.h"
 #include "PracticePlanner.h"
+#include "Take.h"
 
 namespace pv
 {
@@ -61,13 +62,22 @@ private:
     void sessionEnd();
     void showTopicHistory (const juce::String& topicId);
 
+    // Takes
+    void toggleRecording();
+    void startRecording();
+    void stopRecording();
+    void updateRecordButton();
+    juce::File takeFolder() const;
+    void openAudioFile (const juce::File&);     // a take replays over its song; anything else loads as a song
+
     void layoutYouTube();
     juce::Rectangle<int> defaultCompactBounds() const;
 
     AppEngine& engine;
 
     juce::Label titleLabel;
-    juce::TextButton tunerButton         { "Tuner" },
+    juce::TextButton recordButton        { "Rec" },
+                     tunerButton         { "Tuner" },
                      audioSettingsButton { "Audio settings" },
                      bluetoothButton     { "Bluetooth MIDI" },
                      saveButton          { "Save" },
@@ -79,6 +89,12 @@ private:
     double lastTrackerTick = 0.0;
     juce::File lastSongFile;
     int practisingButtonCountdown = 0;
+
+    // The take being recorded: where it goes and what it was played along to.
+    juce::File recordingFile, recordingFolder;
+    TakeInfo recordingInfo;
+    juce::String recordMessage;         // shown on the button for a moment after a take was saved
+    int recordMessageCountdown = 0;
 
     PracticeSession session;
     int planMinutes = 45;

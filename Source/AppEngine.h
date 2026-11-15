@@ -9,6 +9,7 @@
 #include "PlayerProcessor.h"
 #include "PluginCatalogue.h"
 #include "PluginChain.h"
+#include "Recorder.h"
 #include "Tuner.h"
 
 namespace pv
@@ -54,6 +55,10 @@ public:
     std::function<int()> getBypassTarget;
     std::function<void()> onSaveState;          // UI: write pending edits (e.g. topic notes) to disk
     std::function<void()> onToggleTuner;        // UI: open / close the tuner (footswitch action)
+
+    // Records takes: the processed guitar (from the looper's after-FX node) + what the song player did.
+    std::unique_ptr<Recorder> recorder;
+    std::function<void()> onToggleRecording;    // UI: start / stop a take (footswitch action)
 
     // Listens to the guitar input stage while the tuner is open.
     std::unique_ptr<Tuner> tuner;

@@ -566,18 +566,28 @@ private:
 };
 
 //==============================================================================
-/** Every session of the topic, newest first, with its note. */
+/** Every session and take of the topic, newest first; sessions show their note, takes can be tapped. */
 class TopicHistory::SessionList final : public juce::Component
 {
 public:
-    explicit SessionList (std::vector<PracticeEntry> e) : entries (std::move (e)) {}
+    SessionList (std::vector<PracticeEntry> entries, std::vector<TakeRow> takes, std::function<void (const juce::File&)> open)
+        : onOpen (std::move (open))
+    {
+        for (auto& e : entries)
+            items.push_back ({ e.start, false, e, {} });
+
+        for (auto& t : takes)
+            items.push_back ({ t.when, true, {}, t });
+
+        std::stable_sort (items.begin(), items.end(), [] (const Item& x, const Item& y) { return x.when > y.when; });
+    }
 
     int contentHeight() const
     {
         int h = 0;
 
-        for (auto& e : entries)
-            h += e.note.isNotEmpty() ? 46 : 26;
+        for (auto& item : items)
+            h += heightOf (item);
 
         return juce::jmax (30, h);
     }
@@ -586,39 +596,116 @@ public:
     {
         int y = 0;
 
-        for (auto it = entries.rbegin(); it != entries.rend(); ++it)
+        for (size_t i = 0; i < items.size(); ++i)
         {
+            const auto& item = items[i];
             auto r = juce::Rectangle<int> (4, y, getWidth() - 8, 26);
-            y += 26;
+            y += heightOf (item);
 
-            juce::StringArray detail { formatPracticeDuration (it->playedSeconds) };
+            if (item.isTake)
+            {
+                if ((int) i == hoverIndex)
+                {
+                    g.setColour (juce::Colours::white.withAlpha (0.07f));
+                    g.fillRoundedRectangle (r.toFloat(), 4.0f);
+                }
 
-            if (it->maxBpm > 0.0)    detail.add (juce::String (juce::roundToInt (it->maxBpm)) + " bpm");
-            if (it->maxSpeed > 0.0)  detail.add (juce::String (juce::roundToInt (it->maxSpeed * 100.0)) + " %");
-            if (it->looper)          detail.add ("looper");
+                g.setFont (juce::FontOptions (14.0f));
+                g.setColour (axisText);
+                g.drawText (formatTakeLength (item.take.seconds) + "  -  tap to replay", r, juce::Justification::centredRight, true);
+                g.setColour (theme::accent.brighter (0.5f));
+                g.drawText (juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xb6  Take  ")) + item.when.formatted ("%a %d %b %Y, %H:%M")
+                                + "  -  " + item.take.title,
+                            r, juce::Justification::centredLeft, true);
+                continue;
+            }
+
+            const auto& e = item.entry;
+            juce::StringArray detail { formatPracticeDuration (e.playedSeconds) };
+
+            if (e.maxBpm > 0.0)    detail.add (juce::String (juce::roundToInt (e.maxBpm)) + " bpm");
+            if (e.maxSpeed > 0.0)  detail.add (juce::String (juce::roundToInt (e.maxSpeed * 100.0)) + " %");
+            if (e.looper)          detail.add ("looper");
 
             g.setFont (juce::FontOptions (14.0f));
             g.setColour (axisText);
             g.drawText (detail.joinIntoString ("  -  "), r, juce::Justification::centredRight, true);
             g.setColour (primaryText);
-            g.drawText (it->start.formatted ("%a %d %b %Y, %H:%M"), r, juce::Justification::centredLeft, true);
+            g.drawText (e.start.formatted ("%a %d %b %Y, %H:%M"), r, juce::Justification::centredLeft, true);
 
-            if (it->note.isNotEmpty())
+            if (e.note.isNotEmpty())
             {
                 g.setColour (theme::highlight.withAlpha (0.85f));
                 g.setFont (juce::FontOptions (13.0f).withStyle ("Italic"));
-                g.drawText (it->note.replaceCharacters ("\r\n", "  "), r.translated (16, 20).withHeight (18), juce::Justification::centredLeft, true);
-                y += 20;
+                g.drawText (e.note.replaceCharacters ("\r\n", "  "), r.translated (16, 20).withHeight (18), juce::Justification::centredLeft, true);
             }
         }
     }
 
+    void mouseMove (const juce::MouseEvent& e) override
+    {
+        const auto index = indexAt (e.y);
+        const auto take = index >= 0 && items[(size_t) index].isTake;
+        setMouseCursor (take ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+
+        if ((take ? index : -1) != hoverIndex)
+        {
+            hoverIndex = take ? index : -1;
+            repaint();
+        }
+    }
+
+    void mouseExit (const juce::MouseEvent&) override       { hoverIndex = -1; repaint(); }
+
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        const auto index = indexAt (e.y);
+
+        if (index >= 0 && items[(size_t) index].isTake && e.mouseWasClicked() && onOpen)
+            onOpen (items[(size_t) index].take.file);
+    }
+
 private:
-    std::vector<PracticeEntry> entries;
+    struct Item
+    {
+        juce::Time when;
+        bool isTake = false;
+        PracticeEntry entry;
+        TakeRow take;
+    };
+
+    static int heightOf (const Item& item)     { return ! item.isTake && item.entry.note.isNotEmpty() ? 46 : 26; }
+
+    static juce::String formatTakeLength (double seconds)
+    {
+        const auto total = juce::roundToInt (seconds);
+        return juce::String (total / 60) + ":" + juce::String (total % 60).paddedLeft ('0', 2);
+    }
+
+    int indexAt (int y) const
+    {
+        int top = 0;
+
+        for (size_t i = 0; i < items.size(); ++i)
+        {
+            const auto h = heightOf (items[i]);
+
+            if (y >= top && y < top + h)
+                return (int) i;
+
+            top += h;
+        }
+
+        return -1;
+    }
+
+    std::vector<Item> items;
+    std::function<void (const juce::File&)> onOpen;
+    int hoverIndex = -1;
 };
 
 //==============================================================================
-TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId)
+TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId, std::vector<TakeRow> takes)
 {
     getProperties().set ("fillOverlay", true);
 
@@ -639,6 +726,8 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId)
     const auto now = juce::Time::getCurrentTime();
     const auto summary = log.summarise (topicId);
 
+    const auto numTakes = (int) takes.size();
+
     if (! entries.empty())
     {
         juce::StringArray stats;
@@ -646,6 +735,9 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId)
         stats.add (formatPracticeDuration (summary.totalSeconds) + " in total");
         stats.add ("since " + entries.front().start.formatted ("%d %b %Y"));
         stats.add ("last practised " + formatPracticeAgo (summary.last, now));
+
+        if (numTakes > 0)
+            stats.add (juce::String (numTakes) + (numTakes == 1 ? " take" : " takes"));
         statsLabel.setText (stats.joinIntoString ("     "), juce::dontSendNotification);
     }
 
@@ -658,7 +750,7 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId)
     emptyLabel.setJustificationType (juce::Justification::centred);
     emptyLabel.setColour (juce::Label::textColourId, axisText);
     addChildComponent (emptyLabel);
-    emptyLabel.setVisible (entries.empty());
+    emptyLabel.setVisible (entries.empty() && takes.empty());
 
     tempoChart = std::make_unique<LineChart> ("Metronome tempo you played along to (bpm)", " bpm", std::move (tempo));
     speedChart = std::make_unique<LineChart> ("Song speed you played along to (%)", " %", std::move (speed));
@@ -670,9 +762,10 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId)
     speedChart->setVisible (speedChart->hasData());
     weekBars->setVisible (! entries.empty());
 
-    addAndMakeVisible (styleCaption (sessionsHeader, "Sessions"));
-    sessionsHeader.setVisible (! entries.empty());
-    sessionList = std::make_unique<SessionList> (std::move (entries));
+    addAndMakeVisible (styleCaption (sessionsHeader, takes.empty() ? "Sessions" : "Sessions and takes"));
+    sessionsHeader.setVisible (! entries.empty() || ! takes.empty());
+    sessionList = std::make_unique<SessionList> (std::move (entries), std::move (takes),
+                                                 [this] (const juce::File& f) { if (onOpenTake) onOpenTake (f); });
     sessionViewport.setViewedComponent (sessionList.get(), false);
     sessionViewport.setScrollBarsShown (true, false);
     addAndMakeVisible (sessionViewport);

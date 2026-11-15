@@ -125,6 +125,61 @@ private:
 };
 
 //==============================================================================
+/** Progress bar of a replaying take: tap or drag to jump (the song follows). Grey stretches = song paused. */
+class PracticePanel::TakeTimelineView final : public juce::Component
+{
+public:
+    explicit TakeTimelineView (PlayerProcessor& p) : player (p) {}
+
+    void paint (juce::Graphics& g) override
+    {
+        auto r = getLocalBounds().toFloat().reduced (0.0f, 8.0f);
+        g.setColour (theme::panel);
+        g.fillRoundedRectangle (r, 4.0f);
+
+        const auto take = player.getTake();
+        const auto length = player.getTakeLength();
+
+        if (take == nullptr || length <= 0.0)
+            return;
+
+        auto xOf = [&] (double t) { return r.getX() + (float) (juce::jlimit (0.0, 1.0, t / length) * r.getWidth()); };
+
+        // Where the song played along (accent) or was paused / not loaded (left plain).
+        const auto& segments = take->timeline.segments;
+
+        for (size_t i = 0; i < segments.size(); ++i)
+        {
+            if (! segments[i].playing)
+                continue;
+
+            const auto end = i + 1 < segments.size() ? segments[i + 1].takeSeconds : length;
+            g.setColour (theme::accent.withAlpha (0.35f));
+            g.fillRect (juce::Rectangle<float>::leftTopRightBottom (xOf (segments[i].takeSeconds), r.getY(), xOf (end), r.getBottom()));
+        }
+
+        const auto x = xOf (player.getTakePosition());
+        g.setColour (juce::Colours::white.withAlpha (0.35f));
+        g.fillRect (juce::Rectangle<float> (r.getX(), r.getCentreY() - 1.5f, x - r.getX(), 3.0f));
+        g.setColour (theme::highlight);
+        g.fillRect (juce::Rectangle<float> (x - 1.5f, r.getY() - 3.0f, 3.0f, r.getHeight() + 6.0f));
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override    { seekTo (e.x); }
+    void mouseDrag (const juce::MouseEvent& e) override    { seekTo (e.x); }
+
+private:
+    void seekTo (int x)
+    {
+        const auto w = juce::jmax (1, getWidth());
+        player.seekTake (juce::jlimit (0.0, player.getTakeLength(), player.getTakeLength() * x / w));
+        repaint();
+    }
+
+    PlayerProcessor& player;
+};
+
+//==============================================================================
 namespace
 {
     void styleLabel (juce::Label& label, const juce::String& text, float alpha = 0.85f)
@@ -191,12 +246,21 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
     closeVideoButton.onClick = [this] { closeYouTube(); };
     openOnYouTubeButton.onClick = [this] { if (youtube != nullptr) juce::URL (youtube->getWatchUrl()).launchInDefaultBrowser(); };
 
+    takeTimeline = std::make_unique<TakeTimelineView> (player);
+    addChildComponent (*takeTimeline);
+    addChildComponent (guitarVolumeLabel);
+    addChildComponent (guitarVolumeSlider);
+    addChildComponent (closeTakeButton);
+    closeTakeButton.onClick = [this] { closeTake(); };
+
     openButton.onClick = [this] { openFile(); };
     rewindButton.onClick = [this]
     {
         const auto target = loopIsEnabled() ? loopStartSeconds() : 0.0;
 
-        if (youTubeMode)
+        if (isTakeMode())
+            player.seekTake (0.0);
+        else if (youTubeMode)
             youtube->seek (target);
         else
             player.seekToSeconds (target);
@@ -204,7 +268,12 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
     playButton.onClick = [this] { togglePlay(); };
     stopButton.onClick = [this]
     {
-        if (youTubeMode)
+        if (isTakeMode())
+        {
+            player.pauseTake();
+            player.seekTake (0.0);
+        }
+        else if (youTubeMode)
         {
             youtube->pause();
             youtube->seek (loopIsEnabled() ? loopStartSeconds() : 0.0);
@@ -215,9 +284,13 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
         }
     };
 
-    waveform.onSeek = [this] (double seconds) { player.seekToSeconds (seconds); };
+    // While a take replays, the song follows the take: the waveform only shows where it is.
+    waveform.onSeek = [this] (double seconds) { if (! isTakeMode()) player.seekToSeconds (seconds); };
     waveform.onLoopEdited = [this] (double start, double end)
     {
+        if (isTakeMode())
+            return;
+
         player.setLoopSeconds (start, end);
         updateLoopButtons();
     };
@@ -232,6 +305,9 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
     };
     waveform.onLoopSelected = [this] (double start, double end)
     {
+        if (isTakeMode())
+            return;
+
         player.setLoopSeconds (start, end);
         player.setLoopEnabled (true);
         updateLoopButtons();
@@ -304,6 +380,11 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
         else
             player.gain = gain;
     };
+
+    styleLabel (guitarVolumeLabel, "Guitar");
+    styleHorizontal (guitarVolumeSlider, -40.0, 6.0, 0.5, 0.0, " dB");
+    guitarVolumeSlider.setTooltip ("Volume of the recorded take");
+    guitarVolumeSlider.onValueChange = [this] { player.takeGain = juce::Decibels::decibelsToGain ((float) guitarVolumeSlider.getValue(), -40.0f); };
 
     styleLabel (hintLabel, "Tap the waveform to jump, drag to loop, drag a loop edge to adjust it. Zoom: pinch, or Ctrl+wheel. Double-click a slider to reset it.", 0.45f);
     hintLabel.setMinimumHorizontalScale (0.5f);
@@ -530,6 +611,9 @@ void PracticePanel::showYouTube()
     if (player.isPlaying())
         player.pause();
 
+    if (isTakeMode())
+        closeTake();
+
     youTubeMode = true;
     pendingLoopStart = -1.0;
 
@@ -615,7 +699,7 @@ void PracticePanel::openFile()
     });
 }
 
-void PracticePanel::loadSong (const juce::URL& url, std::optional<PracticeSetup> then)
+void PracticePanel::loadSong (const juce::URL& url, std::optional<PracticeSetup> then, std::function<void()> onLoaded)
 {
     closeYouTube();
     songLabel.setText ("Loading " + juce::URL::removeEscapeChars (url.getFileName()) + "...", juce::dontSendNotification);
@@ -623,7 +707,7 @@ void PracticePanel::loadSong (const juce::URL& url, std::optional<PracticeSetup>
 
     const auto file = url.isLocalFile() ? url.getLocalFile() : juce::File();
 
-    player.loadAsync (url, [safeThis = SafePointer<PracticePanel> (this), file, then] (const juce::String& error)
+    player.loadAsync (url, [safeThis = SafePointer<PracticePanel> (this), file, then, onLoaded] (const juce::String& error)
     {
         if (safeThis == nullptr)
             return;
@@ -642,8 +726,106 @@ void PracticePanel::loadSong (const juce::URL& url, std::optional<PracticeSetup>
         if (then.has_value())
             safeThis->applySetup (*then);
 
+        if (onLoaded)
+            onLoaded();
+
         // The timer notices the new song and updates the waveform and labels.
     });
+}
+
+void PracticePanel::openTake (const juce::File& takeSongFile, const juce::File& takeFile, const TakeInfo& info)
+{
+    takeTitle = takeFile.getFileNameWithoutExtension();
+
+    auto loadTake = [safeThis = SafePointer<PracticePanel> (this), takeFile, timeline = info.timeline]
+    {
+        if (safeThis == nullptr)
+            return;
+
+        safeThis->songLabel.setText ("Loading the take...", juce::dontSendNotification);
+        safeThis->player.loadTakeAsync (juce::URL (takeFile), timeline, [safeThis] (const juce::String& error)
+        {
+            if (safeThis != nullptr && error.isNotEmpty())
+                safeThis->songLabel.setText ("Could not load the take: " + error, juce::dontSendNotification);
+        });
+    };
+
+    if (! youTubeMode && player.hasSong() && player.getSong() == songOfFile && songFile == takeSongFile)
+        loadTake();
+    else
+        loadSong (juce::URL (takeSongFile), std::nullopt, loadTake);
+}
+
+void PracticePanel::closeTake()
+{
+    player.setTake (nullptr);
+    updateTakeMode();
+}
+
+void PracticePanel::updateTakeMode()
+{
+    const auto on = isTakeMode();
+
+    if (on == takeShown)
+        return;
+
+    takeShown = on;
+
+    if (on)
+    {
+        // Keep your own settings; show the take's (the song follows the take's timeline).
+        savedSpeed = speedSlider.getValue();
+        savedPitch = pitchSlider.getValue();
+        savedLoopOn = player.isLoopEnabled();
+        savedLoopStart = player.getLoopStartSeconds();
+        savedLoopEnd = player.getLoopEndSeconds();
+        takeSong = player.getSong();
+
+        if (auto take = player.getTake())
+        {
+            // The waveform shows the first loop the take used (none: no loop).
+            player.setLoopSeconds (0.0, 0.0);
+            player.setLoopEnabled (false);
+
+            for (auto& segment : take->timeline.segments)
+                if (segment.loopOn)
+                {
+                    player.setLoopSeconds (segment.loopStart, segment.loopEnd);
+                    break;
+                }
+        }
+
+        pendingLoopStart = -1.0;
+        guitarVolumeSlider.setValue (juce::Decibels::gainToDecibels (player.takeGain.load(), -40.0f), juce::dontSendNotification);
+    }
+    else
+    {
+        speedSlider.setValue (savedSpeed, juce::sendNotificationSync);
+        pitchSlider.setValue (savedPitch, juce::sendNotificationSync);
+        if (player.getSong() == takeSong)   // not when another song was loaded meanwhile
+        {
+            player.setLoopSeconds (savedLoopStart, savedLoopEnd);
+            player.setLoopEnabled (savedLoopOn);
+        }
+
+        takeSong = nullptr;
+        songLabel.setText (shownSong != nullptr ? shownSong->name : juce::String ("No song loaded"), juce::dontSendNotification);
+    }
+
+    for (auto* c : std::initializer_list<juce::Component*> { &setAButton, &setBButton, &loopButton, &clearLoopButton, &snapButton })
+        c->setVisible (! on);
+
+    for (auto* c : std::initializer_list<juce::Component*> { takeTimeline.get(), &guitarVolumeLabel, &guitarVolumeSlider, &closeTakeButton })
+        c->setVisible (on);
+
+    for (auto* c : std::initializer_list<juce::Component*> { &speedSlider, &speedLabel, &pitchSlider, &pitchLabel })
+        c->setEnabled (! on);
+
+    hintLabel.setText (on ? "Replaying a take: the song does what it did while you recorded (position, speed, pitch, loop). Tap the bar to jump."
+                          : "Tap the waveform to jump, drag to loop, drag a loop edge to adjust it. Zoom: pinch, or Ctrl+wheel. Double-click a slider to reset it.",
+                       juce::dontSendNotification);
+    updateLoopButtons();
+    resized();
 }
 
 PracticeSetup PracticePanel::captureSetup() const
@@ -732,7 +914,14 @@ juce::String PracticePanel::getMediaName() const
 
 void PracticePanel::togglePlay()
 {
-    if (youTubeMode)
+    if (isTakeMode())
+    {
+        if (player.isTakePlaying())
+            player.pauseTake();
+        else
+            player.playTake();
+    }
+    else if (youTubeMode)
         youtube->togglePlay();
     else if (player.isPlaying())
         player.pause();
@@ -871,9 +1060,31 @@ void PracticePanel::timerCallback()
         for (auto* b : { &rewindButton, &playButton, &stopButton, &setAButton, &setBButton, &zoomOutButton, &zoomInButton, &fitButton })
             b->setEnabled (hasSong);
 
-        playButton.setButtonText (player.isPlaying() ? "Pause" : "Play");
-        timeLabel.setText (formatTime (player.getPositionSeconds()) + " / " + formatTime (player.getLengthSeconds()),
-                           juce::dontSendNotification);
+        updateTakeMode();
+
+        if (isTakeMode())
+        {
+            playButton.setButtonText (player.isTakePlaying() ? "Pause take" : "Play take");
+            timeLabel.setText (formatTime (player.getTakePosition()) + " / " + formatTime (player.getTakeLength()),
+                               juce::dontSendNotification);
+            songLabel.setText ("Take: " + takeTitle + (shownSong != nullptr ? "  -  over " + shownSong->name : juce::String()),
+                               juce::dontSendNotification);
+
+            // Show the speed and pitch the take is replaying with.
+            if (player.isTakePlaying())
+            {
+                speedSlider.setValue (std::round (player.getEffectiveSpeed() * 100.0), juce::dontSendNotification);
+                pitchSlider.setValue (player.getEffectiveSemitones(), juce::dontSendNotification);
+            }
+
+            takeTimeline->repaint();
+        }
+        else
+        {
+            playButton.setButtonText (player.isPlaying() ? "Pause" : "Play");
+            timeLabel.setText (formatTime (player.getPositionSeconds()) + " / " + formatTime (player.getLengthSeconds()),
+                               juce::dontSendNotification);
+        }
 
         if (hasSong)
             waveform.refresh();
@@ -975,6 +1186,17 @@ void PracticePanel::resized()
     playButton.setBounds (transport.removeFromLeft (110).reduced (2, 0));
     stopButton.setBounds (transport.removeFromLeft (small).reduced (2, 0));
     transport.removeFromLeft (20);
+
+    if (takeShown)
+    {
+        closeTakeButton.setBounds (transport.removeFromRight (110).reduced (2, 0));
+        transport.removeFromRight (8);
+        guitarVolumeSlider.setBounds (transport.removeFromRight (juce::jmin (230, transport.getWidth() / 3)));
+        guitarVolumeLabel.setBounds (transport.removeFromRight (56));
+        transport.removeFromRight (12);
+        takeTimeline->setBounds (transport);
+    }
+
     clearLoopButton.setBounds (transport.removeFromRight (110).reduced (2, 0));
     loopButton.setBounds (transport.removeFromRight (200).reduced (2, 0));
     setBButton.setBounds (transport.removeFromRight (small).reduced (2, 0));

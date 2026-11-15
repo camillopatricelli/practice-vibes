@@ -5,6 +5,7 @@
 #include "MetronomeProcessor.h"
 #include "PracticeLog.h"
 #include "PlayerProcessor.h"
+#include "Take.h"
 #include "WaveformView.h"
 
 namespace pv
@@ -26,7 +27,13 @@ public:
 
     /** Loads a song into the player (also used by the Topics tab to open audio resources).
         `then`: speed, pitch, loop and metronome to apply once it's loaded (restoring a practice setup). */
-    void loadSong (const juce::URL&, std::optional<PracticeSetup> then = std::nullopt);
+    void loadSong (const juce::URL&, std::optional<PracticeSetup> then = std::nullopt, std::function<void()> onLoaded = {});
+
+    /** Replays a recorded take over its song: loads the song (unless it's loaded already), then the take.
+        While the take is open, the transport plays the take and the song follows the take's timeline. */
+    void openTake (const juce::File& songFile, const juce::File& takeFile, const TakeInfo&);
+    void closeTake();
+    bool isTakeMode() const                             { return player.hasTake(); }
 
     /** What's on screen now, for the practice log (songPath: the song's full path). */
     PracticeSetup captureSetup() const;
@@ -51,6 +58,19 @@ public:
 private:
     class BeatIndicator;
     class YouTubeTimeline;
+    class TakeTimelineView;
+
+    // Take mode (a recorded take replays over the song)
+    std::unique_ptr<TakeTimelineView> takeTimeline;
+    juce::Label guitarVolumeLabel;
+    juce::Slider guitarVolumeSlider;
+    juce::TextButton closeTakeButton { "Close take" };
+    juce::String takeTitle;
+    bool takeShown = false;
+    double savedSpeed = 100.0, savedPitch = 0.0, savedLoopStart = 0.0, savedLoopEnd = 0.0;
+    bool savedLoopOn = false;
+    std::shared_ptr<const LoadedSong> takeSong;     // the song the saved loop belongs to
+    void updateTakeMode();
 
     // YouTube mode
     YouTubePlayer* youtube = nullptr;

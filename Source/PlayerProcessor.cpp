@@ -235,15 +235,74 @@ void PlayerProcessor::setSong (std::shared_ptr<LoadedSong> newSong)
     loopEnd = 0;
     positionSeconds = 0.0;
 
+    takePlaying = false;
     std::shared_ptr<LoadedSong> old;
+    std::shared_ptr<Take> oldTake;
 
     {
         const juce::SpinLock::ScopedLockType lock (songLock);
         old = std::exchange (song, std::move (newSong));
+        oldTake = std::exchange (take, nullptr);
         seekTarget = 0;
     }
 
     // `old` is released here, on the message thread, never on the audio thread.
+}
+
+//==============================================================================
+void PlayerProcessor::loadTakeAsync (const juce::URL& file, TakeTimeline timeline, LoadCallback onDone)
+{
+    std::weak_ptr<bool> weakAlive = alive;
+
+    loaderPool.addJob ([this, weakAlive, file, timeline = std::move (timeline), done = std::move (onDone)]
+    {
+        juce::String error;
+        auto decoded = decodeSong (formatManager, file, error);
+        std::shared_ptr<Take> newTake;
+
+        if (decoded != nullptr)
+        {
+            newTake = std::make_shared<Take>();
+            newTake->audio = std::move (*decoded);
+            newTake->timeline = timeline;
+        }
+
+        juce::MessageManager::callAsync ([this, weakAlive, newTake, error, done]
+        {
+            if (weakAlive.expired())
+                return;
+
+            if (newTake != nullptr)
+                setTake (newTake);
+
+            if (done)
+                done (error);
+        });
+    });
+}
+
+void PlayerProcessor::setTake (std::shared_ptr<Take> newTake)
+{
+    playing = false;
+    takePlaying = false;
+    takePosition = 0.0;
+    takeSeek = 0.0;
+    std::shared_ptr<Take> old;
+
+    {
+        const juce::SpinLock::ScopedLockType lock (songLock);
+        old = std::exchange (take, std::move (newTake));
+    }
+}
+
+void PlayerProcessor::playTake()
+{
+    if (take == nullptr)
+        return;
+
+    // Start over at the end; otherwise line the song up again where the take is.
+    takeSeek = getTakePosition() >= getTakeLength() - 0.05 ? 0.0 : getTakePosition();
+    takePlaying = true;
 }
 
 //==============================================================================
@@ -358,33 +417,99 @@ void PlayerProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     clock.samplesRendered = samplesRendered;
     clock.heardSeconds = positionSeconds.load();
     clock.speed = speed.load();
-    clock.playing = playing.load() && song != nullptr;
+    clock.playing = renderedPlaying;
 }
 
 void PlayerProcessor::renderBlock (juce::AudioBuffer<float>& buffer)
 {
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
+    renderedPlaying = false;
 
     const juce::SpinLock::ScopedTryLockType lock (songLock);
 
-    if (! lock.isLocked() || song == nullptr || buffer.getNumChannels() < 2)
+    if (! lock.isLocked())
         return;
+
+    if (song == nullptr || buffer.getNumChannels() < 2)
+    {
+        if (auto* listener = songListener.load())
+            listener->songBlock ({});
+
+        return;
+    }
 
     const auto numSamples = buffer.getNumSamples();
     const auto length = (juce::int64) song->audio.getNumSamples();
     const auto rateRatio = song->sampleRate / deviceSampleRate;   // song samples per device sample at 1x
-    const auto playbackRate = speed.load() * rateRatio;
+
+    // This block's settings: the user's, or a replaying take's timeline.
+    auto speedNow = speed.load();
+    auto semitonesNow = semitones.load();
+    auto playNow = playing.load();
+    auto loopOn = loopEnabled.load();
+    auto loopStartNow = loopStart.load(), loopEndNow = loopEnd.load();
+    auto target = seekTarget.exchange (-1);
+    auto* takeNow = take.get();
+    std::optional<double> replaySeekSeconds;     // a replaying take wants the song heard from here
+
+    if (takeNow != nullptr)
+    {
+        playNow = false;
+        auto resync = false;
+
+        if (const auto s = takeSeek.exchange (-1.0); s >= 0.0)
+        {
+            takeSamples = (juce::int64) std::llround (juce::jmin (s, takeNow->getLengthSeconds()) * deviceSampleRate);
+            takePos = (double) takeSamples / deviceSampleRate;
+            resync = true;
+        }
+
+        if (takePlaying.load())
+        {
+            const auto& timeline = takeNow->timeline;
+
+            if (const auto index = timeline.segmentAt (takePos); index >= 0)
+            {
+                const auto& segment = timeline.segments[(size_t) index];
+                speedNow = segment.speed;
+                semitonesNow = segment.semitones;
+                playNow = segment.playing;
+                loopOn = segment.loopOn;
+                loopStartNow = secondsToSamples (segment.loopStart);
+                loopEndNow = secondsToSamples (segment.loopEnd);
+
+                // Seek when the take jumped, or a new segment starts somewhere else than where the song is.
+                const auto wanted = timeline.songSecondsAt (takePos, index);
+
+                if (resync || (index != takeSegment && std::abs (wanted - heardSeconds) > 0.02))
+                    replaySeekSeconds = wanted;
+
+                takeSegment = index;
+            }
+        }
+        else
+        {
+            takeSegment = -1;
+
+            if (resync)     // moved while paused: show the song where the take is
+                replaySeekSeconds = takeNow->timeline.songSecondsAt (takePos);
+        }
+    }
+
+    effectiveSpeed = speedNow;
+    effectiveSemitones = semitonesNow;
+    const auto playbackRate = speedNow * rateRatio;
 
     SongReader reader;
     reader.song = song.get();
-    reader.loopStart = loopStart.load();
-    reader.loopEnd = loopEnd.load();
-    reader.looping = loopEnabled.load() && reader.loopEnd - reader.loopStart > 256;
+    reader.loopStart = loopStartNow;
+    reader.loopEnd = loopEndNow;
+    reader.looping = loopOn && reader.loopEnd - reader.loopStart > 256;
 
     // The stretcher preserves samples-per-cycle, so a sample-rate mismatch must be
     // corrected through the transpose factor as well as the read rate.
-    const auto transposeFactor = rateRatio * std::pow (2.0, semitones.load() / 12.0);
+    const auto transposeFactor = rateRatio * std::pow (2.0, semitonesNow / 12.0);
 
     if (transposeFactor != lastTransposeFactor)
     {
@@ -392,7 +517,20 @@ void PlayerProcessor::renderBlock (juce::AudioBuffer<float>& buffer)
         lastTransposeFactor = transposeFactor;
     }
 
-    if (const auto target = seekTarget.exchange (-1); target >= 0)
+    // After a seek the stretcher's output lags its input by outputLatency() (see `delay` below): what is heard
+    // at the start of the block is that much before the seek target.
+    const auto seekLag = (juce::int64) std::llround (stretch.outputLatency() * playbackRate);
+
+    if (replaySeekSeconds.has_value())
+    {
+        target = reader.map (juce::jmax<juce::int64> (0, (juce::int64) std::llround (*replaySeekSeconds * song->sampleRate) + seekLag));
+        positionSeconds = juce::jmax (0.0, *replaySeekSeconds);
+    }
+
+    if (target >= 0)
+        heardSeconds = replaySeekSeconds.has_value() ? *replaySeekSeconds : (double) (target - seekLag) / song->sampleRate;
+
+    if (target >= 0)
     {
         stretch.reset();
         reader.start = target;
@@ -402,35 +540,99 @@ void PlayerProcessor::renderBlock (juce::AudioBuffer<float>& buffer)
         inputRemainder = 0.0;
     }
 
-    if (! playing.load())
-        return;
-
-    inputRemainder += numSamples * playbackRate;
-    const auto inputSamples = (int) inputRemainder;
-    inputRemainder -= inputSamples;
-
-    reader.start = readPosition;
-    stretch.process (reader, inputSamples, buffer.getArrayOfWritePointers(), numSamples);
-    readPosition = reader.map (readPosition + inputSamples);
-
-    const auto newGain = gain.load();
-    buffer.applyGainRamp (0, numSamples, lastGain, newGain);
-    lastGain = newGain;
-
-    // What the listener hears now was read this many song samples ago.
-    const auto delay = (juce::int64) (stretch.inputLatency() + stretch.outputLatency() * playbackRate);
-    auto heard = readPosition - delay;
-
-    if (reader.looping && heard < reader.loopStart && readPosition >= reader.loopStart)
-        heard += reader.loopEnd - reader.loopStart;
-
-    positionSeconds = (double) juce::jlimit<juce::int64> (0, length, heard) / song->sampleRate;
-
-    if (! reader.looping && readPosition >= length + delay)
+    if (auto* listener = songListener.load())
     {
-        playing = false;
-        positionSeconds = (double) length / song->sampleRate;
+        SongState state;
+        state.heardSeconds = heardSeconds;
+        state.playing = playNow;
+        state.speed = speedNow;
+        state.semitones = semitonesNow;
+        state.loopOn = reader.looping;
+        state.loopStart = (double) reader.loopStart / song->sampleRate;
+        state.loopEnd = (double) reader.loopEnd / song->sampleRate;
+        listener->songBlock (state);
     }
+
+    if (playNow)
+    {
+        renderedPlaying = true;
+        inputRemainder += numSamples * playbackRate;
+        const auto inputSamples = (int) inputRemainder;
+        inputRemainder -= inputSamples;
+
+        reader.start = readPosition;
+        stretch.process (reader, inputSamples, buffer.getArrayOfWritePointers(), numSamples);
+        readPosition = reader.map (readPosition + inputSamples);
+
+        const auto newGain = gain.load();
+        buffer.applyGainRamp (0, numSamples, lastGain, newGain);
+        lastGain = newGain;
+
+        // What the listener hears now was read this many song samples ago.
+        const auto delay = (juce::int64) (stretch.inputLatency() + stretch.outputLatency() * playbackRate);
+        auto heard = readPosition - delay;
+
+        if (reader.looping && heard < reader.loopStart && readPosition >= reader.loopStart)
+            heard += reader.loopEnd - reader.loopStart;
+
+        positionSeconds = (double) juce::jlimit<juce::int64> (0, length, heard) / song->sampleRate;
+        heardSeconds = (double) heard / song->sampleRate;
+
+        if (! reader.looping && readPosition >= length + delay)
+        {
+            positionSeconds = (double) length / song->sampleRate;
+
+            if (takeNow == nullptr)
+                playing = false;
+            else
+                renderedPlaying = false;
+        }
+    }
+
+    if (takeNow != nullptr && takePlaying.load())
+        mixTake (*takeNow, buffer);
+}
+
+void PlayerProcessor::mixTake (const Take& t, juce::AudioBuffer<float>& buffer)
+{
+    // The take plays at its own sample rate (linear interpolation if the device runs at another one).
+    const auto& audio = t.audio.audio;
+    const auto takeLength = audio.getNumSamples();
+    const auto step = t.audio.sampleRate / deviceSampleRate;
+    const auto numSamples = buffer.getNumSamples();
+    const auto newGain = takeGain.load();
+    const auto position = takePos * t.audio.sampleRate;
+
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const auto* in = audio.getReadPointer (juce::jmin (ch, audio.getNumChannels() - 1));
+        auto* out = buffer.getWritePointer (ch);
+        auto p = position;
+
+        for (int i = 0; i < numSamples; ++i, p += step)
+        {
+            const auto index = (int) p;
+
+            if (index + 1 >= takeLength)
+                break;
+
+            const auto frac = (float) (p - index);
+            const auto g = lastTakeGain + (newGain - lastTakeGain) * ((float) i / (float) numSamples);
+            out[i] += g * (in[index] + frac * (in[index + 1] - in[index]));
+        }
+    }
+
+    lastTakeGain = newGain;
+    takeSamples += numSamples;
+    takePos = (double) takeSamples / deviceSampleRate;
+
+    if (takePos >= t.getLengthSeconds())
+    {
+        takePos = t.getLengthSeconds();
+        takePlaying = false;
+    }
+
+    takePosition = takePos;
 }
 
 } // namespace pv

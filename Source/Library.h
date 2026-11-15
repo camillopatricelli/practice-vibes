@@ -24,6 +24,7 @@ struct Resource
     juce::String url;           // links only
     juce::StringArray tags;
     juce::Time added;
+    bool isTake = false;        // a recorded take (has its details in the folder's ".takes", see TakeInfo)
 
     bool isLink() const noexcept    { return fileName.isEmpty(); }
 };

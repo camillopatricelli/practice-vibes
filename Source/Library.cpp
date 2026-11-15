@@ -1,4 +1,5 @@
 #include "Library.h"
+#include "Take.h"
 #include "AppPaths.h"
 
 namespace pv
@@ -147,6 +148,9 @@ bool hasTag (const juce::StringArray& tags, const juce::String& tag)
 
 juce::String badgeText (const Resource& r)
 {
+    if (r.isTake)
+        return "TAKE";
+
     switch (kindOf (r))
     {
         case ResourceKind::youtube:    return "YT";
@@ -402,6 +406,9 @@ bool Library::loadTopic (const juce::File& folder, Topic& topic)
             topic.resources.push_back (std::move (r));
         }
     }
+
+    for (auto& r : topic.resources)
+        r.isTake = ! r.isLink() && TakeInfo::infoFileFor (topic.getFile (r)).existsAsFile();
 
     return true;
 }
@@ -673,10 +680,21 @@ Resource* Library::moveInboxFile (Topic& topic, const juce::File& inboxFile)
 
     inbox.removeFirstMatchingValue (inboxFile);
 
+    // A take's details go with it.
+    const auto info = TakeInfo::infoFileFor (inboxFile);
+    const auto isTake = info.existsAsFile();
+
+    if (isTake)
+    {
+        TakeInfo::infoFileFor (target).getParentDirectory().createDirectory();
+        info.moveFileTo (TakeInfo::infoFileFor (target));
+    }
+
     Resource r;
     r.id = r.fileName = target.getFileName();
     r.title = target.getFileNameWithoutExtension();
     r.added = juce::Time::getCurrentTime();
+    r.isTake = isTake;
     topic.resources.push_back (r);
     saveTopic (topic);
     return topic.findResource (r.id);
@@ -712,6 +730,9 @@ bool Library::removeResource (Topic& topic, const juce::String& resourceId)
 
     if (! it->isLink() && ! removeToBin (topic.getFile (*it)))
         return false;
+
+    if (! it->isLink())
+        TakeInfo::infoFileFor (topic.getFile (*it)).deleteFile();
 
     topic.resources.erase (it);
     return saveTopic (topic);

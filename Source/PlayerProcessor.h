@@ -3,6 +3,7 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <signalsmith-stretch/signalsmith-stretch.h>
+#include "Take.h"
 
 namespace pv
 {
@@ -94,6 +95,57 @@ public:
     bool getClock (Clock&) const;
 
     //==============================================================================
+    /** What the player does at the start of a block (reported to a SongBlockListener, e.g. the take recorder). */
+    struct SongState
+    {
+        double heardSeconds = 0.0;          // song position heard from this block on
+        bool playing = false;
+        double speed = 1.0, semitones = 0.0;
+        bool loopOn = false;
+        double loopStart = 0.0, loopEnd = 0.0;
+    };
+
+    struct SongBlockListener
+    {
+        virtual ~SongBlockListener() = default;
+        virtual void songBlock (const SongState&) noexcept = 0;    // audio thread
+    };
+
+    void setSongBlockListener (SongBlockListener* l)   { songListener = l; }
+
+    //==============================================================================
+    /** A recorded take replayed over the song: the take plays from start to end, and the song follows the take's
+        timeline (position, speed, pitch, loop, pauses) as it was while recording. While a take is set, the
+        song's own transport is idle: playTake() / pauseTake() / seekTake() drive both. */
+    struct Take
+    {
+        LoadedSong audio;
+        TakeTimeline timeline;
+        double getLengthSeconds() const     { return audio.getLengthSeconds(); }
+    };
+
+    /** Decodes a take's audio file on the loader thread, then sets it (message thread callback). */
+    void loadTakeAsync (const juce::URL& file, TakeTimeline, LoadCallback onDone);
+
+    /** Message thread. nullptr removes the take (the song stays loaded, paused). Loading a song removes it too. */
+    void setTake (std::shared_ptr<Take>);
+    bool hasTake() const noexcept                       { return take != nullptr; }
+    std::shared_ptr<const Take> getTake() const         { return take; }
+
+    void playTake();
+    void pauseTake()                                    { takePlaying = false; }
+    void seekTake (double seconds)                      { takeSeek = juce::jmax (0.0, seconds); takePosition = juce::jmax (0.0, seconds); }
+    bool isTakePlaying() const noexcept                 { return takePlaying.load(); }
+    double getTakePosition() const noexcept             { return takePosition.load(); }
+    double getTakeLength() const                        { return take != nullptr ? take->getLengthSeconds() : 0.0; }
+
+    std::atomic<float> takeGain { 1.0f };
+
+    /** The speed / pitch actually used (a replaying take's timeline overrides setSpeed / setSemitones). */
+    double getEffectiveSpeed() const noexcept           { return effectiveSpeed.load(); }
+    double getEffectiveSemitones() const noexcept       { return effectiveSemitones.load(); }
+
+    //==============================================================================
     const juce::String getName() const override         { return "Song player"; }
     void prepareToPlay (double sampleRate, int maximumBlockSize) override;
     void releaseResources() override                    {}
@@ -121,6 +173,7 @@ public:
 private:
     juce::int64 secondsToSamples (double seconds) const;
     void renderBlock (juce::AudioBuffer<float>&);
+    void mixTake (const Take&, juce::AudioBuffer<float>&);
 
     mutable juce::SpinLock clockLock;
     Clock clock;
@@ -145,6 +198,19 @@ private:
     std::atomic<double> speed { 1.0 }, semitones { 0.0 }, positionSeconds { 0.0 };
     std::atomic<bool> loopEnabled { false };
     std::atomic<juce::int64> loopStart { 0 }, loopEnd { 0 };
+
+    // Take replay (the take is swapped under songLock, like the song)
+    std::shared_ptr<Take> take;
+    std::atomic<bool> takePlaying { false };
+    std::atomic<double> takeSeek { -1.0 }, takePosition { 0.0 };
+    double takePos = 0.0;               // audio thread: seconds = takeSamples / deviceSampleRate
+    juce::int64 takeSamples = 0;
+    int takeSegment = -1;
+    float lastTakeGain = 1.0f;
+    std::atomic<double> effectiveSpeed { 1.0 }, effectiveSemitones { 0.0 };
+    bool renderedPlaying = false;       // the song was heard in the last block
+    double heardSeconds = 0.0;          // like positionSeconds, but not clamped to the song (negative just after a seek to 0)
+    std::atomic<SongBlockListener*> songListener { nullptr };
 
     std::shared_ptr<bool> alive = std::make_shared<bool> (true);
 

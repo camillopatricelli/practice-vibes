@@ -41,6 +41,9 @@ AppEngine::AppEngine()
     chain->getInputStage().tap = tuner.get();
 
     looper = std::make_unique<Looper> (*metronome);
+    recorder = std::make_unique<Recorder>();
+    looper->afterFxTap = recorder.get();
+    player->setSongBlockListener (recorder.get());
     chain->setLooperNodes (looper->createBeforeFxNode(), looper->createAfterFxNode());
     chain->setBlockListener (this);
     chain->setPlayHead (&playHead);
@@ -82,6 +85,7 @@ AppEngine::~AppEngine()
     metronome = nullptr;
     chain.reset();      // stops audio and deletes the looper's nodes before the looper
     looper.reset();
+    recorder.reset();
     deviceManager.closeAudioDevice();
 }
 
@@ -219,6 +223,7 @@ void AppEngine::beginBlock (juce::int64 blockStart, int numSamples)
     metronome->advanceClock (blockStart, numSamples);
     playHead.update (*metronome, blockStart);
     looper->beginBlock (blockStart, numSamples);
+    recorder->beginBlock (blockStart, numSamples);
 }
 
 void AppEngine::performFootswitchAction (FootswitchAction action, double pressSeconds)
@@ -256,6 +261,11 @@ void AppEngine::performFootswitchAction (FootswitchAction action, double pressSe
         case Kind::tuner:
             if (onToggleTuner)
                 onToggleTuner();
+            break;
+
+        case Kind::record:
+            if (onToggleRecording)
+                onToggleRecording();
             break;
 
         case Kind::none:

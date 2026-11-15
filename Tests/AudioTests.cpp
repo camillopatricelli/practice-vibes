@@ -13,6 +13,8 @@
 #include "../Source/PlayerProcessor.h"
 #include "../Source/PracticeLog.h"
 #include "../Source/PracticePlanner.h"
+#include "../Source/Recorder.h"
+#include "../Source/Take.h"
 #include "../Source/Tuner.h"
 #include "../Source/GainMeterProcessor.h"
 
@@ -2453,6 +2455,324 @@ static void testPracticePlanner()
     }
 }
 
+//==============================================================================
+namespace
+{
+    /** A song of short 1 kHz bursts at irregular times, so any timing error shows up. */
+    std::shared_ptr<LoadedSong> makeClickSong (double sampleRate, double seconds)
+    {
+        auto song = std::make_shared<LoadedSong>();
+        song->sampleRate = sampleRate;
+        song->name = "clicks.wav";
+        const auto length = (int) (sampleRate * seconds);
+        song->audio.setSize (2, length);
+        song->audio.clear();
+        juce::Random random (42);
+        const auto burst = (int) (0.02 * sampleRate);
+
+        for (double t = 0.2; t < seconds - 0.1; t += 0.17 + 0.2 * random.nextDouble())
+        {
+            const auto start = (int) (t * sampleRate);
+            const auto amplitude = 0.3f + 0.6f * random.nextFloat();
+
+            for (int i = 0; i < burst && start + i < length; ++i)
+            {
+                const auto v = amplitude * (float) (std::sin (juce::MathConstants<double>::twoPi * 1000.0 * i / sampleRate)
+                                                    * std::exp (-i / (0.004 * sampleRate)));
+                song->audio.setSample (0, start + i, v);
+                song->audio.setSample (1, start + i, v);
+            }
+        }
+
+        return song;
+    }
+
+    /** Lag (in samples, positive = b later than a) that best lines up the envelopes of a and b in [from, to). */
+    int envelopeLag (const std::vector<float>& a, const std::vector<float>& b, int from, int to, int maxLag)
+    {
+        constexpr int hop = 16;
+        auto envelope = [&] (const std::vector<float>& x, int start, int count)
+        {
+            std::vector<float> e ((size_t) count, 0.0f);
+
+            for (int i = 0; i < count; ++i)
+                for (int j = 0; j < hop; ++j)
+                    if (const auto k = start + i * hop + j; k >= 0 && k < (int) x.size())
+                        e[(size_t) i] += std::abs (x[(size_t) k]);
+
+            return e;
+        };
+
+        const auto count = (to - from) / hop;
+        const auto lags = maxLag / hop;
+        const auto ea = envelope (a, from, count);
+        const auto eb = envelope (b, from - lags * hop, count + 2 * lags);
+        auto best = 0.0f;
+        auto bestLag = 0;
+
+        for (int lag = -lags; lag <= lags; ++lag)
+        {
+            auto sum = 0.0f;
+
+            for (int i = 0; i < count; ++i)
+                sum += ea[(size_t) i] * eb[(size_t) (i + lag + lags)];
+
+            if (sum > best)
+            {
+                best = sum;
+                bestLag = lag;
+            }
+        }
+
+        return bestLag * hop;
+    }
+
+    float rms (const std::vector<float>& x, int from, int to)
+    {
+        double sum = 0.0;
+
+        for (int i = from; i < to && i < (int) x.size(); ++i)
+            sum += (double) x[(size_t) i] * x[(size_t) i];
+
+        return (float) std::sqrt (sum / juce::jmax (1, to - from));
+    }
+}
+
+static void testTakes()
+{
+    std::cout << "Takes (recording + replay over the song)" << std::endl;
+
+    // Timeline maths -----------------------------------------------------------
+    {
+        TakeTimeline tl;
+        TakeSegment a;  a.takeSeconds = 0.0; a.songSeconds = 10.0; a.playing = true; a.speed = 0.5;
+        TakeSegment b;  b.takeSeconds = 4.0; b.songSeconds = 30.0; b.playing = true; b.speed = 1.0;
+                        b.loopOn = true; b.loopStart = 30.0; b.loopEnd = 32.0;
+        TakeSegment c;  c.takeSeconds = 9.0; c.songSeconds = 31.0; c.playing = false;
+        tl.segments = { a, b, c };
+
+        check (tl.segmentAt (-1.0) == 0 && tl.segmentAt (3.9) == 0 && tl.segmentAt (4.0) == 1 && tl.segmentAt (20.0) == 2,
+               "segmentAt picks the segment in force");
+        check (std::abs (tl.songSecondsAt (2.0) - 11.0) < 1e-9, "half speed: 2 s of take = 1 s of song");
+        check (std::abs (tl.songSecondsAt (-1.0) - 9.5) < 1e-9, "before the first segment: extrapolated back");
+        check (std::abs (tl.songSecondsAt (5.5) - 31.5) < 1e-9, "inside the loop before it wraps");
+        check (std::abs (tl.songSecondsAt (6.5) - 30.5) < 1e-9, "loop wraps like the player (32 -> 30)");
+        check (std::abs (tl.songSecondsAt (12.0) - 31.0) < 1e-9, "paused: the song stays put");
+        check (tl.usesSong(), "a timeline with playing segments uses the song");
+
+        TakeTimeline silent;
+        silent.segments = { c };
+        check (! silent.usesSong() && ! TakeTimeline().usesSong(), "no playing segment: the take stands alone");
+
+        // Round trip through the info file.
+        TakeInfo info;
+        info.recorded = juce::Time (2026, 10, 15, 14, 32, 5, 0, true);
+        info.lengthSeconds = 151.25;
+        info.topicId = "topic-1";
+        info.songPath = "Jazz/Autumn Leaves.mp3";
+        info.songName = "Autumn Leaves.mp3";
+        info.timeline = tl;
+
+        auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("pv-test-takes");
+        folder.deleteRecursively();
+        folder.createDirectory();
+        const auto audioFile = folder.getChildFile ("Take 1.flac");
+        audioFile.replaceWithText ("x");
+        check (info.save (audioFile) && TakeInfo::infoFileFor (audioFile) == folder.getChildFile (".takes/Take 1.flac.xml"),
+               "info saved in the folder's hidden .takes folder");
+
+        const auto loaded = TakeInfo::load (audioFile);
+        auto same = loaded.has_value() && loaded->songPath == info.songPath && loaded->topicId == "topic-1"
+                 && std::abs (loaded->lengthSeconds - 151.25) < 1e-9 && loaded->recorded == info.recorded
+                 && loaded->timeline.segments.size() == 3;
+
+        if (same)
+            for (size_t i = 0; i < 3; ++i)
+            {
+                const auto& x = loaded->timeline.segments[i];
+                const auto& y = tl.segments[i];
+                same = same && x.takeSeconds == y.takeSeconds && x.songSeconds == y.songSeconds && x.playing == y.playing
+                         && x.speed == y.speed && x.loopOn == y.loopOn && x.loopStart == y.loopStart && x.loopEnd == y.loopEnd;
+            }
+
+        check (same, "take info survives a save / load round trip");
+        check (! TakeInfo::load (folder.getChildFile ("nothing.flac")).has_value(), "no info file: not a take");
+
+        // The library marks it and shows a TAKE badge; removing it removes its info too.
+        {
+            auto topicFolder = folder.getChildFile ("Lesson");
+            topicFolder.createDirectory();
+            const auto takeFile = topicFolder.getChildFile ("Take 2.flac");
+            takeFile.replaceWithText ("x");
+            info.save (takeFile);
+            topicFolder.getChildFile ("song.mp3").replaceWithText ("x");
+
+            Library lib (folder);
+            lib.rescan();
+            auto* topic = lib.getTopics().empty() ? nullptr : lib.findTopic (lib.getTopics().front().id);
+            auto* take = topic != nullptr ? topic->findResource ("Take 2.flac") : nullptr;
+            auto* song = topic != nullptr ? topic->findResource ("song.mp3") : nullptr;
+            check (take != nullptr && take->isTake && badgeText (*take) == "TAKE" && song != nullptr && ! song->isTake,
+                   "library: takes are marked and badged TAKE, other audio isn't");
+            check (lib.getInbox().contains (audioFile) && lib.getInbox().size() == 1, "the .takes folder itself is not listed");
+
+            if (topic != nullptr)
+            {
+                lib.removeResource (*topic, "Take 2.flac");
+                check (! TakeInfo::infoFileFor (takeFile).existsAsFile(), "removing a take removes its info file");
+
+                auto* moved = lib.moveInboxFile (*topic, audioFile);
+                check (moved != nullptr && moved->isTake && TakeInfo::infoFileFor (topic->getFile (*moved)).existsAsFile()
+                           && ! TakeInfo::infoFileFor (audioFile).existsAsFile(),
+                       "moving a take from the Inbox into a topic moves its info along");
+            }
+        }
+
+        check (TakeInfo::makeFileName (info.recorded, "Autumn Leaves.mp3") == "Take 2026-11-15 14.32 - Autumn Leaves"
+                   && TakeInfo::makeFileName (info.recorded, {}) == "Take 2026-11-15 14.32"
+                   && TakeInfo::makeFileName (info.recorded, "AC/DC: T.N.T.") == "Take 2026-11-15 14.32 - ACDC T.N.T",
+               "take file names: date + song, no extension, no illegal characters");
+        folder.deleteRecursively();
+    }
+
+    // Record along to the song, then replay the take over the song ------------------------------------------
+    for (const auto songRate : { 48000.0, 44100.0 })
+    {
+        constexpr double rate = 48000.0;
+        constexpr int block = 512;
+        constexpr int comp = 777;           // round-trip latency: the "guitar" arrives this late
+        const auto total = (int) (12.0 * rate);
+        auto song = makeClickSong (songRate, 20.0);
+        const auto label = juce::String (" (song at ") + juce::String (songRate / 1000.0, 1) + " kHz)";
+
+        // 1. Record: the "guitar" plays exactly what it hears, comp samples late.
+        PlayerProcessor player;
+        player.prepareToPlay (rate, block);
+        player.setSong (song);
+        player.setSpeed (0.8);      // starts paused at 0:00; Play is pressed 0.3 s into the take (like in real use)
+
+        Recorder recorder (30.0);
+        player.setSongBlockListener (&recorder);
+        const auto file = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("pv-test-take.flac");
+        juce::String error;
+        check (recorder.start (file, rate, comp, error), "recorder starts" + label);
+
+        std::vector<float> heard ((size_t) total, 0.0f);
+        juce::AudioBuffer<float> buffer (2, block), guitar (2, block);
+        juce::MidiBuffer midi;
+
+        for (int g = 0; g < total; g += block)
+        {
+            auto at = [&] (double seconds) { const auto s = (int) (seconds * rate); return g <= s && s < g + block; };
+
+            if (at (0.3))  player.play();
+            if (at (4.0))  player.seekToSeconds (8.0);
+            if (at (6.0))  { player.setLoopSeconds (9.0, 10.5); player.setLoopEnabled (true); }
+            if (at (9.0))  player.pause();
+            if (at (9.5))  player.play();
+
+            recorder.beginBlock (g, block);
+            buffer.clear();
+            player.processBlock (buffer, midi);
+
+            for (int i = 0; i < block && g + i < total; ++i)
+                heard[(size_t) (g + i)] = buffer.getSample (0, i);
+
+            for (int i = 0; i < block; ++i)
+            {
+                const auto k = g + i - comp;
+                const auto v = k >= 0 && k < total ? heard[(size_t) k] : 0.0f;
+                guitar.setSample (0, i, v);
+                guitar.setSample (1, i, v);
+            }
+
+            recorder.captureGuitar (guitar.getReadPointer (0), guitar.getReadPointer (1), block);
+        }
+
+        const auto result = recorder.stop();
+        player.setSongBlockListener (nullptr);
+        const auto expectedSeconds = (total - comp) / rate;
+        check (! recorder.isRecording() && std::abs (result.seconds - expectedSeconds) < 0.001 && ! recorder.hasDroppedAudio(),
+               "take length = recording time minus the latency" + label);
+        check (result.timeline.usesSong() && result.timeline.segments.size() == 6,
+               "timeline: paused, play, seek, loop, pause, play (" + juce::String ((int) result.timeline.segments.size()) + " segments)" + label);
+
+        // The file holds the guitar shifted back by the latency: take sample k = what was heard at k.
+        juce::AudioFormatManager formats;
+        formats.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
+        auto take = std::make_shared<PlayerProcessor::Take>();
+        take->timeline = result.timeline;
+
+        if (reader != nullptr)
+        {
+            take->audio.sampleRate = reader->sampleRate;
+            take->audio.audio.setSize (2, (int) reader->lengthInSamples);
+            reader->read (&take->audio.audio, 0, (int) reader->lengthInSamples, 0, true, true);
+        }
+
+        reader.reset();
+        auto maxError = take->audio.audio.getNumSamples() > 0 ? 0.0f : 1.0f;
+
+        for (int k = 0; k < take->audio.audio.getNumSamples() && k < total; ++k)
+            maxError = juce::jmax (maxError, std::abs (take->audio.audio.getSample (0, k) - heard[(size_t) k]));
+
+        check (take->audio.audio.getNumSamples() == total - comp && maxError < 1.0e-4f,
+               "FLAC take lines up with what was heard, latency removed (max error " + juce::String (maxError, 6) + ")" + label);
+
+        // 2. Replay: song alone (take muted), then take alone (song muted).
+        auto replay = [&] (float songGain, float takeGain, double startAt)
+        {
+            PlayerProcessor p;
+            p.prepareToPlay (rate, block);
+            p.setSong (song);
+            p.setTake (take);
+            p.gain = songGain;
+            p.takeGain = takeGain;
+            p.seekTake (startAt);
+            p.playTake();
+
+            std::vector<float> out ((size_t) total, 0.0f);
+            const auto start = (int) (startAt * rate);
+
+            for (int g = start; g < total; g += block)
+            {
+                buffer.clear();
+                p.processBlock (buffer, midi);
+
+                for (int i = 0; i < block && g + i < total; ++i)
+                    out[(size_t) (g + i)] = buffer.getSample (0, i);
+            }
+
+            return std::make_pair (out, p.isTakePlaying());
+        };
+
+        const auto [songOut, stillPlaying] = replay (1.0f, 0.0f, 0.0);
+        const auto takeOut = replay (0.0f, 1.0f, 0.0).first;
+
+        struct Window { double from, to; const char* what; };
+
+        for (auto w : { Window { 0.5, 3.5, "start" }, Window { 4.3, 5.8, "after a seek" }, Window { 6.5, 8.8, "in the A-B loop" },
+                        Window { 9.7, 11.5, "after a pause" } })
+        {
+            const auto lag = envelopeLag (songOut, takeOut, (int) (w.from * rate), (int) (w.to * rate), 2400);
+            check (std::abs (lag) <= 48, juce::String ("replay: take and song in step ") + w.what + " (lag "
+                                             + juce::String (lag) + " samples)" + label);
+        }
+
+        check (rms (songOut, (int) (9.1 * rate), (int) (9.45 * rate)) < 1.0e-4f && rms (songOut, (int) (8.0 * rate), (int) (8.8 * rate)) > 1.0e-3f,
+               "replay: the song pauses where it paused while recording" + label);
+        check (! stillPlaying || take->getLengthSeconds() > 11.9, "replay stops at the end of the take" + label);
+
+        // Starting in the middle (seekTake) lines up too.
+        const auto fromMiddle = replay (1.0f, 0.0f, 7.0).first;
+        const auto lag = envelopeLag (fromMiddle, takeOut, (int) (7.3 * rate), (int) (8.8 * rate), 2400);
+        check (std::abs (lag) <= 48, "replay from the middle of the take is in step (lag " + juce::String (lag) + ")" + label);
+
+        file.deleteFile();
+    }
+}
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI juceInit;
@@ -2476,6 +2796,7 @@ int main()
     testLibrary();
     testPracticeLog();
     testPracticePlanner();
+    testTakes();
 
     std::cout << (failures == 0 ? "ALL TESTS PASSED" : juce::String (failures) + " TEST(S) FAILED") << std::endl;
     return failures == 0 ? 0 : 1;

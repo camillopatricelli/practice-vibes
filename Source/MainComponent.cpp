@@ -9,6 +9,7 @@
 #include "YouTubePlayer.h"
 #include "Theme.h"
 #include "WebView.h"
+#include "AppPaths.h"
 
 namespace pv
 {
@@ -187,7 +188,7 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     titleLabel.setColour (juce::Label::textColourId, juce::Colours::white);
     addAndMakeVisible (titleLabel);
 
-    for (auto* b : { &tunerButton, &audioSettingsButton, &bluetoothButton, &saveButton, &practisingButton })
+    for (auto* b : { &recordButton, &tunerButton, &audioSettingsButton, &bluetoothButton, &saveButton, &practisingButton })
         addAndMakeVisible (*b);
 
     practisingButton.setTooltip ("What you're practising: played time is logged to this topic (see the Today tab)");
@@ -197,6 +198,10 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     tunerButton.onClick = [this] { toggleTuner(); };
     tunerButton.setTooltip ("Chromatic tuner (a footswitch can open and close it too)");
     engine.onToggleTuner = [this] { toggleTuner(); };
+    recordButton.onClick = [this] { toggleRecording(); };
+    recordButton.setTooltip ("Record yourself (the guitar after the rig) into the topic you're practising. "
+                             "Open the take later to hear it over the song, in step. A footswitch can do this too.");
+    engine.onToggleRecording = [this] { toggleRecording(); };
     engine.onSaveState = [this]
     {
         if (libraryPanel != nullptr)
@@ -229,11 +234,7 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     looperPanel->hideOverlay = [this] { closeOverlay(); };
     libraryPanel->showOverlay = [this] (const juce::String& title, std::unique_ptr<juce::Component> c) { showOverlay (title, std::move (c)); };
     libraryPanel->hideOverlay = [this] { closeOverlay(); };
-    libraryPanel->onOpenAudio = [this] (const juce::File& file)
-    {
-        practicePanel->loadSong (juce::URL (file));
-        showTab (practicePanel.get());
-    };
+    libraryPanel->onOpenAudio = [this] (const juce::File& file) { openAudioFile (file); };
     libraryPanel->onOpenYouTube = [this] (const YouTubeLink& link, const juce::String& title) { openYouTube (link, title); };
 
     // Practice log: opening something from a topic makes it the topic you're practising.
@@ -331,6 +332,11 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
 MainComponent::~MainComponent()
 {
     stopTimer();
+
+    if (engine.recorder->isRecording())
+        stopRecording();    // keep what was recorded
+
+    engine.onToggleRecording = nullptr;
     tracker.finish();
     tracker.onSaved = nullptr;
     tracker.captureSetup = nullptr;
@@ -365,6 +371,7 @@ void MainComponent::resized()
     bluetoothButton.setBounds (top.removeFromRight (150).reduced (4));
     audioSettingsButton.setBounds (top.removeFromRight (150).reduced (4));
     tunerButton.setBounds (top.removeFromRight (90).reduced (4));
+    recordButton.setBounds (top.removeFromRight (juce::jlimit (90, 140, top.getWidth() / 6)).reduced (4));
     practisingButton.setBounds (top.removeFromRight (juce::jlimit (150, 320, top.getWidth() - 180)).reduced (4));
     titleLabel.setBounds (top);
 
@@ -377,6 +384,7 @@ void MainComponent::timerCallback()
 {
     layoutYouTube();
     tickTracker();
+    updateRecordButton();
 }
 
 void MainComponent::showTab (juce::Component* content)
@@ -727,7 +735,49 @@ void MainComponent::showTopicHistory (const juce::String& topicId)
         return;
 
     tracker.flush();   // include what you're playing right now
-    showOverlay ("History: " + topic->title, std::make_unique<TopicHistory> (*practiceLog, topicId));
+
+    std::vector<TakeRow> takes;
+
+    for (auto& r : topic->resources)
+    {
+        if (! r.isTake)
+            continue;
+
+        TakeRow row;
+        row.file = topic->getFile (r);
+        row.when = row.file.getCreationTime();
+        row.title = "guitar only";
+
+        if (const auto info = TakeInfo::load (row.file))
+        {
+            if (info->recorded != juce::Time())
+                row.when = info->recorded;
+
+            row.seconds = info->lengthSeconds;
+
+            if (info->songName.isNotEmpty() && info->timeline.usesSong())
+                row.title = info->songName;
+            else if (info->youTubeTitle.isNotEmpty())
+                row.title = info->youTubeTitle + " (YouTube)";
+        }
+
+        takes.push_back (row);
+    }
+
+    auto history = std::make_unique<TopicHistory> (*practiceLog, topicId, std::move (takes));
+    history->onOpenTake = [this] (const juce::File& f)
+    {
+        // Not from inside the history's own click: opening closes (deletes) the overlay.
+        juce::MessageManager::callAsync ([safe = SafePointer<MainComponent> (this), f]
+        {
+            if (safe != nullptr)
+            {
+                safe->closeOverlay();
+                safe->openAudioFile (f);
+            }
+        });
+    };
+    showOverlay ("History: " + topic->title, std::move (history));
 }
 
 void MainComponent::layoutYouTube()
@@ -797,6 +847,185 @@ void MainComponent::layoutYouTube()
     {
         youtube->setVisible (false);   // paused on another tab or under an overlay
     }
+}
+
+//==============================================================================
+juce::File MainComponent::takeFolder() const
+{
+    // The topic you're practising, else the library's Inbox, else a Recordings folder next to the Loops.
+    if (auto* lib = libraryPanel->getLibrary())
+    {
+        if (auto* topic = lib->findTopic (tracker.getActiveTopicId()))
+            return topic->folder;
+
+        return lib->getRoot();
+    }
+
+   #if JUCE_IOS
+    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("Recordings");
+   #else
+    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("Practice Vibes").getChildFile ("Recordings");
+   #endif
+}
+
+void MainComponent::toggleRecording()
+{
+    if (engine.recorder->isRecording())
+        stopRecording();
+    else
+        startRecording();
+}
+
+void MainComponent::startRecording()
+{
+    auto* device = engine.deviceManager.getCurrentAudioDevice();
+
+    if (device == nullptr || device->getActiveInputChannels().isZero())
+    {
+        recordMessage = "No audio input";
+        recordMessageCountdown = 30;
+        juce::Logger::writeToLog ("Can't record a take: no audio input is open (see Audio settings)");
+        return;
+    }
+
+    recordingFolder = takeFolder();
+    recordingFile = recordingFolder.getChildFile (TakeInfo::folderName)
+                                   .getChildFile ("recording-" + juce::Uuid().toDashedString().substring (0, 8) + ".flac");
+
+    // What you're playing along to (for the file name and for replaying in step later).
+    recordingInfo = {};
+    recordingInfo.recorded = juce::Time::getCurrentTime();
+    recordingInfo.topicId = tracker.getActiveTopicId();
+
+    if (practicePanel->isYouTubeMode())
+    {
+        const auto setup = practicePanel->captureSetup();
+        recordingInfo.youTubeId = setup.youTubeId;
+        recordingInfo.youTubeTitle = setup.youTubeTitle;
+    }
+    else if (practicePanel->getSongFile() != juce::File())
+    {
+        auto* lib = libraryPanel->getLibrary();
+        recordingInfo.songPath = PracticeSetup::portablePath (practicePanel->getSongFile(), lib != nullptr ? lib->getRoot() : juce::File());
+        recordingInfo.songName = practicePanel->getSongFile().getFileName();
+    }
+
+    juce::String error;
+
+    if (! engine.recorder->start (recordingFile, device->getCurrentSampleRate(), engine.looper->getCompensationSamples(), error))
+    {
+        recordMessage = "Can't record";
+        recordMessageCountdown = 30;
+        juce::Logger::writeToLog ("Can't record a take: " + error);
+        return;
+    }
+
+    juce::Logger::writeToLog ("Recording a take into " + recordingFolder.getFullPathName()
+                              + " (latency compensation " + juce::String (engine.looper->getCompensationSamples()) + " samples)");
+    updateRecordButton();
+}
+
+void MainComponent::stopRecording()
+{
+    auto result = engine.recorder->stop();
+
+    if (result.file == juce::File())
+        return;
+
+    if (engine.recorder->hasDroppedAudio())
+        juce::Logger::writeToLog ("Warning: the disk didn't keep up while recording - the take has gaps");
+
+    if (result.seconds < 1.0)
+    {
+        result.file.deleteFile();
+        recordMessage = "Too short";
+        recordMessageCountdown = 20;
+        updateRecordButton();
+        return;
+    }
+
+    recordingInfo.lengthSeconds = result.seconds;
+    recordingInfo.timeline = std::move (result.timeline);
+
+    // Only name a song the take actually played along to.
+    const auto what = recordingInfo.timeline.usesSong() ? recordingInfo.songName : recordingInfo.youTubeTitle;
+    const auto base = TakeInfo::makeFileName (recordingInfo.recorded, what);
+    auto target = recordingFolder.getChildFile (base + ".flac");
+
+    for (int n = 2; target.exists(); ++n)
+        target = recordingFolder.getChildFile (base + " (" + juce::String (n) + ").flac");
+
+    if (! result.file.moveFileTo (target))
+    {
+        target = result.file;   // keep it where it is rather than lose it
+        juce::Logger::writeToLog ("Could not rename the take; it stays at " + target.getFullPathName());
+    }
+
+    recordingInfo.save (target);
+    juce::Logger::writeToLog ("Saved take " + target.getFileName() + " (" + juce::String (result.seconds, 1) + " s"
+                              + (recordingInfo.timeline.usesSong() ? ", in step with " + recordingInfo.songName : juce::String())
+                              + ") to " + recordingFolder.getFullPathName());
+
+    recordMessage = "Take saved";
+    recordMessageCountdown = 30;
+    libraryPanel->checkForChanges();
+    updateRecordButton();
+}
+
+void MainComponent::updateRecordButton()
+{
+    juce::String text;
+
+    if (engine.recorder->isRecording())
+    {
+        const auto seconds = juce::roundToInt (engine.recorder->getRecordedSeconds());
+        text = juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xa0 ")) + juce::String (seconds / 60) + ":"
+             + juce::String (seconds % 60).paddedLeft ('0', 2);
+        recordButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xffc62828));
+        recordButton.setColour (juce::TextButton::textColourOffId, juce::Colours::white);
+    }
+    else
+    {
+        recordButton.removeColour (juce::TextButton::buttonColourId);
+        recordButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffff7070));   // a red "Rec"
+
+        if (recordMessageCountdown > 0)
+        {
+            --recordMessageCountdown;
+            text = recordMessage;
+        }
+        else
+        {
+            text = juce::String (juce::CharPointer_UTF8 ("\xe2\x97\x8f Rec"));
+        }
+    }
+
+    if (recordButton.getButtonText() != text)
+        recordButton.setButtonText (text);
+}
+
+void MainComponent::openAudioFile (const juce::File& file)
+{
+    if (const auto info = TakeInfo::load (file))
+    {
+        if (info->timeline.usesSong() && info->songPath.isNotEmpty())
+        {
+            auto* lib = libraryPanel->getLibrary();
+            const auto song = PracticeSetup::resolvePath (info->songPath, lib != nullptr ? lib->getRoot() : juce::File());
+
+            if (song.existsAsFile())
+            {
+                practicePanel->openTake (song, file, *info);
+                showTab (practicePanel.get());
+                return;
+            }
+
+            juce::Logger::writeToLog ("The take's song (" + info->songPath + ") wasn't found: playing the take on its own");
+        }
+    }
+
+    practicePanel->loadSong (juce::URL (file));
+    showTab (practicePanel.get());
 }
 
 //==============================================================================

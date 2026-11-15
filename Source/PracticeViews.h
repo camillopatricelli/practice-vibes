@@ -44,11 +44,23 @@ private:
     std::vector<std::unique_ptr<SlotRow>> rows;
 };
 
-/** Overlay: one topic's practice history - tempo and song speed over time, minutes per week, every session. */
+/** A recorded take listed in a topic's history. */
+struct TakeRow
+{
+    juce::Time when;
+    juce::String title;         // what it was played along to ("guitar only" if nothing)
+    double seconds = 0.0;
+    juce::File file;
+};
+
+/** Overlay: one topic's practice history - tempo and song speed over time, minutes per week, every session
+    and every recorded take (tap a take to replay it). */
 class TopicHistory final : public juce::Component
 {
 public:
-    TopicHistory (const PracticeLog&, const juce::String& topicId);
+    TopicHistory (const PracticeLog&, const juce::String& topicId, std::vector<TakeRow> takes = {});
+
+    std::function<void (const juce::File&)> onOpenTake;
     ~TopicHistory() override;
 
     void paint (juce::Graphics&) override;

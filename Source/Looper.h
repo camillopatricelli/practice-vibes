@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "AudioTap.h"
 #include "LatencyCalibrator.h"
 #include "MetronomeProcessor.h"
 
@@ -50,6 +51,9 @@ public:
     std::atomic<float> latencyOffsetMs { 0.0f };          // manual fine-tune, added to the measured latency
     std::atomic<int> deviceLatencySamples { 0 };          // device input + output latency
     std::atomic<int> chainLatencySamples { 0 };           // plugin latency
+
+    /** Gets the processed guitar (the "after FX" input) every block, e.g. the take recorder. */
+    std::atomic<StereoTap*> afterFxTap { nullptr };
 
     /** Measures the round trip on the dry input while active (see LatencyCalibrator). */
     LatencyCalibrator calibrator;
