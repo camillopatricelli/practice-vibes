@@ -3,6 +3,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_dsp/juce_dsp.h>
 #include "AudioTap.h"
+#include <complex>
 #include <optional>
 
 namespace pv
@@ -137,8 +138,8 @@ private:
         strings' partials (Hz) in that band. Uses the complex spectrum left by analyse(). */
     Peak fitPartial (int windowLength, double rate, float target, double start, const std::vector<double>& others) const;
 
-    juce::dsp::FFT fft;
-    std::vector<float> window, spectrum, magnitude;
+    std::vector<float> window, spectrum, magnitude;      // spectrum: bins 0..N/2 as interleaved re, im
+    std::vector<std::complex<double>> fftData, twiddles;
 };
 
 /** Chromatic tuner: the guitar input stage pushes the dry signal into a ring buffer while the

@@ -1913,6 +1913,38 @@ namespace
         std::cout << "Tunings and strum check" << std::endl;
 
         {
+            // Diagnostic: juce::dsp::FFT (vDSP on Apple, JUCE's own engine elsewhere) against a direct DFT in double.
+            constexpr int order = 17, size = 1 << order, n = 24000;
+            juce::dsp::FFT fft (order);
+            std::vector<float> data ((size_t) size * 2, 0.0f);
+            std::vector<double> x ((size_t) n);
+
+            for (int i = 0; i < n; ++i)
+            {
+                const auto hann = 0.5 - 0.5 * std::cos (juce::MathConstants<double>::twoPi * i / (n - 1));
+                x[(size_t) i] = hann * (std::sin (0.0171 * i) + 0.3 * std::sin (0.0517 * i + 1.0));
+                data[(size_t) i] = (float) x[(size_t) i];
+            }
+
+            fft.performRealOnlyForwardTransform (data.data());
+            double worst = 0.0, peak = 0.0;
+
+            for (int k : { 0, 1, 7, 356, 357, 358, 1076, 1077, 1078, 5000, size / 2 - 1 })
+            {
+                std::complex<double> direct;
+
+                for (int i = 0; i < n; ++i)
+                    direct += x[(size_t) i] * std::polar (1.0, -juce::MathConstants<double>::twoPi * (double) k * i / size);
+
+                peak = juce::jmax (peak, std::abs (direct));
+                worst = juce::jmax (worst, std::abs (direct - std::complex<double> (data[(size_t) (2 * k)], data[(size_t) (2 * k + 1)])));
+            }
+
+            check (worst < 1.0e-3 * peak, "juce::dsp::FFT matches a direct DFT: error " + juce::String (worst / peak, 7)
+                                          + " of the peak (" + juce::String (peak, 1) + ")");
+        }
+
+        {
             juce::StringArray names;
 
             for (auto& t : tuningPresets())
@@ -1991,8 +2023,15 @@ namespace
                 }
 
             const auto delay = resultAt / rate - 0.4;
+            juce::String perString;
+
+            if (result && ! (allHeard && worst < 1.5f))
+                for (size_t i = 0; i < 6; ++i)
+                    perString << (i == 0 ? " [" : ", ") << ((*result)[i].heard ? juce::String ((*result)[i].cents - detune[i], 2) : "-")
+                              << (i == 5 ? "]" : "");
+
             check (allHeard && worst < 1.5f, juce::String (tuning.name) + " strum at " + juce::String (rate, 0)
-                                             + " Hz: six strings within 1.5 cents (worst " + juce::String (worst, 2) + ")");
+                                             + " Hz: six strings within 1.5 cents (worst " + juce::String (worst, 2) + ")" + perString);
             check (result && delay > 0.5 && delay < 0.8, "strum result arrives "
                                                           + juce::String (delay, 2) + " s after the strum");
         }
