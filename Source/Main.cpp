@@ -19,16 +19,21 @@ public:
 
        #if JUCE_IOS || JUCE_ANDROID
         setFullScreen (true);
+        setVisible (true);
        #else
         setResizable (true, true);
         setResizeLimits (900, 600, 4000, 3000);
         centreWithSize (1280, 800);     // the size "Restore" goes back to
+        // Desktop: stays hidden until showMaximised(), so the half-drawn window isn't seen while
+        // the engine opens the audio device and reloads the plugins.
        #endif
+    }
 
-        setVisible (true);
-
+    void showMaximised()
+    {
        #if ! (JUCE_IOS || JUCE_ANDROID)
-        setFullScreen (true);           // desktop: start maximised (title bar always on screen)
+        setVisible (true);
+        setFullScreen (true);           // start maximised (title bar always on screen)
        #endif
     }
 
@@ -62,6 +67,7 @@ public:
         engine = std::make_unique<AppEngine>();
         mainWindow = std::make_unique<MainWindow> (getApplicationName(), *engine, *log);
         engine->start();
+        mainWindow->showMaximised();    // desktop: shown only once the blocking start-up work is done
 
        #if ! (JUCE_IOS || JUCE_ANDROID)
         // Desktop: a song file passed on the command line is opened in the player.
