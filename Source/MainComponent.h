@@ -20,7 +20,7 @@ class RigPanel;
 class TodayPanel;
 class YouTubePlayer;
 
-/** Top-level UI: title bar, tabs (Today / Practice / Topics / Looper / Guitar rig / Log) and a full-window
+/** Top-level UI: title bar, tabs (Today / Practice / Topics / Links / Looper / Guitar rig, plus an optional Log) and a full-window
     overlay used for plugin UIs and the audio settings.
 */
 class MainComponent final : public juce::Component,
@@ -38,6 +38,8 @@ private:
     class Overlay;
 
     void openAudioSettings();
+    bool isLogTabShown() const;
+    void setLogTabShown (bool);     // the Log tab is hidden unless switched on in the audio settings
     void toggleTuner();
     void showOverlay (const juce::String& title, std::unique_ptr<juce::Component>);
     void closeOverlay();

@@ -336,8 +336,11 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     tabs.addTab ("Links", theme::background, linksPanel.get(), false);
     tabs.addTab ("Looper", theme::background, looperPanel.get(), false);
     tabs.addTab ("Guitar rig", theme::background, rigPanel.get(), false);
-    tabs.addTab ("Log", theme::background, logPanel.get(), false);
     addAndMakeVisible (tabs);
+
+    // The Log tab is for troubleshooting: off unless switched on in the audio settings.
+    if (auto ui = juce::parseXML (getUiSettingsFile()))
+        setLogTabShown (ui->getBoolAttribute ("showLogTab", false));
 
     youtube = std::make_unique<YouTubePlayer>();
     addChildComponent (*youtube);
@@ -1038,7 +1041,7 @@ void MainComponent::offerAddToInbox (const juce::URL& song)
         if (copy == juce::File())
         {
             juce::Logger::writeToLog ("Could not copy " + name + " into the library");
-            safe->practicePanel->showNote ("Could not copy the song into the library (see the Log tab)");
+            safe->practicePanel->showNote ("Could not copy the song into the library (details in the log)");
             return;
         }
 
@@ -1444,7 +1447,69 @@ void MainComponent::openAudioSettings()
                                                                           0, 8,    // outputs
                                                                           true,    // MIDI inputs
                                                                           false, false, false);
-    showOverlay ("Audio settings", std::move (selector));
+
+    // The device selector, with the Log tab switch underneath.
+    struct Settings final : public juce::Component
+    {
+        Settings (std::unique_ptr<juce::Component> s, bool logShown, std::function<void (bool)> onLog)
+            : selector (std::move (s))
+        {
+            addAndMakeVisible (*selector);
+            logToggle.setToggleState (logShown, juce::dontSendNotification);
+            logToggle.setTooltip ("A tab with everything the app writes to its log, for troubleshooting");
+            logToggle.onClick = [this, onLog] { onLog (logToggle.getToggleState()); };
+            addAndMakeVisible (logToggle);
+        }
+
+        void resized() override
+        {
+            auto r = getLocalBounds();
+            logToggle.setBounds (r.removeFromBottom (32).reduced (8, 2));
+            selector->setBounds (r);
+        }
+
+        std::unique_ptr<juce::Component> selector;
+        juce::ToggleButton logToggle { "Show the Log tab" };
+    };
+
+    showOverlay ("Audio settings", std::make_unique<Settings> (std::move (selector), isLogTabShown(),
+                                                               [this] (bool shown)
+                                                               {
+                                                                   setLogTabShown (shown);
+                                                                   juce::XmlElement ui ("UI");
+                                                                   ui.setAttribute ("showLogTab", shown);
+                                                                   ui.writeTo (getUiSettingsFile());
+                                                               }));
+}
+
+bool MainComponent::isLogTabShown() const
+{
+    for (int i = 0; i < tabs.getNumTabs(); ++i)
+        if (tabs.getTabContentComponent (i) == logPanel.get())
+            return true;
+
+    return false;
+}
+
+void MainComponent::setLogTabShown (bool shown)
+{
+    if (shown == isLogTabShown())
+        return;
+
+    if (shown)
+    {
+        tabs.addTab ("Log", theme::background, logPanel.get(), false);
+        return;
+    }
+
+    for (int i = tabs.getNumTabs(); --i >= 0;)
+        if (tabs.getTabContentComponent (i) == logPanel.get())
+        {
+            if (tabs.getCurrentTabIndex() == i)
+                tabs.setCurrentTabIndex (0);
+
+            tabs.removeTab (i);
+        }
 }
 
 void MainComponent::toggleTuner()
