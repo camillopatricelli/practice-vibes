@@ -276,19 +276,6 @@ StrumAnalyser::StrumAnalyser()
       spectrum ((size_t) strumFftSize * 2),
       magnitude ((size_t) strumFftSize / 2)
 {
-    // An impulse at sample 1 transforms to e^(-2 pi i k / N) in the reference convention: |X| = 1 and, at bin 1,
-    // a negative imaginary part. Measure what this engine gives and remember how to undo it.
-    std::fill (spectrum.begin(), spectrum.end(), 0.0f);
-    spectrum[1] = 1.0f;
-    fft.performRealOnlyForwardTransform (spectrum.data());
-
-    const auto re = spectrum[2], im = spectrum[3];
-    const auto size = std::hypot (re, im);
-
-    if (size > 0.0f)
-        spectrumScale = 1.0f / size;
-
-    imagSign = im > 0.0f ? -1.0f : 1.0f;
 }
 
 int StrumAnalyser::samplesNeeded (double sampleRate) noexcept
@@ -525,13 +512,6 @@ StrumResult StrumAnalyser::analyse (const float* samples, int numSamples, double
                                  * (0.5f - 0.5f * std::cos (juce::MathConstants<float>::twoPi * (float) i / (float) (n - 1)));
 
     fft.performRealOnlyForwardTransform (spectrum.data());
-
-    if (spectrumScale != 1.0f || imagSign != 1.0f)
-        for (size_t k = 0; k < spectrum.size() / 2; ++k)
-        {
-            spectrum[2 * k] *= spectrumScale;
-            spectrum[2 * k + 1] *= spectrumScale * imagSign;
-        }
 
     for (size_t k = 0; k < magnitude.size(); ++k)
         magnitude[k] = std::hypot (spectrum[2 * k], spectrum[2 * k + 1]);

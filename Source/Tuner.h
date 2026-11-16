@@ -139,10 +139,6 @@ private:
 
     juce::dsp::FFT fft;
     std::vector<float> window, spectrum, magnitude;
-
-    // JUCE's FFT engines (vDSP on Apple, its own elsewhere) differ in scale and in the sign of the phase; the fit
-    // in fitPartial assumes an unscaled e^(-i...) transform, so the spectrum is brought to that form.
-    float spectrumScale = 1.0f, imagSign = 1.0f;
 };
 
 /** Chromatic tuner: the guitar input stage pushes the dry signal into a ring buffer while the
