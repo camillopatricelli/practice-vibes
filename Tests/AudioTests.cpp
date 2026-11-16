@@ -2811,6 +2811,68 @@ static void testPracticeLog()
                "the .practice folder is not a topic");
     }
 
+    // --- Library: saving leaves no temp files, conflict copies are recognised precisely, "New topic" folders get renamed.
+    {
+        check (Library::isConflictCopy ("topic (1).xml") && Library::isConflictCopy ("topic 2.xml") && Library::isConflictCopy ("topic2.xml")
+                   && Library::isConflictCopy ("topic-DESKTOP-PC.xml") && Library::isConflictCopy ("topic (Joe's conflicted copy 2026-11-16).xml"),
+               "cloud conflict copies (Google Drive, iCloud, OneDrive, Dropbox) recognised");
+        check (! Library::isConflictCopy ("topic.xml") && ! Library::isConflictCopy ("topic_temp1a2b3c.xml")
+                   && ! Library::isConflictCopy ("topics of the week.xml") && ! Library::isConflictCopy (".topic.xml.tmp"),
+               "temp files and other names are not conflict copies");
+
+        Library lib (root);
+        auto* t = lib.createTopic ("New topic");
+        const auto id = t->id;
+        auto folder = t->folder;
+        check (Library::isDefaultFolderName (folder.getFileName()), "new topic folder: " + folder.getFileName());
+
+        for (int i = 0; i < 5; ++i)
+        {
+            t->title = "Sweep picking " + juce::String (i);
+            lib.saveTopic (*t);
+        }
+
+        folder.getChildFile ("topic_temp5e1f.xml").replaceWithText ("<TOPIC/>");   // left behind by an older build
+        auto files = folder.findChildFiles (juce::File::findFiles, false);
+        check (files.size() == 2, "five saves leave only topic.xml (+ the old leftover): " + juce::String (files.size()) + " file(s)");
+
+        Library again (root);
+        auto* reloaded = again.findTopic (id);
+        check (reloaded != nullptr && reloaded->conflictFiles.isEmpty() && reloaded->resources.empty() && reloaded->title == "Sweep picking 4",
+               "a leftover topic_temp file is neither a conflict nor a resource");
+
+        if (reloaded != nullptr)
+        {
+            check (again.renameFolderAfterTitle (*reloaded) && reloaded->folder.getFileName() == "Sweep picking 4"
+                       && reloaded->folder.getChildFile ("topic.xml").existsAsFile() && ! folder.exists(),
+                   "\"New topic\" folder renamed after the title: " + reloaded->folder.getFileName());
+            check (! again.renameFolderAfterTitle (*reloaded), "a folder with a real name isn't renamed again");
+
+            // Conflict copy from iCloud: keep it, the current one goes to the bin.
+            auto copy = reloaded->folder.getChildFile ("topic 2.xml");
+            copy.replaceWithText ("<TOPIC id=\"" + id + "\" title=\"From the iPad\"/>");
+            again.rescan();
+            reloaded = again.findTopic (id);
+            check (reloaded != nullptr && reloaded->conflictFiles == juce::StringArray ({ "topic 2.xml" }), "iCloud copy flagged");
+
+            if (reloaded != nullptr)
+            {
+                const auto versions = Library::getTopicFileVersions (*reloaded);
+                check (versions.size() == 2 && versions[1].title == "From the iPad", "both versions listed with their titles");
+                check (Library::keepTopicFileVersion (*reloaded, "topic 2.xml"), "keep the copy");
+                again.rescan();
+                reloaded = again.findTopic (id);
+                check (reloaded != nullptr && reloaded->title == "From the iPad" && reloaded->conflictFiles.isEmpty()
+                           && ! copy.exists(), "kept copy became topic.xml, no conflict left");
+            }
+        }
+
+        auto* withSong = again.createTopic ("New topic");
+        withSong->folder.getChildFile ("song.mp3").replaceWithText ("x");
+        withSong->title = "Blues in A";
+        check (! again.renameFolderAfterTitle (*withSong), "a folder holding audio keeps its name (songs are remembered by path)");
+    }
+
     // Formatting
     check (formatPracticeDuration (10.0) == "< 1 min" && formatPracticeDuration (12 * 60.0) == "12 min"
                && formatPracticeDuration (65 * 60.0) == "1 h 05 min",

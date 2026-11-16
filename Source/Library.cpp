@@ -3,6 +3,7 @@
 #include "Take.h"
 #include "AppPaths.h"
 #include "FolderAccess.h"
+#include <regex>
 
 namespace pv
 {
@@ -324,9 +325,29 @@ bool Library::isIgnoredFile (const juce::File& f)
 
 bool Library::isConflictCopy (const juce::String& fileName)
 {
-    // OneDrive: "topic-PCNAME.xml"; Dropbox: "topic (x's conflicted copy).xml"; Google Drive: "topic (1).xml".
-    return fileName.startsWithIgnoreCase ("topic") && fileName.endsWithIgnoreCase (".xml")
-        && ! fileName.equalsIgnoreCase (topicFileName);
+    // Only the names cloud clients give a second copy of topic.xml, never our own temporary files:
+    // OneDrive "topic-PCNAME.xml"; Dropbox "topic (x's conflicted copy).xml"; Google Drive "topic (1).xml";
+    // iCloud "topic 2.xml" (and "topic2.xml").
+    if (! fileName.startsWithIgnoreCase ("topic") || ! fileName.endsWithIgnoreCase (".xml")
+        || fileName.equalsIgnoreCase (topicFileName))
+        return false;
+
+    const auto rest = fileName.substring (5, fileName.length() - 4).toStdString();
+    static const std::regex pattern (R"(^(-.+| ?\(\d+\)| ?\d+| ?\(.*conflict.*\))$)", std::regex::icase);
+    return std::regex_match (rest, pattern);
+}
+
+bool Library::isTemporaryTopicFile (const juce::String& fileName)
+{
+    // XmlElement::writeTo() (used before) wrote "topic_temp<hex>.xml" next to topic.xml; a failed swap left them behind.
+    return (fileName.startsWithIgnoreCase ("topic_temp") && fileName.endsWithIgnoreCase (".xml"))
+        || fileName.equalsIgnoreCase (topicTempFileName);
+}
+
+bool Library::isDefaultFolderName (const juce::String& folderName)
+{
+    static const std::regex pattern (R"(^New topic( \(\d+\))?$)", std::regex::icase);
+    return std::regex_match (folderName.toStdString(), pattern);
 }
 
 juce::String Library::titleFromUrl (const juce::String& url)
@@ -406,6 +427,15 @@ bool Library::loadTopic (const juce::File& folder, Topic& topic)
     for (auto& f : files)
     {
         const auto name = f.getFileName();
+
+        if (isTemporaryTopicFile (name))
+        {
+            // Left by an interrupted save: never a resource. Cleared once it's clearly stale.
+            if (f.getLastModificationTime() < juce::Time::getCurrentTime() - juce::RelativeTime::minutes (2))
+                f.deleteFile();
+
+            continue;
+        }
 
         if (name.equalsIgnoreCase (topicFileName) || isIgnoredFile (f))
             continue;
@@ -626,7 +656,135 @@ bool Library::saveTopic (const Topic& t)
     }
 
     t.folder.createDirectory();
-    return xml.writeTo (t.folder.getChildFile (topicFileName));
+    return writeTopicFile (t.folder, xml.toString());
+}
+
+bool Library::writeTopicFile (const juce::File& folder, const juce::String& text)
+{
+    const auto target = folder.getChildFile (topicFileName);
+
+    // Unchanged: leave the file alone, so the cloud client has nothing to upload.
+    if (target.existsAsFile() && target.loadFileAsString() == text)
+        return true;
+
+    // Write a temporary file whose name we and sync clients skip (dot prefix, .tmp), then swap it in.
+    // (XmlElement::writeTo() uses "topic_temp<hex>.xml", which a cloud drive syncs and can leave behind.)
+    const auto temp = folder.getChildFile (topicTempFileName);
+    temp.deleteFile();
+
+    {
+        juce::FileOutputStream out (temp);
+
+        if (! out.openedOk() || ! out.writeText (text, false, false, nullptr))   // as is: compared above next time
+            return false;
+
+        out.flush();
+
+        if (out.getStatus().failed())
+            return false;
+    }
+
+    // The cloud client may hold topic.xml open for a moment while it uploads it.
+    for (int attempt = 0; attempt < 10; ++attempt)
+    {
+        if (temp.replaceFileIn (target))
+            return true;
+
+        juce::Thread::sleep (100);
+    }
+
+    // Still locked: overwrite in place rather than leave a second file in the folder.
+    temp.deleteFile();
+    juce::FileOutputStream out (target);
+
+    if (! out.openedOk())
+        return false;
+
+    out.setPosition (0);
+    out.truncate();
+    out.writeText (text, false, false, nullptr);
+    out.flush();
+    return out.getStatus().wasOk();
+}
+
+bool Library::renameFolderAfterTitle (Topic& t)
+{
+    // Only folders still called "New topic": a folder the user named stays as it is. Songs are remembered by
+    // their path (practice log, takes, stems), so a folder that holds audio isn't renamed either.
+    if (! isDefaultFolderName (t.folder.getFileName()) || ! t.folder.isDirectory())
+        return false;
+
+    auto folderName = juce::File::createLegalFileName (t.title.trim()).trim().substring (0, 60).trim();
+
+    if (folderName.isEmpty() || folderName.startsWithChar ('.') || folderName.startsWithChar ('_')
+        || isDefaultFolderName (folderName))
+        return false;
+
+    for (auto& f : t.folder.findChildFiles (juce::File::findFiles, false))
+        if (classifyFileName (f.getFileName()) == ResourceKind::audio)
+            return false;
+
+    const auto target = uniqueChild (root, folderName);
+
+    if (! t.folder.moveFileTo (target))
+    {
+        juce::Logger::writeToLog ("Library: could not rename " + t.folder.getFullPathName() + " to " + target.getFileName());
+        return false;
+    }
+
+    juce::Logger::writeToLog ("Library: renamed topic folder \"" + t.folder.getFileName() + "\" to \"" + target.getFileName() + "\"");
+    t.folder = target;
+    return true;
+}
+
+std::vector<Library::TopicFileVersion> Library::getTopicFileVersions (const Topic& t)
+{
+    std::vector<TopicFileVersion> versions;
+    juce::StringArray names (topicFileName);
+    names.addArray (t.conflictFiles);
+
+    for (auto& name : names)
+    {
+        const auto file = t.folder.getChildFile (name);
+
+        if (! file.existsAsFile())
+            continue;
+
+        TopicFileVersion v;
+        v.fileName = name;
+        v.saved = file.getLastModificationTime();
+
+        if (auto xml = juce::parseXMLIfTagMatches (file, "TOPIC"))
+        {
+            v.title = xml->getStringAttribute ("title");
+            for (auto* e : xml->getChildWithTagNameIterator ("RESOURCE"))
+                v.resources += e != nullptr ? 1 : 0;
+        }
+
+        versions.push_back (v);
+    }
+
+    return versions;
+}
+
+bool Library::keepTopicFileVersion (const Topic& t, const juce::String& fileName)
+{
+    if (! fileName.equalsIgnoreCase (topicFileName))
+    {
+        const auto chosen = t.folder.getChildFile (fileName);
+        const auto target = t.folder.getChildFile (topicFileName);
+
+        if (! chosen.existsAsFile() || ! moveToBin (target) || ! chosen.moveFileTo (target))
+            return false;
+    }
+
+    bool ok = true;
+
+    for (auto& name : t.conflictFiles)
+        if (! name.equalsIgnoreCase (fileName))
+            ok = moveToBin (t.folder.getChildFile (name)) && ok;
+
+    return ok;
 }
 
 bool Library::moveToBin (const juce::File& f)

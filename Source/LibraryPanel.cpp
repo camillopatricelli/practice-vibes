@@ -54,6 +54,7 @@ public:
         styleEditor (titleEditor);
         titleEditor.onTextChange = [this] { edited(); };
         titleEditor.onReturnKey = [this] { descriptionEditor.grabKeyboardFocus(); };
+        titleEditor.onFocusLost = [this] { owner.titleSettled (topicId); };
         addAndMakeVisible (titleEditor);
 
         tagsEditor.setTextToShowWhenEmpty ("Tags, separated by commas (e.g. technique, jazz, lesson)", juce::Colours::white.withAlpha (0.35f));
@@ -63,6 +64,9 @@ public:
         tagsEditor.onReturnKey = [this] { descriptionEditor.grabKeyboardFocus(); };
         tagsEditor.onFocusLost = [this]
         {
+            owner.flush();
+
+
             // Show the cleaned-up list (duplicates and stray commas removed).
             if (auto* t = owner.library->findTopic (topicId))
                 tagsEditor.setText (joinTags (t->tags), false);
@@ -101,11 +105,15 @@ public:
         descriptionEditor.setTextToShowWhenEmpty ("What to practise, how, lesson notes...", juce::Colours::white.withAlpha (0.35f));
         styleEditor (descriptionEditor);
         descriptionEditor.onTextChange = [this] { edited(); };
+        descriptionEditor.onFocusLost = [this] { owner.flush(); };
         addAndMakeVisible (descriptionEditor);
 
         conflictLabel.setColour (juce::Label::textColourId, theme::highlight);
         conflictLabel.setMinimumHorizontalScale (0.6f);
         addChildComponent (conflictLabel);
+        conflictButton.setTooltip ("Shows each copy's title and when it was saved; the ones you don't keep go to the bin");
+        conflictButton.onClick = [this] { owner.chooseTopicVersion (topicId, conflictButton); };
+        addChildComponent (conflictButton);
 
         addAndMakeVisible (styleCaption (resourcesLabel, "Resources"));
         addFilesButton.onClick = [this] { owner.addFiles (topicId); };
@@ -149,8 +157,10 @@ public:
         noGuitarToggle.setToggleState (topic.noGuitar, juce::dontSendNotification);
 
         conflictLabel.setVisible (! topic.conflictFiles.isEmpty());
-        conflictLabel.setText ("Another device saved a different version of this topic at the same time: "
-                                   + topic.conflictFiles.joinIntoString (", ") + " (in the topic folder).",
+        conflictButton.setVisible (! topic.conflictFiles.isEmpty());
+        conflictLabel.setText ("The cloud sync made " + juce::String (topic.conflictFiles.size() == 1 ? "an extra copy" : "extra copies")
+                                   + " of this topic's file (" + topic.conflictFiles.joinIntoString (", ")
+                                   + "). Choose which version to keep.",
                                juce::dontSendNotification);
 
         rows.clear();
@@ -214,7 +224,11 @@ public:
         area.removeFromTop (6);
 
         if (conflictLabel.isVisible())
-            conflictLabel.setBounds (area.removeFromTop (24));
+        {
+            auto row = area.removeFromTop (28);
+            conflictButton.setBounds (row.removeFromRight (150).reduced (2, 2));
+            conflictLabel.setBounds (row);
+        }
 
         auto header = area.removeFromTop (40);
         addLinkButton.setBounds (header.removeFromRight (120).reduced (2, 4));
@@ -268,7 +282,7 @@ private:
     juce::TextEditor titleEditor, tagsEditor, descriptionEditor;
     juce::Label createdLabel, notesLabel, resourcesLabel, conflictLabel, noResourcesLabel;
     juce::TextButton deleteButton { "Delete topic" }, addFilesButton { "Add files..." }, addLinkButton { "Add link..." },
-                     practiseButton { "Practise" }, historyButton { "History" };
+                     practiseButton { "Practise" }, historyButton { "History" }, conflictButton { "Choose version..." };
     juce::ToggleButton rotationToggle { "In practice rotation" }, noGuitarToggle { "Timed without the guitar" };
     juce::Viewport viewport;
     juce::Component rowHolder;
@@ -939,6 +953,65 @@ void LibraryPanel::flush()
     }
 }
 
+void LibraryPanel::titleSettled (const juce::String& topicId)
+{
+    if (library == nullptr)
+        return;
+
+    flush();
+
+    if (auto* t = library->findTopic (topicId); t != nullptr && library->renameFolderAfterTitle (*t))
+    {
+        signature = library->computeSignature();
+
+        if (onTopicsChanged)
+            onTopicsChanged();
+    }
+}
+
+void LibraryPanel::chooseTopicVersion (const juce::String& topicId, juce::Component& anchor)
+{
+    auto* t = library != nullptr ? library->findTopic (topicId) : nullptr;
+
+    if (t == nullptr)
+        return;
+
+    flush();
+    const auto versions = Library::getTopicFileVersions (*t);
+    juce::PopupMenu menu;
+    menu.addSectionHeader ("Keep which version? The others go to the bin.");
+
+    for (size_t i = 0; i < versions.size(); ++i)
+    {
+        const auto& v = versions[i];
+        const auto isCurrent = v.fileName.equalsIgnoreCase (Library::topicFileName);
+        menu.addItem ((int) i + 1, "\"" + (v.title.isNotEmpty() ? v.title : juce::String ("(no title)")) + "\", saved "
+                                       + v.saved.formatted ("%d %b %H:%M:%S") + ", "
+                                       + juce::String (v.resources) + (v.resources == 1 ? " resource" : " resources")
+                                       + (isCurrent ? " (the one shown)" : " (" + v.fileName + ")"));
+    }
+
+    juce::Component::SafePointer<LibraryPanel> safeThis (this);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&anchor),
+                        [safeThis, topicId, versions] (int result)
+    {
+        if (safeThis == nullptr || safeThis->library == nullptr || result <= 0 || result > (int) versions.size())
+            return;
+
+        auto* topic = safeThis->library->findTopic (topicId);
+
+        if (topic == nullptr)
+            return;
+
+        if (! Library::keepTopicFileVersion (*topic, versions[(size_t) result - 1].fileName))
+            safeThis->showError ("Could not tidy up the copies in " + topic->folder.getFullPathName());
+
+        safeThis->library->rescan();
+        safeThis->signature = safeThis->library->computeSignature();
+        safeThis->refreshAfterRescan();
+    });
+}
+
 void LibraryPanel::timerCallback()
 {
     if (library == nullptr)
@@ -946,7 +1019,10 @@ void LibraryPanel::timerCallback()
 
     const auto now = juce::Time::getMillisecondCounter();
 
-    if (dirty && now - lastEdit > 800)
+    // Not after every short pause: each save is an upload for a cloud drive, and quick rewrites while the
+    // previous upload is still running is what makes cloud clients create duplicate copies.
+    // Leaving the field (or the topic) saves at once.
+    if (dirty && now - lastEdit > 2500)
         flush();
 
     if (! isShowing() || (lastPoll != 0 && now - lastPoll < 3000))

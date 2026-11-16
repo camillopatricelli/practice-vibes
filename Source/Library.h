@@ -149,12 +149,31 @@ public:
 
     static bool isIgnoredFile (const juce::File&);
     static bool isConflictCopy (const juce::String& fileName);
+    static bool isTemporaryTopicFile (const juce::String& fileName);
+    static bool isDefaultFolderName (const juce::String& folderName);   // "New topic", "New topic (2)"...
     static juce::String titleFromUrl (const juce::String& url);
 
+    /** Renames a folder still called "New topic" after the topic's title (not if it holds audio). True if renamed. */
+    bool renameFolderAfterTitle (Topic&);
+
+    /** topic.xml and the copies a cloud sync left next to it (Topic::conflictFiles), to choose which one to keep. */
+    struct TopicFileVersion
+    {
+        juce::String fileName, title;
+        juce::Time saved;
+        int resources = 0;
+    };
+    static std::vector<TopicFileVersion> getTopicFileVersions (const Topic&);
+
+    /** Makes the chosen file topic.xml and moves the other copies to the bin. Rescan afterwards. */
+    static bool keepTopicFileVersion (const Topic&, const juce::String& fileName);
+
     static constexpr const char* topicFileName = "topic.xml";
+    static constexpr const char* topicTempFileName = ".topic.xml.tmp";
 
 private:
     static bool loadTopic (const juce::File& folder, Topic&);
+    static bool writeTopicFile (const juce::File& folder, const juce::String& text);
     void sortTopics();
     juce::File uniqueChild (const juce::File& folder, const juce::String& fileName) const;
     juce::File copyIn (const juce::URL& source, const juce::File& folder);

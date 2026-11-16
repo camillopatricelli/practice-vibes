@@ -73,6 +73,8 @@ private:
     void newTopic();
     void deleteTopic (const juce::String& topicId);
     void editedTopic();                        // a title/description keystroke: save soon
+    void titleSettled (const juce::String& topicId);   // left the title field: save, rename a "New topic" folder
+    void chooseTopicVersion (const juce::String& topicId, juce::Component& anchor);   // cloud-sync copies of topic.xml
     void setRotation (const juce::String& topicId, bool inRotation);
     void setNoGuitar (const juce::String& topicId, bool noGuitar);
     void addFiles (const juce::String& topicId);
