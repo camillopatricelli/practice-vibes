@@ -113,6 +113,7 @@ target_sources(PracticeVibes PRIVATE
     Source/PracticeLog.cpp
     Source/PracticePanel.cpp
     Source/PracticePlanner.cpp
+    Source/SessionPlans.cpp
     Source/PracticeViews.cpp
     Source/Recorder.cpp
     Source/RigPanel.cpp
@@ -212,6 +213,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         Source/PlayerProcessor.cpp
         Source/PracticeLog.cpp
         Source/PracticePlanner.cpp
+        Source/SessionPlans.cpp
         Source/Recorder.cpp
         Source/OnnxDemucs.cpp
         Source/StemMixer.cpp

@@ -3,21 +3,26 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "PracticeLog.h"
 #include "PracticePlanner.h"
+#include "SessionPlans.h"
 
 namespace pv
 {
 
-/** Overlay: "I have 45 minutes" (+ an optional focus tag) -> a few rotation topics with time slots.
-    Any slot can be re-rolled, retimed or removed before starting. Nothing is saved as a routine.
+/** Overlay: "I have 45 minutes" (+ an optional focus tag) -> a few rotation topics with time slots, or a saved plan.
+    Any slot can be re-rolled, retimed, made random or removed before starting. Loading a saved plan and tweaking it
+    only changes today's session; the saved plan changes only when it is saved again.
 */
 class SessionPlanner final : public juce::Component
 {
 public:
     using CandidatesFn = std::function<std::vector<PlanCandidate> (const juce::String& tag)>;
 
-    SessionPlanner (CandidatesFn, const juce::StringArray& tags, int minutes, const juce::String& tag);
+    /** `plans` may be null (no library: nothing can be saved). `planId`: open with that saved plan loaded. */
+    SessionPlanner (CandidatesFn, TopicTitleFn, PlanList* plans, const juce::StringArray& tags, int minutes,
+                    const juce::String& tag, const juce::String& planId = {});
     ~SessionPlanner() override;
 
+    /** Only the slots that can be practised (missing topics left out). */
     std::function<void (std::vector<SessionSlot>, int minutes, const juce::String& tag)> onStart;
     std::function<void()> onCancel;
 
@@ -28,20 +33,38 @@ private:
     class SlotRow;
 
     void replan();
+    void loadPlan (const juce::String& planId);
     void rebuildRows();
+    void slotsEdited();
     void updateTotal();
+    void refreshPlanBox();
+    void showSaveMenu();
+    void showPlanMenu();
+    void askName (const juce::String& title, const juce::String& initial, std::function<void (juce::String)> done);
+    void saveAsNew (const juce::String& name);
+    void showAddMenu();
     juce::String currentTag() const;
+    const SessionPlan* loadedPlan() const;
 
     CandidatesFn candidatesFor;
+    TopicTitleFn titleOf;
+    PlanList* plans = nullptr;
     std::vector<PlanCandidate> candidates;
     std::vector<SessionSlot> slots;
     juce::Random random;
+    juce::String loadedPlanId;
+    bool edited = false;
 
-    juce::Label timeLabel, focusLabel, totalLabel, emptyLabel;
-    juce::ComboBox timeBox, focusBox;
-    juce::TextButton shuffleButton { "Shuffle" }, addButton { "+ Add a topic" },
+    juce::Label planLabel, timeLabel, focusLabel, totalLabel, statusLabel, emptyLabel;
+    juce::ComboBox planBox, timeBox, focusBox;
+    juce::TextButton saveButton { "Save as plan..." }, planMenuButton { "Plan..." },
+                     shuffleButton { "Shuffle" }, addButton { "+ Add a topic" },
                      startButton { "Start session" }, cancelButton { "Cancel" };
     std::vector<std::unique_ptr<SlotRow>> rows;
+    juce::Viewport rowViewport;
+    juce::Component rowHolder;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SessionPlanner)
 };
 
 /** Overlay form: correct or delete one practice log entry (start time, played minutes, note). */

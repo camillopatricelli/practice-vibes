@@ -16,6 +16,7 @@
 #include "../Source/PracticeLog.h"
 #include "../Source/PracticePlanner.h"
 #include "../Source/Recorder.h"
+#include "../Source/SessionPlans.h"
 #include "../Source/StemMixer.h"
 #include "../Source/StoragePanel.h"
 #include "../Source/Stems.h"
@@ -3175,6 +3176,96 @@ namespace
     }
 }
 
+static void testSessionPlans()
+{
+    std::cout << "\n[Saved session plans]\n";
+
+    const auto root = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("pv-plans-test");
+    root.deleteRecursively();
+    root.createDirectory();
+
+    std::map<juce::String, juce::String> titles { { "a", "Alternate picking" }, { "b", "Barre chords" }, { "c", "Chord melody" } };
+    auto titleOf = [&titles] (const juce::String& id) { auto it = titles.find (id); return it != titles.end() ? it->second : juce::String(); };
+    auto candidatesFor = [&titles] (const juce::String& tag)
+    {
+        std::vector<PlanCandidate> result;
+
+        for (auto& [id, title] : titles)
+            if (tag.isEmpty() || id != "a")   // only b and c carry the tag
+                result.push_back ({ id, title, 1.0 });
+
+        return result;
+    };
+
+    // What the planner had on screen: a fixed topic, a random slot, another fixed topic.
+    std::vector<SessionSlot> onScreen { { "a", "Alternate picking", 15 }, { "c", "Chord melody", 10 }, { "b", "Barre chords", 20 } };
+    onScreen[1].random = true;
+    onScreen[1].tag = "chords";
+
+    juce::String id;
+    {
+        PlanList plans (root);
+        check (plans.getPlans().empty(), "a new library has no plans");
+        check (plans.add ("  ", {}).isEmpty(), "an empty name is refused");
+
+        id = plans.add ("Morning", planSlotsFrom (onScreen));
+        const auto* p = plans.find (id);
+        check (p != nullptr && p->slots.size() == 3 && p->slots[1].random && p->slots[1].topicId.isEmpty()
+                   && p->slots[1].tag == "chords" && p->slots[2].topicId == "b" && p->slots[2].minutes == 20,
+               "saved: fixed topics by id, the random slot keeps only its tag");
+        check (plans.uniqueName ("morning") == "morning 2" && plans.uniqueName ("Evening") == "Evening", "unique names ignore case");
+    }
+
+    // Another device reads it; edits there are picked up here.
+    PlanList here (root);
+    {
+        check (here.getPlans().size() == 1 && here.getPlans()[0].name == "Morning", "another PlanList reads the saved plan");
+
+        PlanList there (root);
+        const auto copy = there.duplicate (id);
+        check (there.find (copy) != nullptr && there.find (copy)->name == "Morning (copy)" && there.find (copy)->slots.size() == 3,
+               "duplicate: same slots, \"(copy)\" name");
+        check (there.rename (copy, "Evening") && ! there.rename (copy, "  "), "rename (not to an empty name)");
+        juce::Thread::sleep (20);
+        there.setSlots (id, { { "a", 30 } });
+    }
+    check (here.reloadIfChanged() && here.getPlans().size() == 2 && here.findByName ("evening") != nullptr
+               && here.find (id)->slots.size() == 1 && here.find (id)->slots[0].minutes == 30,
+           "changes from another device are reloaded");
+    check (! here.reloadIfChanged(), "no change: nothing re-read");
+
+    // Using a plan: random slots avoid the plan's fixed topics, deleted topics show as missing.
+    {
+        juce::Random random (3);
+        SessionPlan plan { "x", "Test", { { "a", 15 }, { {}, 10, true, "chords" }, { "b", 20 } } };
+        bool alwaysC = true;
+
+        for (int i = 0; i < 50; ++i)
+        {
+            const auto slots = slotsFromPlan (plan, titleOf, candidatesFor, random);
+            alwaysC = alwaysC && slots.size() == 3 && slots[1].topicId == "c" && slots[1].random && ! slots[1].missing;
+        }
+
+        check (alwaysC, "random slot picks a tagged topic not already in the plan");
+
+        titles.erase ("b");
+        auto slots = slotsFromPlan (plan, titleOf, candidatesFor, random);
+        check (slots[2].missing && slots[2].topicId == "b" && slots[2].title.contains ("Missing"), "deleted topic -> missing slot");
+        check (playableSlots (slots).size() == 2 && totalMinutes (playableSlots (slots)) == 25, "missing slots are skipped when starting");
+        check (planSlotsFrom (slots)[2].topicId == "b", "re-saving keeps the missing topic's id");
+
+        std::vector<PlanCandidate> pool { { "c", "Chord melody", 1.0 }, { "d", "Dorian", 1.0 } };
+        check (rerollSlot (slots, 2, pool, random) && ! slots[2].missing && slots[2].topicId == "d", "re-roll fixes a missing slot");
+
+        titles.erase ("c");
+        slots = slotsFromPlan (plan, titleOf, candidatesFor, random);
+        check (slots[1].missing && slots[1].title.contains ("#chords"), "no topic left for a random slot -> missing");
+    }
+
+    check (here.remove (id) && here.find (id) == nullptr && here.getPlans().size() == 1, "delete a plan");
+    root.deleteRecursively();
+}
+
 static void testTakes()
 {
     std::cout << "Takes (recording + replay over the song)" << std::endl;
@@ -3929,6 +4020,7 @@ int main()
     testNoGuitarTopics();
     testOutsideSongs();
     testPracticePlanner();
+    testSessionPlans();
     testTakes();
     testStorage();
     testStems();

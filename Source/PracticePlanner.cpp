@@ -99,6 +99,7 @@ bool rerollSlot (std::vector<SessionSlot>& slots, size_t index, const std::vecto
 
     slots[index].topicId = candidates[(size_t) pick].topicId;
     slots[index].title = candidates[(size_t) pick].title;
+    slots[index].missing = false;
     return true;
 }
 

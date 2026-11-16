@@ -55,11 +55,11 @@ namespace
 }
 
 //==============================================================================
-/** One planned slot: number, topic, minutes, Re-roll, Remove. */
+/** One planned slot: number, topic, minutes, Random, Re-roll, Remove. */
 class SessionPlanner::SlotRow final : public juce::Component
 {
 public:
-    SlotRow (int number, const SessionSlot& slot) : index (number), title (slot.title)
+    SlotRow (int number, const SessionSlot& slot) : index (number), title (slot.title), tag (slot.tag), missing (slot.missing)
     {
         for (int m = 5; m <= 60; m += 5)
             minutesBox.addItem (juce::String (m) + " min", m);
@@ -73,11 +73,19 @@ public:
         removeButton.onClick = [this] { if (onRemove) onRemove(); };
         rerollButton.setTooltip ("Another rotation topic (neglected ones come up more often)");
 
-        for (auto* c : std::initializer_list<juce::Component*> { &minutesBox, &rerollButton, &removeButton })
+        randomButton.setClickingTogglesState (true);
+        randomButton.setToggleState (slot.random, juce::dontSendNotification);
+        randomButton.setColour (juce::TextButton::buttonOnColourId, theme::accent);
+        randomButton.setTooltip ("On: in a saved plan this slot picks a rotation topic again every time the plan is used. "
+                                 "Off: the plan keeps this topic.");
+        randomButton.onClick = [this] { if (onRandom) onRandom (randomButton.getToggleState()); };
+
+        for (auto* c : std::initializer_list<juce::Component*> { &minutesBox, &randomButton, &rerollButton, &removeButton })
             addAndMakeVisible (*c);
     }
 
     std::function<void (int)> onMinutes;
+    std::function<void (bool)> onRandom;
     std::function<void()> onReroll, onRemove;
 
     void paint (juce::Graphics& g) override
@@ -88,7 +96,19 @@ public:
         g.setColour (axisText);
         g.setFont (juce::FontOptions (15.0f).withStyle ("Bold"));
         g.drawText (juce::String (index) + ".", r.removeFromLeft (28), juce::Justification::centredLeft);
-        g.setColour (primaryText);
+
+        if (randomButton.getToggleState())
+        {
+            const juce::Font small (juce::FontOptions (12.0f));
+            g.setFont (small);
+            g.setColour (axisText);
+            const auto note = tag.isNotEmpty() ? "random #" + tag : juce::String ("random");
+            g.drawText (note, r.removeFromRight (juce::jmin (r.getWidth() / 2, (int) textWidth (small, note) + 8)),
+                        juce::Justification::centredRight, true);
+        }
+
+        g.setColour (missing ? juce::Colour (0xffe07a6a) : primaryText);
+        g.setFont (juce::FontOptions (15.0f).withStyle (missing ? "Italic" : "Bold"));
         g.drawText (title, r, juce::Justification::centredLeft, true);
     }
 
@@ -97,23 +117,48 @@ public:
         auto r = getLocalBounds().reduced (8, 6);
         removeButton.setBounds (r.removeFromRight (40));
         r.removeFromRight (6);
-        rerollButton.setBounds (r.removeFromRight (90));
+        rerollButton.setBounds (r.removeFromRight (80));
         r.removeFromRight (6);
-        minutesBox.setBounds (r.removeFromRight (100));
+        randomButton.setBounds (r.removeFromRight (80));
+        r.removeFromRight (6);
+        minutesBox.setBounds (r.removeFromRight (96));
     }
 
 private:
     int index;
-    juce::String title;
+    juce::String title, tag;
+    bool missing;
     juce::ComboBox minutesBox;
-    juce::TextButton rerollButton { "Re-roll" }, removeButton { "X" };
+    juce::TextButton randomButton { "Random" }, rerollButton { "Re-roll" }, removeButton { "X" };
 };
 
-SessionPlanner::SessionPlanner (CandidatesFn fn, const juce::StringArray& tags, int minutes, const juce::String& tag)
-    : candidatesFor (std::move (fn))
+SessionPlanner::SessionPlanner (CandidatesFn fn, TopicTitleFn titles, PlanList* planList, const juce::StringArray& tags,
+                                int minutes, const juce::String& tag, const juce::String& planId)
+    : candidatesFor (std::move (fn)), titleOf (std::move (titles)), plans (planList)
 {
+    addAndMakeVisible (styleCaption (planLabel, "Plan"));
     addAndMakeVisible (styleCaption (timeLabel, "I have"));
     addAndMakeVisible (styleCaption (focusLabel, "Focus"));
+
+    planBox.setTooltip ("Plan on the spot, or start from one of your saved plans");
+    planBox.onChange = [this]
+    {
+        const auto i = planBox.getSelectedId() - 100;
+
+        if (plans != nullptr && juce::isPositiveAndBelow (i, (int) plans->getPlans().size()))
+            loadPlan (plans->getPlans()[(size_t) i].id);
+        else
+            replan();
+    };
+    addAndMakeVisible (planBox);
+
+    saveButton.setTooltip ("Keep this session as a named plan (stored with the library, so your other devices get it too)");
+    saveButton.onClick = [this] { showSaveMenu(); };
+    addAndMakeVisible (saveButton);
+
+    planMenuButton.setTooltip ("Rename, duplicate or delete the saved plan");
+    planMenuButton.onClick = [this] { showPlanMenu(); };
+    addAndMakeVisible (planMenuButton);
 
     for (int m : { 15, 20, 30, 45, 60, 75, 90, 120 })
         timeBox.addItem (juce::String (m) + " minutes", m);
@@ -134,29 +179,22 @@ SessionPlanner::SessionPlanner (CandidatesFn fn, const juce::StringArray& tags, 
     addAndMakeVisible (focusBox);
 
     shuffleButton.onClick = [this] { replan(); };
-    shuffleButton.setTooltip ("Pick again (neglected topics come up more often)");
+    shuffleButton.setTooltip ("Plan on the spot again (neglected topics come up more often)");
     addAndMakeVisible (shuffleButton);
 
-    addButton.onClick = [this]
-    {
-        juce::StringArray used;
-
-        for (auto& s : slots)
-            used.add (s.topicId);
-
-        const auto pick = pickWeighted (candidates, random, used);
-
-        if (pick >= 0)
-        {
-            slots.push_back ({ candidates[(size_t) pick].topicId, candidates[(size_t) pick].title, 10 });
-            rebuildRows();
-        }
-    };
-    addAndMakeVisible (addButton);
+    addButton.onClick = [this] { showAddMenu(); };
+    rowHolder.addAndMakeVisible (addButton);
+    rowViewport.setViewedComponent (&rowHolder, false);
+    rowViewport.setScrollBarsShown (true, false);
+    addAndMakeVisible (rowViewport);
 
     totalLabel.setColour (juce::Label::textColourId, primaryText);
     totalLabel.setFont (juce::FontOptions (15.0f));
     addAndMakeVisible (totalLabel);
+
+    statusLabel.setColour (juce::Label::textColourId, axisText);
+    statusLabel.setFont (juce::FontOptions (13.0f));
+    addAndMakeVisible (statusLabel);
 
     emptyLabel.setColour (juce::Label::textColourId, axisText);
     emptyLabel.setJustificationType (juce::Justification::centred);
@@ -167,14 +205,22 @@ SessionPlanner::SessionPlanner (CandidatesFn fn, const juce::StringArray& tags, 
     startButton.setColour (juce::TextButton::buttonColourId, theme::accent);
     startButton.onClick = [this]
     {
-        if (onStart && ! slots.empty())
-            onStart (slots, timeBox.getSelectedId(), currentTag());
+        auto playable = playableSlots (slots);
+
+        if (onStart && ! playable.empty())
+            onStart (std::move (playable), timeBox.getSelectedId(), currentTag());
     };
     cancelButton.onClick = [this] { if (onCancel) onCancel(); };
     addAndMakeVisible (startButton);
     addAndMakeVisible (cancelButton);
 
-    replan();
+    if (plans != nullptr)
+        plans->reloadIfChanged();
+
+    if (plans != nullptr && planId.isNotEmpty() && plans->find (planId) != nullptr)
+        loadPlan (planId);
+    else
+        replan();
 }
 
 SessionPlanner::~SessionPlanner() = default;
@@ -184,11 +230,80 @@ juce::String SessionPlanner::currentTag() const
     return focusBox.getSelectedId() > 1 ? focusBox.getText().substring (1) : juce::String();
 }
 
+const SessionPlan* SessionPlanner::loadedPlan() const
+{
+    return plans != nullptr && loadedPlanId.isNotEmpty() ? plans->find (loadedPlanId) : nullptr;
+}
+
 void SessionPlanner::replan()
 {
+    loadedPlanId = {};
+    edited = false;
     candidates = candidatesFor ? candidatesFor (currentTag()) : std::vector<PlanCandidate> {};
     slots = planSession (candidates, timeBox.getSelectedId(), random);
+    refreshPlanBox();
     rebuildRows();
+}
+
+void SessionPlanner::loadPlan (const juce::String& planId)
+{
+    if (plans != nullptr)
+        plans->reloadIfChanged();
+
+    const auto* plan = plans != nullptr ? plans->find (planId) : nullptr;
+
+    if (plan == nullptr)
+    {
+        replan();
+        return;
+    }
+
+    loadedPlanId = planId;
+    edited = false;
+    candidates = candidatesFor ? candidatesFor (currentTag()) : std::vector<PlanCandidate> {};
+    slots = slotsFromPlan (*plan, titleOf, candidatesFor, random);
+    refreshPlanBox();
+    rebuildRows();
+}
+
+void SessionPlanner::refreshPlanBox()
+{
+    planBox.clear (juce::dontSendNotification);
+    planBox.addItem ("Plan on the spot", 1);
+    int selected = 1;
+
+    if (plans != nullptr && ! plans->getPlans().empty())
+    {
+        planBox.addSeparator();
+        planBox.addSectionHeading ("Saved plans");
+
+        for (size_t i = 0; i < plans->getPlans().size(); ++i)
+        {
+            const auto& p = plans->getPlans()[i];
+            planBox.addItem (p.name, 100 + (int) i);
+
+            if (p.id == loadedPlanId)
+                selected = 100 + (int) i;
+        }
+    }
+
+    if (selected == 1)
+        loadedPlanId = {};
+
+    planBox.setSelectedId (selected, juce::dontSendNotification);
+    planBox.setEnabled (plans != nullptr && ! plans->getPlans().empty());
+    saveButton.setEnabled (plans != nullptr);
+
+    if (plans == nullptr)
+        saveButton.setTooltip ("Choose a library folder first: plans are kept in it");
+
+    planMenuButton.setEnabled (loadedPlan() != nullptr);
+}
+
+void SessionPlanner::slotsEdited()
+{
+    edited = true;
+    updateTotal();
 }
 
 void SessionPlanner::rebuildRows()
@@ -198,41 +313,258 @@ void SessionPlanner::rebuildRows()
     for (size_t i = 0; i < slots.size(); ++i)
     {
         auto row = std::make_unique<SlotRow> ((int) i + 1, slots[i]);
-        row->onMinutes = [this, i] (int m) { if (i < slots.size()) { slots[i].minutes = m; updateTotal(); } };
+        row->onMinutes = [this, i] (int m) { if (i < slots.size()) { slots[i].minutes = m; slotsEdited(); } };
+        row->onRandom = [this, i] (bool on)
+        {
+            if (i >= slots.size())
+                return;
+
+            slots[i].random = on;
+
+            if (on && ! slots[i].missing)
+                slots[i].tag = currentTag();
+
+            edited = true;
+            rebuildRows();
+        };
         row->onReroll = [this, i]
         {
-            if (rerollSlot (slots, i, candidates, random))
+            if (i >= slots.size())
+                return;
+
+            const auto pool = slots[i].random && candidatesFor ? candidatesFor (slots[i].tag) : candidates;
+
+            if (rerollSlot (slots, i, pool, random))
+            {
+                edited = true;
                 rebuildRows();
+            }
         };
         row->onRemove = [this, i]
         {
             if (i < slots.size())
             {
                 slots.erase (slots.begin() + (std::ptrdiff_t) i);
+                edited = true;
                 rebuildRows();
             }
         };
-        addAndMakeVisible (*row);
+        rowHolder.addAndMakeVisible (*row);
         rows.push_back (std::move (row));
     }
 
-    emptyLabel.setVisible (candidates.empty());
+    emptyLabel.setVisible (candidates.empty() && slots.empty());
     updateTotal();
     resized();
 }
 
 void SessionPlanner::updateTotal()
 {
-    totalLabel.setText (slots.empty() ? juce::String() : "Total: " + juce::String (totalMinutes (slots)) + " min, "
-                                                           + juce::String ((int) slots.size()) + (slots.size() == 1 ? " topic" : " topics"),
+    const auto playable = playableSlots (slots);
+    totalLabel.setText (playable.empty() ? juce::String() : "Total: " + juce::String (totalMinutes (playable)) + " min, "
+                                                              + juce::String ((int) playable.size()) + (playable.size() == 1 ? " topic" : " topics"),
                         juce::dontSendNotification);
-    startButton.setEnabled (! slots.empty());
+    startButton.setEnabled (! playable.empty());
+
+    juce::StringArray notes;
+
+    if (playable.size() < slots.size())
+        notes.add ("Missing topics are skipped (Re-roll or X to fix them)");
+
+    if (const auto* plan = loadedPlan())
+        notes.add (edited ? "Changed for today - \"" + plan->name + "\" stays as saved unless you save it"
+                          : "Saved plan \"" + plan->name + "\"");
+
+    statusLabel.setText (notes.joinIntoString (". "), juce::dontSendNotification);
+
     juce::StringArray used;
 
     for (auto& s : slots)
         used.add (s.topicId);
 
     addButton.setEnabled (pickWeighted (candidates, random, used) >= 0 && slots.size() < 8);
+    planMenuButton.setEnabled (loadedPlan() != nullptr);
+}
+
+void SessionPlanner::showAddMenu()
+{
+    juce::StringArray used;
+
+    for (auto& s : slots)
+        used.add (s.topicId);
+
+    auto addPick = [this, used] (int pick)
+    {
+        if (! juce::isPositiveAndBelow (pick, (int) candidates.size()) || used.contains (candidates[(size_t) pick].topicId))
+            return;
+
+        slots.push_back ({ candidates[(size_t) pick].topicId, candidates[(size_t) pick].title, 10 });
+        edited = true;
+        rebuildRows();
+    };
+
+    juce::PopupMenu menu;
+    menu.addItem ("Roll the dice", [this, used, addPick] { addPick (pickWeighted (candidates, random, used)); });
+    menu.addSeparator();
+
+    for (int i = 0; i < (int) candidates.size(); ++i)
+        if (! used.contains (candidates[(size_t) i].topicId))
+            menu.addItem (candidates[(size_t) i].title, [addPick, i] { addPick (i); });
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&addButton));
+}
+
+void SessionPlanner::askName (const juce::String& title, const juce::String& initial, std::function<void (juce::String)> done)
+{
+    auto* window = new juce::AlertWindow (title, "Name:", juce::MessageBoxIconType::NoIcon, this);
+    window->addTextEditor ("name", initial);
+    window->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([safe = SafePointer<SessionPlanner> (this), window, done] (int result)
+    {
+        const auto name = window->getTextEditorContents ("name").trim();
+
+        if (safe != nullptr && result == 1 && name.isNotEmpty())
+            done (name);
+    }), true);
+}
+
+void SessionPlanner::saveAsNew (const juce::String& name)
+{
+    if (plans == nullptr)
+        return;
+
+    plans->reloadIfChanged();
+
+    auto store = [safe = SafePointer<SessionPlanner> (this), name]
+    {
+        if (safe == nullptr || safe->plans == nullptr)
+            return;
+
+        auto& list = *safe->plans;
+        const auto slotsToSave = planSlotsFrom (safe->slots);
+
+        if (const auto* existing = list.findByName (name))
+        {
+            const auto id = existing->id;
+            list.setSlots (id, slotsToSave);
+            safe->loadedPlanId = id;
+        }
+        else
+        {
+            safe->loadedPlanId = list.add (name, slotsToSave);
+        }
+
+        safe->edited = false;
+        safe->refreshPlanBox();
+        safe->updateTotal();
+    };
+
+    if (plans->findByName (name) != nullptr && (loadedPlan() == nullptr || ! loadedPlan()->name.equalsIgnoreCase (name)))
+    {
+        juce::AlertWindow::showAsync (juce::MessageBoxOptions{}.withIconType (juce::MessageBoxIconType::QuestionIcon)
+                                          .withTitle ("Save plan").withMessage ("A plan called \"" + name + "\" exists. Replace it?")
+                                          .withButton ("Replace", 1).withButton ("Cancel", 0).withAssociatedComponent (this),
+                                      [store] (int r) { if (r == 1) store(); });
+        return;
+    }
+
+    store();
+}
+
+void SessionPlanner::showSaveMenu()
+{
+    if (plans == nullptr || slots.empty())
+        return;
+
+    auto askNew = [this]
+    {
+        askName ("Save as plan", plans->uniqueName (juce::String (totalMinutes (slots)) + " min plan"),
+                 [this] (juce::String name) { saveAsNew (name); });
+    };
+
+    const auto* plan = loadedPlan();
+
+    if (plan == nullptr)
+    {
+        askNew();
+        return;
+    }
+
+    juce::PopupMenu menu;
+    menu.addItem ("Save changes to \"" + plan->name + "\"", edited, false, [this]
+    {
+        plans->reloadIfChanged();
+
+        if (plans->setSlots (loadedPlanId, planSlotsFrom (slots)))
+        {
+            edited = false;
+            refreshPlanBox();
+            updateTotal();
+        }
+    });
+    menu.addItem ("Save as a new plan...", askNew);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&saveButton));
+}
+
+void SessionPlanner::showPlanMenu()
+{
+    const auto* plan = loadedPlan();
+
+    if (plan == nullptr)
+        return;
+
+    const auto id = plan->id, name = plan->name;
+    juce::PopupMenu menu;
+
+    menu.addItem ("Rename...", [this, id, name]
+    {
+        askName ("Rename plan", name, [this, id] (juce::String newName)
+        {
+            plans->reloadIfChanged();
+
+            if (const auto* other = plans->findByName (newName); other != nullptr && other->id != id)
+            {
+                statusLabel.setText ("There's already a plan called \"" + newName + "\"", juce::dontSendNotification);
+                return;
+            }
+
+            plans->rename (id, newName);
+            refreshPlanBox();
+            updateTotal();
+        });
+    });
+
+    menu.addItem ("Duplicate", [this, id]
+    {
+        plans->reloadIfChanged();
+        const auto copy = plans->duplicate (id);
+
+        if (copy.isNotEmpty())
+            loadPlan (copy);
+    });
+
+    menu.addItem ("Delete...", [this, id, name]
+    {
+        juce::AlertWindow::showAsync (juce::MessageBoxOptions{}.withIconType (juce::MessageBoxIconType::WarningIcon)
+                                          .withTitle ("Delete plan").withMessage ("Delete the plan \"" + name + "\"? Your practice log is not affected.")
+                                          .withButton ("Delete", 1).withButton ("Cancel", 0).withAssociatedComponent (this),
+                                      [safe = SafePointer<SessionPlanner> (this), id] (int result)
+        {
+            if (safe == nullptr || result != 1 || safe->plans == nullptr)
+                return;
+
+            safe->plans->reloadIfChanged();
+            safe->plans->remove (id);
+            safe->loadedPlanId = {};   // today's slots stay, now as a plan on the spot
+            safe->edited = false;
+            safe->refreshPlanBox();
+            safe->updateTotal();
+        });
+    });
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&planMenuButton));
 }
 
 void SessionPlanner::paint (juce::Graphics& g)
@@ -244,6 +576,15 @@ void SessionPlanner::paint (juce::Graphics& g)
 void SessionPlanner::resized()
 {
     auto area = getLocalBounds().reduced (16);
+
+    auto planRow = area.removeFromTop (36);
+    planLabel.setBounds (planRow.removeFromLeft (70));
+    planMenuButton.setBounds (planRow.removeFromRight (80).reduced (0, 2));
+    planRow.removeFromRight (6);
+    saveButton.setBounds (planRow.removeFromRight (130).reduced (0, 2));
+    planRow.removeFromRight (10);
+    planBox.setBounds (planRow.reduced (0, 2));
+    area.removeFromTop (6);
 
     auto top = area.removeFromTop (36);
     timeLabel.setBounds (top.removeFromLeft (70));
@@ -258,19 +599,24 @@ void SessionPlanner::resized()
     startButton.setBounds (bottom.removeFromRight (150).reduced (3));
     cancelButton.setBounds (bottom.removeFromRight (110).reduced (3));
     totalLabel.setBounds (bottom);
+    statusLabel.setBounds (area.removeFromBottom (22));
 
     area.removeFromTop (14);
     emptyLabel.setBounds (area);
+    rowViewport.setBounds (area);
 
     constexpr int rowHeight = 48, gap = 6;
+    const auto width = area.getWidth() - ((int) rows.size() * (rowHeight + gap) + 36 > area.getHeight() ? rowViewport.getScrollBarThickness() : 0);
+    int y = 0;
 
     for (auto& row : rows)
     {
-        row->setBounds (area.removeFromTop (rowHeight));
-        area.removeFromTop (gap);
+        row->setBounds (0, y, width, rowHeight);
+        y += rowHeight + gap;
     }
 
-    addButton.setBounds (area.removeFromTop (36).removeFromLeft (160));
+    addButton.setBounds (0, y, 160, 36);
+    rowHolder.setSize (width, y + 36);
 }
 
 //==============================================================================

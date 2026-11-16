@@ -288,6 +288,18 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     todayPanel->getCandidates = [this] (const juce::String& tag) { return rotationCandidates (tag); };
     todayPanel->getRotationTags = [this] { return rotationTags(); };
     todayPanel->onPlanSession = [this] (const juce::String& tag) { openSessionPlanner (tag); };
+    todayPanel->getSavedPlans = [this]
+    {
+        std::vector<std::pair<juce::String, juce::String>> result;
+
+        if (auto* plans = savedPlans())
+            for (auto& p : plans->getPlans())
+                result.push_back ({ p.id, p.name });
+
+        return result;
+    };
+    todayPanel->onStartPlan = [this] (const juce::String& id) { startSavedPlan (id); };
+    todayPanel->onEditPlan = [this] (const juce::String& id) { openSessionPlanner ({}, id); };
     todayPanel->onSessionNext = [this] { sessionNext(); };
     todayPanel->onSessionExtend = [this] { sessionExtend(); };
     todayPanel->onSessionEnd = [this] { sessionEnd(); };
@@ -652,7 +664,19 @@ void MainComponent::showPractisingMenu()
             menu.addSubMenu ("Practise a rotation topic", topics);
 
             if (! session.isRunning())
+            {
                 menu.addItem ("Plan a session...", [this] { openSessionPlanner ({}); });
+
+                if (auto* plans = savedPlans(); plans != nullptr && ! plans->getPlans().empty())
+                {
+                    juce::PopupMenu planMenu;
+
+                    for (auto& p : plans->getPlans())
+                        planMenu.addItem (p.name, [this, id = p.id] { startSavedPlan (id); });
+
+                    menu.addSubMenu ("Start a saved plan", planMenu);
+                }
+            }
         }
         else
         {
@@ -714,11 +738,53 @@ juce::StringArray MainComponent::rotationTags()
     return tags;
 }
 
-void MainComponent::openSessionPlanner (const juce::String& tag)
+PlanList* MainComponent::savedPlans()
+{
+    auto* lib = libraryPanel->getLibrary();
+
+    if (lib == nullptr)
+    {
+        planList.reset();
+        return nullptr;
+    }
+
+    const auto file = lib->getRoot().getChildFile (PlanList::folderName).getChildFile (PlanList::fileName);
+
+    if (planList == nullptr || planList->getFile() != file)
+        planList = std::make_unique<PlanList> (lib->getRoot());
+    else
+        planList->reloadIfChanged();
+
+    return planList.get();
+}
+
+juce::String MainComponent::topicTitle (const juce::String& topicId)
+{
+    auto* lib = libraryPanel->getLibrary();
+    auto* topic = lib != nullptr && topicId.isNotEmpty() ? lib->findTopic (topicId) : nullptr;
+
+    if (topic == nullptr)
+        return {};
+
+    return topic->title.isNotEmpty() ? topic->title : juce::String ("(untitled)");
+}
+
+void MainComponent::openSessionPlanner (const juce::String& tag, const juce::String& planId)
 {
     auto planner = std::make_unique<SessionPlanner> ([this] (const juce::String& t) { return rotationCandidates (t); },
-                                                     rotationTags(), planMinutes, tag);
-    planner->onCancel = [this] { juce::MessageManager::callAsync ([safe = SafePointer<MainComponent> (this)] { if (safe != nullptr) safe->closeOverlay(); }); };
+                                                     [this] (const juce::String& id) { return topicTitle (id); },
+                                                     savedPlans(), rotationTags(), planMinutes, tag, planId);
+    planner->onCancel = [this]
+    {
+        juce::MessageManager::callAsync ([safe = SafePointer<MainComponent> (this)]
+        {
+            if (safe != nullptr)
+            {
+                safe->closeOverlay();
+                safe->todayPanel->refresh();   // plans may have been saved, renamed or deleted
+            }
+        });
+    };
     planner->onStart = [this] (std::vector<SessionSlot> slots, int minutes, const juce::String&)
     {
         planMinutes = minutes;
@@ -731,6 +797,29 @@ void MainComponent::openSessionPlanner (const juce::String& tag)
         });
     };
     showOverlay ("Plan a practice session", std::move (planner));
+}
+
+void MainComponent::startSavedPlan (const juce::String& planId)
+{
+    auto* plans = savedPlans();
+    const auto* plan = plans != nullptr ? plans->find (planId) : nullptr;
+
+    if (plan == nullptr)
+        return;
+
+    juce::Random random;
+    const auto all = slotsFromPlan (*plan, [this] (const juce::String& id) { return topicTitle (id); },
+                                    [this] (const juce::String& t) { return rotationCandidates (t); }, random);
+    auto playable = playableSlots (all);
+
+    if (playable.empty() || playable.size() < all.size())
+    {
+        // Something is missing: show the plan so it can be fixed (or started without those slots).
+        openSessionPlanner ({}, planId);
+        return;
+    }
+
+    startSession (playable);
 }
 
 void MainComponent::startSession (std::vector<SessionSlot> slots)

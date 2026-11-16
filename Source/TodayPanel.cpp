@@ -371,7 +371,10 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
     focusBox.addItem ("All tags", 1);
     focusBox.setSelectedId (1, juce::dontSendNotification);
 
-    for (auto* c : std::initializer_list<juce::Component*> { &diceButton, &planButton, &focusBox })
+    plansButton.setTooltip ("Your saved session plans: start one as it is, or load it to change today's session");
+    plansButton.onClick = [this] { showPlansMenu(); };
+
+    for (auto* c : std::initializer_list<juce::Component*> { &diceButton, &planButton, &plansButton, &focusBox })
         addAndMakeVisible (*c);
 
     diceLabel.setFont (juce::FontOptions (16.0f).withStyle ("Bold"));
@@ -491,6 +494,7 @@ void TodayPanel::refresh()
 
     diceButton.setEnabled (! rows.empty());
     planButton.setEnabled (! rows.empty());
+    plansButton.setVisible (getSavedPlans && ! getSavedPlans().empty());
 
     if (diceTopicId.isNotEmpty() && (library == nullptr || library->findTopic (diceTopicId) == nullptr))
         diceTopicId = {};
@@ -498,6 +502,28 @@ void TodayPanel::refresh()
     updateNow();
     updateSession();
     resized();
+}
+
+void TodayPanel::showPlansMenu()
+{
+    const auto plans = getSavedPlans ? getSavedPlans() : std::vector<std::pair<juce::String, juce::String>> {};
+    juce::PopupMenu menu;
+
+    for (auto& [id, name] : plans)
+    {
+        juce::PopupMenu sub;
+        sub.addItem ("Start", ! session.isRunning(), false, [this, planId = id] { if (onStartPlan) onStartPlan (planId); });
+        sub.addItem ("Change for today...", ! session.isRunning(), false, [this, planId = id] { if (onEditPlan) onEditPlan (planId); });
+        menu.addSubMenu (name, sub);
+    }
+
+    if (session.isRunning())
+    {
+        menu.addSeparator();
+        menu.addItem ("A session is running - end it first", false, false, [] {});
+    }
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&plansButton));
 }
 
 juce::String TodayPanel::focusTag() const
@@ -789,6 +815,13 @@ void TodayPanel::resized()
     auto headerRow = left.removeFromTop (36);
     planButton.setBounds (headerRow.removeFromRight (150).reduced (0, 2));
     headerRow.removeFromRight (6);
+
+    if (plansButton.isVisible())
+    {
+        plansButton.setBounds (headerRow.removeFromRight (110).reduced (0, 2));
+        headerRow.removeFromRight (6);
+    }
+
     diceButton.setBounds (headerRow.removeFromRight (130).reduced (0, 2));
     headerRow.removeFromRight (6);
     focusBox.setBounds (headerRow.removeFromRight (juce::jmin (150, juce::jmax (90, headerRow.getWidth() - 160))).reduced (0, 3));

@@ -6,6 +6,7 @@
 #include "Library.h"
 #include "PracticeLog.h"
 #include "PracticePlanner.h"
+#include "SessionPlans.h"
 #include "Take.h"
 
 namespace pv
@@ -56,7 +57,13 @@ private:
     // Dice, sessions, history
     std::vector<PlanCandidate> rotationCandidates (const juce::String& tag);
     juce::StringArray rotationTags();
-    void openSessionPlanner (const juce::String& tag);
+    /** `planId`: open with that saved plan loaded (to tweak it before starting). */
+    void openSessionPlanner (const juce::String& tag, const juce::String& planId = {});
+    /** Starts a saved plan as it is (random slots picked now); with missing topics it opens the planner instead. */
+    void startSavedPlan (const juce::String& planId);
+    /** The library's saved plans, re-read if another device changed them; nullptr without a library. */
+    PlanList* savedPlans();
+    juce::String topicTitle (const juce::String& topicId);
     void startSession (std::vector<SessionSlot>);
     void sessionNext();
     void sessionExtend();
@@ -109,6 +116,7 @@ private:
 
     PracticeSession session;
     int planMinutes = 45;
+    std::unique_ptr<PlanList> planList;     // <library>/.plans/plans.xml
 
     std::unique_ptr<TodayPanel> todayPanel;
     std::unique_ptr<PracticePanel> practicePanel;

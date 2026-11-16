@@ -23,13 +23,16 @@ struct SessionSlot
 {
     juce::String topicId, title;
     int minutes = 10;
+    bool random = false;        // saved plans: pick a rotation topic again every time the plan is used
+    juce::String tag;           // random slots: only topics with this tag
+    bool missing = false;       // from a saved plan: the topic was deleted (or no random topic was left)
 };
 
 /** About one topic per 12 minutes (1 to 6, never more than there are topics), each picked at most once,
     minutes in steps of 5 (the first slot takes what's left over). */
 std::vector<SessionSlot> planSession (const std::vector<PlanCandidate>&, int totalMinutes, juce::Random&);
 
-/** Replaces one slot's topic with another one not already in the session; false if there's none. */
+/** Replaces one slot's topic with another one not already in the session (no longer missing); false if there's none. */
 bool rerollSlot (std::vector<SessionSlot>&, size_t index, const std::vector<PlanCandidate>&, juce::Random&);
 
 int totalMinutes (const std::vector<SessionSlot>&);

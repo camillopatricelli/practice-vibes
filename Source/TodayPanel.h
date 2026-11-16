@@ -31,6 +31,8 @@ public:
     std::function<std::vector<PlanCandidate> (const juce::String& tag)> getCandidates;
     std::function<juce::StringArray()> getRotationTags;
     std::function<void (const juce::String& tag)> onPlanSession;
+    std::function<std::vector<std::pair<juce::String, juce::String>>()> getSavedPlans;   // (id, name)
+    std::function<void (const juce::String& planId)> onStartPlan, onEditPlan;
     std::function<void()> onSessionNext, onSessionExtend, onSessionEnd, onSessionDismiss;
 
     /** Rebuilds the lists (topics or log changed). */
@@ -48,6 +50,7 @@ private:
     void updateNow();
     void updateSession();
     void rollDice();
+    void showPlansMenu();
     juce::String focusTag() const;
     bool sessionVisible() const noexcept    { return session.isRunning() || session.isFinished(); }
 
@@ -68,7 +71,7 @@ private:
     std::unique_ptr<RecentView> recentView;
     juce::String shownActiveId;
 
-    juce::TextButton diceButton { "Roll the dice" }, planButton { "Plan a session..." };
+    juce::TextButton diceButton { "Roll the dice" }, planButton { "Plan a session..." }, plansButton { "Saved plans" };
     juce::ComboBox focusBox;
 
     juce::String diceTopicId;
