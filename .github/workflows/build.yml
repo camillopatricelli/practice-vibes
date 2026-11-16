@@ -84,7 +84,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout\v4
+      - uses: actions/checkout@v4
 
       - name: Configure
         run: cmake --preset macos
@@ -122,7 +122,7 @@ jobs:
           done
           test -f PracticeVibes-macos.dmg
 
-      - uses: actions/upload-artifact\v4
+      - uses: actions/upload-artifact@v4
         with:
           name: PracticeVibes-macos
           path: PracticeVibes-macos.dmg
