@@ -268,52 +268,14 @@ namespace
 {
     constexpr int strumFftOrder = 17;   // 131072 points: 0.37 Hz bins at 48 kHz, zero-padded window
     constexpr int strumFftSize = 1 << strumFftOrder;
-
-    /** In-place radix-2 complex FFT: forward (e^-i), unscaled, in double precision. The strum fit models the
-        complex spectrum exactly, so it uses this rather than juce::dsp::FFT, whose engine (and results) differ
-        between platforms (vDSP on Apple). */
-    void forwardFft (std::vector<std::complex<double>>& a, const std::vector<std::complex<double>>& twiddles)
-    {
-        const auto n = a.size();
-
-        for (size_t i = 1, j = 0; i < n; ++i)
-        {
-            auto bit = n >> 1;
-
-            for (; (j & bit) != 0; bit >>= 1)
-                j ^= bit;
-
-            j ^= bit;
-
-            if (i < j)
-                std::swap (a[i], a[j]);
-        }
-
-        for (size_t length = 2; length <= n; length <<= 1)
-        {
-            const auto half = length / 2, stride = n / length;
-
-            for (size_t i = 0; i < n; i += length)
-                for (size_t k = 0; k < half; ++k)
-                {
-                    const auto u = a[i + k];
-                    const auto v = a[i + k + half] * twiddles[k * stride];
-                    a[i + k] = u + v;
-                    a[i + k + half] = u - v;
-                }
-        }
-    }
 }
 
 StrumAnalyser::StrumAnalyser()
-    : window ((size_t) strumFftSize),
-      spectrum ((size_t) strumFftSize + 2),
-      magnitude ((size_t) strumFftSize / 2),
-      fftData ((size_t) strumFftSize),
-      twiddles ((size_t) strumFftSize / 2)
+    : fft (strumFftOrder),
+      window ((size_t) strumFftSize),
+      spectrum ((size_t) strumFftSize * 2),
+      magnitude ((size_t) strumFftSize / 2)
 {
-    for (size_t k = 0; k < twiddles.size(); ++k)
-        twiddles[k] = std::polar (1.0, -juce::MathConstants<double>::twoPi * (double) k / strumFftSize);
 }
 
 int StrumAnalyser::samplesNeeded (double sampleRate) noexcept
@@ -375,7 +337,9 @@ namespace
         {
             const auto half = std::sin (0.5 * theta);
             const auto ratio = std::abs (half) < 1.0e-12 ? (double) n : std::sin (0.5 * n * theta) / half;
-            return std::polar (ratio, -0.5 * theta * (n - 1));
+            // ratio is often negative: std::polar (ratio, ...) would be NaN with libc++ (macOS/iOS), which
+            // requires rho >= 0, so scale a unit phasor instead.
+            return ratio * std::polar (1.0, -0.5 * theta * (n - 1));
         };
 
         const auto theta = juce::MathConstants<double>::twoPi * (k / points - f);
@@ -543,19 +507,13 @@ StrumResult StrumAnalyser::analyse (const float* samples, int numSamples, double
     if (std::sqrt (energy / n) < PitchDetector::minLevel)
         return result;
 
-    std::fill (fftData.begin(), fftData.end(), std::complex<double>());
+    std::fill (spectrum.begin(), spectrum.end(), 0.0f);
 
     for (int i = 0; i < n; ++i)
-        fftData[(size_t) i] = (double) window[(size_t) i]
-                                * (0.5 - 0.5 * std::cos (juce::MathConstants<double>::twoPi * i / (n - 1)));
+        spectrum[(size_t) i] = window[(size_t) i]
+                                 * (0.5f - 0.5f * std::cos (juce::MathConstants<float>::twoPi * (float) i / (float) (n - 1)));
 
-    forwardFft (fftData, twiddles);
-
-    for (size_t k = 0; k <= (size_t) strumFftSize / 2; ++k)
-    {
-        spectrum[2 * k] = (float) fftData[k].real();
-        spectrum[2 * k + 1] = (float) fftData[k].imag();
-    }
+    fft.performRealOnlyForwardTransform (spectrum.data());
 
     for (size_t k = 0; k < magnitude.size(); ++k)
         magnitude[k] = std::hypot (spectrum[2 * k], spectrum[2 * k + 1]);
