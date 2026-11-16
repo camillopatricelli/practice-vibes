@@ -17,15 +17,10 @@ public:
 
     void paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool selected) override
     {
-        if (selected)
-            g.fillAll (theme::selection());
-        else if (row % 2 == 1)
-            g.fillAll (theme::text().withAlpha (0.03f));
-
+        const auto r = theme::paintListRow (g, width, height, selected);
         g.setColour (theme::text());
         g.setFont (juce::FontOptions (16.0f));
-        g.drawText (rowText ? rowText (row) : juce::String(), 10, 0, width - 20, height,
-                    juce::Justification::centredLeft, true);
+        g.drawText (rowText ? rowText (row) : juce::String(), r, juce::Justification::centredLeft, true);
     }
 
     void listBoxItemDoubleClicked (int row, const juce::MouseEvent&) override
@@ -102,7 +97,7 @@ RigPanel::RigPanel (AppEngine& e)
     catalogueModel->onDoubleClick = [this] (int) { addSelectedPlugin(); };
     catalogueList.setModel (catalogueModel.get());
     catalogueList.setRowHeight (40);
-    catalogueList.setColour (juce::ListBox::backgroundColourId, theme::panel());
+    catalogueList.setColour (juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
     addAndMakeVisible (catalogueList);
 
     catalogueStatus.setColour (juce::Label::textColourId, theme::text().withAlpha (0.6f));
@@ -133,7 +128,7 @@ RigPanel::RigPanel (AppEngine& e)
     chainModel->onDoubleClick = [this] (int row) { openEditor (row); };
     chainList.setModel (chainModel.get());
     chainList.setRowHeight (44);
-    chainList.setColour (juce::ListBox::backgroundColourId, theme::panel());
+    chainList.setColour (juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
     addAndMakeVisible (chainList);
 
     editButton.onClick = [this] { openEditor (selectedChainIndex()); };
@@ -261,6 +256,8 @@ RigPanel::~RigPanel()
 void RigPanel::paint (juce::Graphics& g)
 {
     g.fillAll (theme::background());
+    theme::paintListCard (g, catalogueList);
+    theme::paintListCard (g, chainList);
 }
 
 void RigPanel::resized()
@@ -284,7 +281,7 @@ void RigPanel::resized()
         scanButton.setBounds (leftButtons.removeFromRight (leftButtons.getWidth() / 2).reduced (3));
 
     addButton.setBounds (leftButtons.reduced (3));
-    catalogueList.setBounds (left.reduced (0, 4));
+    catalogueList.setBounds (left.reduced (theme::listCardPadX, theme::listCardPadY));
 
     // Middle: chain
     chainHeader.setBounds (middle.removeFromTop (30));
@@ -294,7 +291,7 @@ void RigPanel::resized()
     for (auto* b : { &editButton, &bypassButton, &upButton, &downButton, &removeButton })
         b->setBounds (chainButtons.removeFromLeft (buttonWidth).reduced (3));
 
-    chainList.setBounds (middle.reduced (0, 4));
+    chainList.setBounds (middle.reduced (theme::listCardPadX, theme::listCardPadY));
 
     // Right: levels and MIDI
     auto take = [&right] (int height) { return right.removeFromTop (height); };

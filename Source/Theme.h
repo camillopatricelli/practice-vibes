@@ -109,4 +109,32 @@ namespace pv::theme
         g.setColour (line());
         g.drawRoundedRectangle (r.reduced (0.5f), corner, 1.0f);
     }
+
+    /** Padding between a list card's edge and the ListBox inside it (see paintListCard). */
+    inline constexpr int listCardPadX = 4, listCardPadY = 6;
+
+    /** Lists sit in a rounded card: give the ListBox a transparent background, place it at
+        `cardArea.reduced (listCardPadX, listCardPadY)` and call this from the parent's paint(). */
+    inline void paintListCard (juce::Graphics& g, const juce::Component& list)
+    {
+        if (list.isVisible())
+            paintCard (g, list.getBounds().expanded (listCardPadX, listCardPadY).toFloat(), 14.0f);
+    }
+
+    /** A list row: a rounded pill inset from the list's edges, translucent amber with an amber rim when selected.
+        Returns the area for the row's content. */
+    inline juce::Rectangle<int> paintListRow (juce::Graphics& g, int width, int height, bool selected)
+    {
+        const auto pill = juce::Rectangle<float> (0.0f, 0.0f, (float) width, (float) height).reduced (2.0f, 1.5f);
+
+        if (selected)
+        {
+            g.setColour (selection());
+            g.fillRoundedRectangle (pill, 10.0f);
+            g.setColour (accent().withAlpha (0.45f));
+            g.drawRoundedRectangle (pill.reduced (0.5f), 10.0f, 1.0f);
+        }
+
+        return pill.toNearestInt().reduced (10, 4);
+    }
 }

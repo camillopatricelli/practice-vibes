@@ -450,7 +450,7 @@ LibraryPanel::LibraryPanel()
     tagsButton.setTooltip ("Show only topics with a tag (on the topic or one of its resources)");
 
     topicList.setRowHeight (54);
-    topicList.setColour (juce::ListBox::backgroundColourId, theme::panel());
+    topicList.setColour (juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
     topicList.setOutlineThickness (0);
 
     emptyLabel.setJustificationType (juce::Justification::centred);
@@ -602,6 +602,7 @@ void LibraryPanel::showStorage()
 void LibraryPanel::paint (juce::Graphics& g)
 {
     g.fillAll (theme::background());
+    theme::paintListCard (g, topicList);
 }
 
 void LibraryPanel::resized()
@@ -643,7 +644,7 @@ void LibraryPanel::resized()
     left.removeFromTop (4);
     folderButton.setBounds (left.removeFromBottom (40).reduced (0, 4));
     left.removeFromBottom (4);
-    topicList.setBounds (left);
+    topicList.setBounds (left.reduced (theme::listCardPadX, theme::listCardPadY));
 
     topicView->setBounds (area);
     inboxView->setBounds (area);
@@ -669,16 +670,7 @@ void LibraryPanel::paintListBoxItem (int row, juce::Graphics& g, int width, int 
     if (library == nullptr || ! juce::isPositiveAndBelow (row, (int) rowIds.size()))
         return;
 
-    if (selected)
-    {
-        g.setColour (theme::selection());
-        g.fillRect (0, 0, width, height);
-    }
-
-    g.setColour (theme::line());
-    g.fillRect (0, height - 1, width, 1);
-
-    auto r = juce::Rectangle<int> (0, 0, width, height).reduced (12, 6);
+    auto r = theme::paintListRow (g, width, height, selected).reduced (2, 2);
     const auto& id = rowIds[(size_t) row];
 
     if (id == inboxId)

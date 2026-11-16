@@ -156,11 +156,10 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        auto r = getLocalBounds().toFloat();
-        g.setColour (theme::panel());
-        g.fillRoundedRectangle (r, 6.0f);
+        // Room below for the card's soft shadow in the light theme.
+        theme::paintCard (g, cardBounds().toFloat().reduced (1.0f, 0.0f), 14.0f);
 
-        auto inner = getLocalBounds().reduced (8);
+        auto inner = cardBounds().reduced (10, 8);
         drawBadge (g, inner.removeFromLeft (inner.getHeight()).toFloat(), resource);
         inner.removeFromLeft (12);
         inner.removeFromRight (menuButton.getRight() - openButton.getX() + 12);
@@ -189,13 +188,16 @@ public:
 
     void resized() override
     {
-        auto r = getLocalBounds().reduced (8);
+        auto r = cardBounds().reduced (10, 8);
         const auto h = juce::jmin (36, r.getHeight());
         const auto menuWidth = menuButton.getButtonText().length() > 3 ? 140 : 44;
         menuButton.setBounds (r.removeFromRight (menuWidth).withSizeKeepingCentre (menuWidth, h));
         r.removeFromRight (6);
         openButton.setBounds (r.removeFromRight (80).withSizeKeepingCentre (80, h));
     }
+
+    /** The visible card: the row minus room below for the card's soft shadow (light theme). */
+    juce::Rectangle<int> cardBounds() const  { return getLocalBounds().withTrimmedBottom (3); }
 
     void mouseDoubleClick (const juce::MouseEvent&) override
     {

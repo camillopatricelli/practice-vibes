@@ -8,6 +8,7 @@
 #include "PlayerProcessor.h"
 #include "StemMixer.h"
 #include "Take.h"
+#include "TimeDisplay.h"
 #include "WaveformView.h"
 
 namespace pv
@@ -144,7 +145,8 @@ private:
     std::unique_ptr<juce::FileChooser> fileChooser;
 
     // Song
-    juce::Label songHeader, songLabel, timeLabel;
+    juce::Label songHeader, songLabel;
+    TimeDisplay timeLabel;
     juce::TextButton openButton { "Open audio file" };
     WaveformView waveform;
     juce::TextButton zoomOutButton { "-" }, zoomInButton { "+" }, fitButton { "Fit" }, zoomLoopButton { "Zoom to loop" };

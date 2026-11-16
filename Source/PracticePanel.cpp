@@ -235,9 +235,8 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
     styleHeader (songHeader, "Song");
     styleLabel (songLabel, "No song loaded", 0.7f);
     songLabel.setMinimumHorizontalScale (0.6f);
-    styleLabel (timeLabel, "0:00.0 / 0:00.0");
-    timeLabel.setJustificationType (juce::Justification::centredRight);
-    timeLabel.setFont (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), 17.0f, juce::Font::plain));
+    timeLabel.setText ("0:00.0 / 0:00.0");
+    timeLabel.setFontSize (18.0f);
 
     for (auto* c : std::initializer_list<juce::Component*> { &songHeader, &songLabel, &timeLabel, &openButton, &waveform,
                                                              &rewindButton, &playButton, &stopButton, &setAButton, &setBButton,
