@@ -279,14 +279,14 @@ void YouTubePlayer::paint (juce::Graphics& g)
     if (compact)
     {
         auto bar = getLocalBounds().removeFromTop (compactBarHeight);
-        g.setColour (theme::panel.brighter (0.1f));
+        g.setColour (theme::raised());
         g.fillRect (bar);
-        g.setColour (juce::Colours::white.withAlpha (0.85f));
+        g.setColour (theme::text().withAlpha (0.85f));
         g.setFont (juce::FontOptions (13.5f).withStyle ("Bold"));
         auto text = bar.reduced (10, 0);
         text.removeFromRight (closeButton.getRight() - playButton.getX() + 8);
         g.drawText (getTitle(), text, juce::Justification::centredLeft, true);
-        g.setColour (theme::accent);
+        g.setColour (theme::accent());
         g.drawRect (getLocalBounds(), 1);
     }
 }

@@ -145,8 +145,10 @@ target_sources(PracticeVibes PRIVATE
     Source/Stems.cpp
     Source/Take.cpp
     Source/TodayPanel.cpp
+    Source/Theme.cpp
     Source/Tuner.cpp
     Source/TunerPanel.cpp
+    Source/WarmLookAndFeel.cpp
     Source/WaveformView.cpp
     Source/YouTubePlayer.cpp)
 
@@ -222,6 +224,13 @@ juce_add_binary_data(PracticeVibesDrumKit
     NAMESPACE   DrumKitData
     SOURCES     ${PV_DRUM_SAMPLES})
 
+# The UI fonts: Outfit (headings) and DM Sans (text), both SIL Open Font License (Resources/Fonts/*-OFL.txt).
+file(GLOB PV_FONTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Resources/Fonts/*.ttf)
+juce_add_binary_data(PracticeVibesFonts
+    HEADER_NAME FontData.h
+    NAMESPACE   FontData
+    SOURCES     ${PV_FONTS})
+
 target_link_libraries(PracticeVibes
     PRIVATE
         juce::juce_audio_utils
@@ -230,6 +239,7 @@ target_link_libraries(PracticeVibes
         signalsmith-stretch
         PracticeVibesIcons
         PracticeVibesDrumKit
+        PracticeVibesFonts
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -265,6 +275,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         Source/StoragePanel.cpp
         Source/Stems.cpp
         Source/Take.cpp
+        Source/Theme.cpp
         Source/Tuner.cpp)
 
     pv_use_onnxruntime(PracticeVibesTests)

@@ -4,15 +4,42 @@
 #include "AppPaths.h"
 #include "MainComponent.h"
 #include "StoragePanel.h"
+#include "Theme.h"
+#include "WarmLookAndFeel.h"
 
 namespace pv
 {
+
+/** Windows 10/11: the native title bar in the theme's colours (Windows 11 caption colour; dark mode on Windows 10). */
+inline void colourTitleBar (juce::Component& window)
+{
+   #if JUCE_WINDOWS
+    using SetAttribute = long (__stdcall*) (void*, unsigned long, const void*, unsigned long);
+    static juce::DynamicLibrary dwm ("dwmapi.dll");
+    static auto setAttribute = (SetAttribute) dwm.getFunction ("DwmSetWindowAttribute");
+
+    auto* hwnd = window.getWindowHandle();
+
+    if (setAttribute == nullptr || hwnd == nullptr)
+        return;
+
+    auto colorRef = [] (juce::Colour c) -> unsigned long { return (unsigned long) c.getRed() | ((unsigned long) c.getGreen() << 8) | ((unsigned long) c.getBlue() << 16); };
+
+    const int dark = theme::isDark() ? 1 : 0;
+    const auto caption = colorRef (theme::background()), text = colorRef (theme::text());
+    setAttribute (hwnd, 20, &dark, sizeof (dark));          // DWMWA_USE_IMMERSIVE_DARK_MODE
+    setAttribute (hwnd, 35, &caption, sizeof (caption));    // DWMWA_CAPTION_COLOR (Windows 11)
+    setAttribute (hwnd, 36, &text, sizeof (text));          // DWMWA_TEXT_COLOR (Windows 11)
+   #else
+    juce::ignoreUnused (window);
+   #endif
+}
 
 class MainWindow final : public juce::DocumentWindow
 {
 public:
     MainWindow (const juce::String& name, AppEngine& engine, AppLog& log)
-        : DocumentWindow (name, juce::Colour (0xff1e1f24), DocumentWindow::allButtons)
+        : DocumentWindow (name, theme::background(), DocumentWindow::allButtons)
     {
         setUsingNativeTitleBar (true);
         setContentOwned (new MainComponent (engine, log), true);
@@ -29,8 +56,16 @@ public:
        #endif
     }
 
+    ~MainWindow() override
+    {
+        theme::removeListener (this);
+    }
+
     void showMaximised()
     {
+        colourTitleBar (*this);
+        theme::addListener (this, [this] (const theme::Palette&) { colourTitleBar (*this); });
+
        #if ! (JUCE_IOS || JUCE_ANDROID)
         setVisible (true);
         setFullScreen (true);           // start maximised (title bar always on screen)
@@ -64,6 +99,14 @@ public:
         juce::Logger::writeToLog ("Data folder: " + getAppDataFolder().getFullPathName());
 
         pv::StorageScan::clearWebCacheIfAsked (getAppDataFolder());    // before any web view uses it
+
+        // The look, before any component exists: theme (Dark / Light / Follow system) from ui.xml, then the fonts and colours.
+        if (auto ui = juce::parseXML (getUiSettingsFile()))
+            theme::setMode (theme::modeFromName (ui->getStringAttribute ("theme", "dark")));
+
+        lookAndFeel = std::make_unique<WarmLookAndFeel>();
+        juce::LookAndFeel::setDefaultLookAndFeel (lookAndFeel.get());
+
         engine = std::make_unique<AppEngine>();
         mainWindow = std::make_unique<MainWindow> (getApplicationName(), *engine, *log);
         engine->start();
@@ -89,6 +132,8 @@ public:
 
         mainWindow.reset();
         engine.reset();
+        juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
+        lookAndFeel.reset();
         log.reset();
     }
 
@@ -133,6 +178,7 @@ private:
     }
 
     std::unique_ptr<AppLog> log;
+    std::unique_ptr<WarmLookAndFeel> lookAndFeel;      // outlives every component
     std::unique_ptr<AppEngine> engine;
     std::unique_ptr<MainWindow> mainWindow;
 };

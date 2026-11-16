@@ -328,11 +328,11 @@ StemControls StemControls::fromString (const juce::String& text)
 StemMixer::StemMixer (Host& h) : host (h)
 {
     title.setFont (theme::headerFont());
-    title.setColour (juce::Label::textColourId, juce::Colours::white);
+    title.setColour (juce::Label::textColourId, theme::text());
     addAndMakeVisible (title);
 
     message.setJustificationType (juce::Justification::topLeft);
-    message.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.8f));
+    message.setColour (juce::Label::textColourId, theme::text().withAlpha (0.8f));
     addAndMakeVisible (message);
     addChildComponent (progressBar);
     addChildComponent (actionButton);
@@ -351,7 +351,7 @@ StemMixer::StemMixer (Host& h) : host (h)
         row->stem = Stems::displayOrder[(size_t) i];
         const auto stem = row->stem;
         row->name.setText (Stems::displayName (stem), juce::dontSendNotification);
-        row->name.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.9f));
+        row->name.setColour (juce::Label::textColourId, theme::text().withAlpha (0.9f));
 
         for (auto* b : { &row->mute, &row->solo })
         {
@@ -359,9 +359,9 @@ StemMixer::StemMixer (Host& h) : host (h)
             b->setTooltip (b == &row->mute ? "Mute" : "Solo (only the soloed stems play)");
         }
 
-        row->mute.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffc04848));
-        row->solo.setColour (juce::TextButton::buttonOnColourId, theme::highlight.darker (0.2f));
-        row->solo.setColour (juce::TextButton::textColourOnId, juce::Colours::black);
+        row->mute.setColour (juce::TextButton::buttonOnColourId, theme::record());
+        row->solo.setColour (juce::TextButton::buttonOnColourId, theme::accent());
+        row->solo.setColour (juce::TextButton::textColourOnId, theme::onAccent());
 
         row->mute.onClick = [this, stem, r = row.get()]
         {
@@ -519,7 +519,7 @@ void StemMixer::update()
 
 void StemMixer::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::panel);
+    g.fillAll (theme::panel());
 }
 
 void StemMixer::resized()

@@ -17,7 +17,7 @@ namespace
     void styleLabel (juce::Label& label, const juce::String& text, float alpha = 0.85f)
     {
         label.setText (text, juce::dontSendNotification);
-        label.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (alpha));
+        label.setColour (juce::Label::textColourId, theme::text().withAlpha (alpha));
     }
 }
 
@@ -50,8 +50,8 @@ public:
         {
             const auto x = (float) i * ((float) getWidth() / (float) beats);
             auto circle = juce::Rectangle<float> (x, 0.0f, size, size).withY (((float) getHeight() - size) * 0.5f);
-            g.setColour (i == lastBeat ? (i == 0 ? theme::highlight : theme::accent.brighter (0.4f))
-                                       : juce::Colours::white.withAlpha (0.12f));
+            g.setColour (i == lastBeat ? (i == 0 ? theme::highlight() : theme::accent())
+                                       : theme::text().withAlpha (0.12f));
             g.fillEllipse (circle.reduced (2.0f));
         }
     }
@@ -71,12 +71,12 @@ public:
         nameLabel.setText (juce::String (track + 1), juce::dontSendNotification);
         nameLabel.setFont (juce::FontOptions (26.0f).withStyle ("Bold"));
         nameLabel.setJustificationType (juce::Justification::centred);
-        nameLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.7f));
+        nameLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.7f));
         addAndMakeVisible (nameLabel);
 
         pedalLabel.setFont (juce::FontOptions (12.0f));
         pedalLabel.setJustificationType (juce::Justification::centred);
-        pedalLabel.setColour (juce::Label::textColourId, theme::highlight);
+        pedalLabel.setColour (juce::Label::textColourId, theme::highlight());
         pedalLabel.setMinimumHorizontalScale (0.6f);
         addAndMakeVisible (pedalLabel);
 
@@ -127,11 +127,11 @@ public:
 
         switch (state)
         {
-            case Looper::State::empty:       text = "Record";                                   colour = theme::panel.brighter (0.25f); break;
+            case Looper::State::empty:       text = "Record";                                   colour = theme::raised(); break;
             case Looper::State::armed:       text = "Waiting for bar line...";                  colour = armedColour;   break;
             case Looper::State::recording:   text = "Recording - tap to stop";                  colour = recordColour;  break;
             case Looper::State::playing:     text = muted ? "Muted - tap to play" : "Playing - tap to overdub";
-                                             colour = muted ? theme::panel.brighter (0.4f) : playColour; break;
+                                             colour = muted ? theme::track() : playColour; break;
             case Looper::State::overdubbing: text = "Overdubbing - tap to stop";                colour = overdubColour; break;
         }
 
@@ -157,11 +157,11 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.setColour (theme::panel);
+        g.setColour (theme::panel());
         g.fillRoundedRectangle (getLocalBounds().toFloat().reduced (1.0f), 6.0f);
 
         auto area = progressArea.toFloat();
-        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        g.setColour (theme::shade (0.35f));
         g.fillRoundedRectangle (area, 4.0f);
 
         const auto colour = lastState == Looper::State::recording   ? recordColour
@@ -178,7 +178,7 @@ public:
 
         if (lastBars > 1 && lastState != Looper::State::recording)
         {
-            g.setColour (juce::Colours::white.withAlpha (0.25f));
+            g.setColour (theme::text().withAlpha (0.25f));
 
             for (int b = 1; b < lastBars; ++b)
             {
@@ -188,7 +188,7 @@ public:
         }
 
         // Output level along the bottom edge
-        g.setColour (juce::Colours::white.withAlpha (0.5f));
+        g.setColour (theme::text().withAlpha (0.5f));
         g.fillRect (area.removeFromBottom (3.0f).withWidth (area.getWidth() * juce::jlimit (0.0f, 1.0f, meterLevel)));
 
         juce::String info;
@@ -202,7 +202,7 @@ public:
         else
             info = juce::String (lastBars) + (lastBars == 1 ? " bar" : " bars");
 
-        g.setColour (juce::Colours::white.withAlpha (0.85f));
+        g.setColour (theme::text().withAlpha (0.85f));
         g.setFont (juce::FontOptions (15.0f));
         g.drawText (info, progressArea.reduced (10, 0), juce::Justification::centredLeft);
     }
@@ -252,7 +252,7 @@ LooperPanel::LooperPanel (AppEngine& e)
 
     header.setText ("Looper", juce::dontSendNotification);
     header.setFont (theme::headerFont());
-    header.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.9f));
+    header.setColour (juce::Label::textColourId, theme::text().withAlpha (0.9f));
     addAndMakeVisible (header);
 
     styleLabel (sourceLabel, "Record");
@@ -262,7 +262,7 @@ LooperPanel::LooperPanel (AppEngine& e)
     {
         b->setClickingTogglesState (true);
         b->setRadioGroupId (1);
-        b->setColour (juce::TextButton::buttonOnColourId, theme::accent);
+        b->setColour (juce::TextButton::buttonOnColourId, theme::accent());
         addAndMakeVisible (*b);
     }
 
@@ -332,7 +332,7 @@ LooperPanel::LooperPanel (AppEngine& e)
     };
 
     tempoDisplay.setFont (juce::FontOptions (30.0f).withStyle ("Bold"));
-    tempoDisplay.setColour (juce::Label::textColourId, theme::highlight);
+    tempoDisplay.setColour (juce::Label::textColourId, theme::highlight());
     tempoDisplay.setJustificationType (juce::Justification::centredRight);
 
     beatDots = std::make_unique<BeatDots> (metronome);
@@ -749,7 +749,7 @@ void LooperPanel::timerCallback()
 //==============================================================================
 void LooperPanel::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::background);
+    g.fillAll (theme::background());
 }
 
 void LooperPanel::resized()

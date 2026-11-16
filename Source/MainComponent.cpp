@@ -16,6 +16,21 @@
 namespace pv
 {
 
+namespace
+{
+    /** Sets one attribute in ui.xml, keeping the others. */
+    void saveUiSetting (const juce::Identifier& name, const juce::var& value)
+    {
+        auto ui = juce::parseXML (getUiSettingsFile());
+
+        if (ui == nullptr || ! ui->hasTagName ("UI"))
+            ui = std::make_unique<juce::XmlElement> ("UI");
+
+        ui->setAttribute (name, value.toString());
+        ui->writeTo (getUiSettingsFile());
+    }
+}
+
 //==============================================================================
 /** The "Log" tab: everything the app writes to its log, plus a copy button
     (handy on the iPad, where there's no debugger).
@@ -32,11 +47,11 @@ public:
         logView.setScrollbarsShown (true);
         logView.setCaretVisible (false);
         logView.setFont (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::plain));
-        logView.setColour (juce::TextEditor::backgroundColourId, theme::panel);
+        logView.setColour (juce::TextEditor::backgroundColourId, theme::panel());
         addAndMakeVisible (logView);
 
         pathLabel.setText ("Log file: " + appLog.getFile().getFullPathName(), juce::dontSendNotification);
-        pathLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.6f));
+        pathLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.6f));
         pathLabel.setMinimumHorizontalScale (0.5f);
         addAndMakeVisible (pathLabel);
 
@@ -52,7 +67,7 @@ public:
         appLog.removeChangeListener (this);
     }
 
-    void paint (juce::Graphics& g) override { g.fillAll (theme::background); }
+    void paint (juce::Graphics& g) override { g.fillAll (theme::background()); }
 
     void resized() override
     {
@@ -91,8 +106,8 @@ class MainComponent::Overlay final : public juce::Component,
 public:
     Overlay()
     {
-        title.setFont (juce::FontOptions (20.0f).withStyle ("Bold"));
-        title.setColour (juce::Label::textColourId, juce::Colours::white);
+        title.setFont (theme::displayFont (21.0f, "SemiBold"));
+        title.setColour (juce::Label::textColourId, theme::text());
         addAndMakeVisible (title);
         addAndMakeVisible (closeButton);
         closeButton.onClick = [this] { if (onClose) onClose(); };
@@ -128,7 +143,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         const auto opaque = content != nullptr && (bool) content->getProperties()["fillOverlay"];
-        g.fillAll (juce::Colours::black.withAlpha (opaque ? 1.0f : 0.88f));
+        g.fillAll (opaque ? theme::background() : theme::isDark() ? juce::Colours::black.withAlpha (0.88f) : theme::background().withAlpha (0.94f));
     }
 
     void resized() override
@@ -186,8 +201,8 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     : engine (e)
 {
     titleLabel.setText (JUCE_APPLICATION_NAME_STRING, juce::dontSendNotification);
-    titleLabel.setFont (juce::FontOptions (22.0f).withStyle ("Bold"));
-    titleLabel.setColour (juce::Label::textColourId, juce::Colours::white);
+    titleLabel.setFont (theme::displayFont (22.0f, "Bold"));
+    titleLabel.setColour (juce::Label::textColourId, theme::text());
     addAndMakeVisible (titleLabel);
 
     // Scaled down once (high-quality resampling) to 4x the drawn size: sharp on every display density.
@@ -338,12 +353,12 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
 
     tabs.setTabBarDepth (42);
     tabs.setOutline (0);
-    tabs.addTab ("Today", theme::background, todayPanel.get(), false);
-    tabs.addTab ("Practice", theme::background, practicePanel.get(), false);
-    tabs.addTab ("Topics", theme::background, libraryPanel.get(), false);
-    tabs.addTab ("Links", theme::background, linksPanel.get(), false);
-    tabs.addTab ("Looper", theme::background, looperPanel.get(), false);
-    tabs.addTab ("Guitar rig", theme::background, rigPanel.get(), false);
+    tabs.addTab ("Today", theme::background(), todayPanel.get(), false);
+    tabs.addTab ("Practice", theme::background(), practicePanel.get(), false);
+    tabs.addTab ("Topics", theme::background(), libraryPanel.get(), false);
+    tabs.addTab ("Links", theme::background(), linksPanel.get(), false);
+    tabs.addTab ("Looper", theme::background(), looperPanel.get(), false);
+    tabs.addTab ("Guitar rig", theme::background(), rigPanel.get(), false);
     addAndMakeVisible (tabs);
 
     // The Log tab is for troubleshooting: off unless switched on in the audio settings.
@@ -382,10 +397,33 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     libraryOpened();   // the Topics tab opened the saved library folder before the callbacks were set
     tabs.setCurrentTabIndex (0);
     startTimerHz (10);
+
+    // Theme switch: the look and feel refreshes every window; the tab panels not on screen aren't in a window.
+    theme::addListener (this, [this] (const theme::Palette& oldPalette)
+    {
+        for (auto* panel : std::initializer_list<juce::Component*> { todayPanel.get(), practicePanel.get(), libraryPanel.get(),
+                                                                    linksPanel.get(), looperPanel.get(), rigPanel.get(), logPanel.get() })
+        {
+            if (panel != nullptr && panel->getParentComponent() == nullptr)
+            {
+                theme::refreshComponents (*panel, oldPalette);
+                panel->sendLookAndFeelChange();
+            }
+        }
+
+        for (int i = 0; i < tabs.getNumTabs(); ++i)
+            tabs.setTabBackgroundColour (i, theme::background());
+
+        if (auto* window = findParentComponentOfClass<juce::ResizableWindow>())
+            window->setBackgroundColour (theme::background());
+
+        repaint();
+    });
 }
 
 MainComponent::~MainComponent()
 {
+    theme::removeListener (this);
     stopTimer();
 
     if (engine.recorder->isRecording())
@@ -408,7 +446,7 @@ MainComponent::~MainComponent()
 //==============================================================================
 void MainComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::background);
+    g.fillAll (theme::background());
 
     if (appIcon.isValid() && ! iconBounds.isEmpty())
     {
@@ -620,15 +658,15 @@ void MainComponent::updatePractisingButton()
 
     if (session.isRunning() && session.isTimeUp())
     {
-        practisingButton.setColour (juce::TextButton::buttonColourId, theme::highlight);
-        practisingButton.setColour (juce::TextButton::textColourOffId, juce::Colours::black);
+        practisingButton.setColour (juce::TextButton::buttonColourId, theme::highlight());
+        practisingButton.setColour (juce::TextButton::textColourOffId, theme::onAccent());
     }
     else
     {
         practisingButton.removeColour (juce::TextButton::textColourOffId);
 
         if (active)
-            practisingButton.setColour (juce::TextButton::buttonColourId, theme::accent);
+            practisingButton.setColour (juce::TextButton::buttonColourId, theme::accent());
         else
             practisingButton.removeColour (juce::TextButton::buttonColourId);
     }
@@ -1450,13 +1488,13 @@ void MainComponent::updateRecordButton()
         const auto seconds = juce::roundToInt (engine.recorder->getRecordedSeconds());
         text = juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xa0 ")) + juce::String (seconds / 60) + ":"
              + juce::String (seconds % 60).paddedLeft ('0', 2);
-        recordButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xffc62828));
+        recordButton.setColour (juce::TextButton::buttonColourId, theme::record());
         recordButton.setColour (juce::TextButton::textColourOffId, juce::Colours::white);
     }
     else
     {
         recordButton.removeColour (juce::TextButton::buttonColourId);
-        recordButton.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffff7070));   // a red "Rec"
+        recordButton.setColour (juce::TextButton::textColourOffId, theme::record());   // a red "Rec"
 
         if (recordMessageCountdown > 0)
         {
@@ -1506,7 +1544,7 @@ void MainComponent::openAudioSettings()
                                                                           true,    // MIDI inputs
                                                                           false, false, false);
 
-    // The device selector, with the Log tab switch underneath.
+    // The device selector, with the theme and the Log tab switch underneath.
     struct Settings final : public juce::Component
     {
         Settings (std::unique_ptr<juce::Component> s, bool logShown, std::function<void (bool)> onLog)
@@ -1517,26 +1555,51 @@ void MainComponent::openAudioSettings()
             logToggle.setTooltip ("A tab with everything the app writes to its log, for troubleshooting");
             logToggle.onClick = [this, onLog] { onLog (logToggle.getToggleState()); };
             addAndMakeVisible (logToggle);
+
+            themeLabel.setText ("Theme", juce::dontSendNotification);
+            themeLabel.setJustificationType (juce::Justification::centredRight);
+            addAndMakeVisible (themeLabel);
+
+            // Ids: 1 + theme::Mode
+            themeBox.addItem ("Dark", 1 + (int) theme::Mode::dark);
+            themeBox.addItem ("Light", 1 + (int) theme::Mode::light);
+           #if JUCE_MAC || JUCE_IOS
+            themeBox.addItem ("Follow the system (Appearance setting)", 1 + (int) theme::Mode::system);
+           #else
+            themeBox.addItem ("Follow the system (Windows app mode)", 1 + (int) theme::Mode::system);
+           #endif
+            themeBox.setSelectedId (1 + (int) theme::getMode(), juce::dontSendNotification);
+            themeBox.onChange = [this]
+            {
+                const auto mode = (theme::Mode) (themeBox.getSelectedId() - 1);
+                saveUiSetting ("theme", theme::modeName (mode));
+                theme::setMode (mode);
+            };
+            addAndMakeVisible (themeBox);
         }
 
         void resized() override
         {
             auto r = getLocalBounds();
-            logToggle.setBounds (r.removeFromBottom (32).reduced (8, 2));
+            auto bottom = r.removeFromBottom (40).reduced (8, 4);
+            logToggle.setBounds (bottom.removeFromRight (220));
+            themeLabel.setBounds (bottom.removeFromLeft (120));
+            bottom.removeFromLeft (10);
+            themeBox.setBounds (bottom.removeFromLeft (juce::jmin (320, bottom.getWidth())));
             selector->setBounds (r);
         }
 
         std::unique_ptr<juce::Component> selector;
         juce::ToggleButton logToggle { "Show the Log tab" };
+        juce::Label themeLabel;
+        juce::ComboBox themeBox;
     };
 
     showOverlay ("Audio settings", std::make_unique<Settings> (std::move (selector), isLogTabShown(),
                                                                [this] (bool shown)
                                                                {
                                                                    setLogTabShown (shown);
-                                                                   juce::XmlElement ui ("UI");
-                                                                   ui.setAttribute ("showLogTab", shown);
-                                                                   ui.writeTo (getUiSettingsFile());
+                                                                   saveUiSetting ("showLogTab", shown);
                                                                }));
 }
 
@@ -1556,7 +1619,7 @@ void MainComponent::setLogTabShown (bool shown)
 
     if (shown)
     {
-        tabs.addTab ("Log", theme::background, logPanel.get(), false);
+        tabs.addTab ("Log", theme::background(), logPanel.get(), false);
         return;
     }
 

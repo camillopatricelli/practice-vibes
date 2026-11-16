@@ -18,11 +18,11 @@ public:
     void paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool selected) override
     {
         if (selected)
-            g.fillAll (theme::accent);
+            g.fillAll (theme::selection());
         else if (row % 2 == 1)
-            g.fillAll (juce::Colours::white.withAlpha (0.03f));
+            g.fillAll (theme::text().withAlpha (0.03f));
 
-        g.setColour (juce::Colours::white);
+        g.setColour (theme::text());
         g.setFont (juce::FontOptions (16.0f));
         g.drawText (rowText ? rowText (row) : juce::String(), 10, 0, width - 20, height,
                     juce::Justification::centredLeft, true);
@@ -48,7 +48,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         const auto bounds = getLocalBounds().toFloat();
-        g.setColour (juce::Colours::black.withAlpha (0.4f));
+        g.setColour (theme::shade (0.4f));
         g.fillRoundedRectangle (bounds, 3.0f);
 
         const auto db = juce::Decibels::gainToDecibels (level, -60.0f);
@@ -57,7 +57,7 @@ public:
         g.setColour (db > -3.0f ? juce::Colours::red : db > -12.0f ? juce::Colours::orange : juce::Colours::limegreen);
         g.fillRoundedRectangle (bounds.withWidth (bounds.getWidth() * proportion), 3.0f);
 
-        g.setColour (juce::Colours::white.withAlpha (0.85f));
+        g.setColour (theme::text().withAlpha (0.85f));
         g.setFont (juce::FontOptions (12.0f));
         g.drawText (level > 0.001f ? juce::String (db, 1) + " dB" : juce::String ("-inf"),
                     getLocalBounds().reduced (6, 0), juce::Justification::centredRight);
@@ -76,7 +76,7 @@ RigPanel::RigPanel (AppEngine& e)
     {
         label.setText (text, juce::dontSendNotification);
         label.setFont (theme::headerFont());
-        label.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.9f));
+        label.setColour (juce::Label::textColourId, theme::text().withAlpha (0.9f));
         addAndMakeVisible (label);
     };
 
@@ -102,10 +102,10 @@ RigPanel::RigPanel (AppEngine& e)
     catalogueModel->onDoubleClick = [this] (int) { addSelectedPlugin(); };
     catalogueList.setModel (catalogueModel.get());
     catalogueList.setRowHeight (40);
-    catalogueList.setColour (juce::ListBox::backgroundColourId, theme::panel);
+    catalogueList.setColour (juce::ListBox::backgroundColourId, theme::panel());
     addAndMakeVisible (catalogueList);
 
-    catalogueStatus.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.6f));
+    catalogueStatus.setColour (juce::Label::textColourId, theme::text().withAlpha (0.6f));
     addAndMakeVisible (catalogueStatus);
 
     addButton.onClick = [this] { addSelectedPlugin(); };
@@ -133,7 +133,7 @@ RigPanel::RigPanel (AppEngine& e)
     chainModel->onDoubleClick = [this] (int row) { openEditor (row); };
     chainList.setModel (chainModel.get());
     chainList.setRowHeight (44);
-    chainList.setColour (juce::ListBox::backgroundColourId, theme::panel);
+    chainList.setColour (juce::ListBox::backgroundColourId, theme::panel());
     addAndMakeVisible (chainList);
 
     editButton.onClick = [this] { openEditor (selectedChainIndex()); };
@@ -184,7 +184,7 @@ RigPanel::RigPanel (AppEngine& e)
                              double minDb, double maxDb, GainMeterProcessor& stage)
     {
         label.setText (name, juce::dontSendNotification);
-        label.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.8f));
+        label.setColour (juce::Label::textColourId, theme::text().withAlpha (0.8f));
         addAndMakeVisible (label);
 
         slider.setSliderStyle (juce::Slider::LinearHorizontal);
@@ -209,13 +209,13 @@ RigPanel::RigPanel (AppEngine& e)
     addAndMakeVisible (monitorButton);
 
     // MIDI -----------------------------------------------------------------
-    midiDevicesLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.8f));
+    midiDevicesLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.8f));
     midiDevicesLabel.setMinimumHorizontalScale (0.6f);
     addAndMakeVisible (midiDevicesLabel);
 
     lastMidiLabel.setText ("No MIDI received yet", juce::dontSendNotification);
     lastMidiLabel.setFont (juce::FontOptions (19.0f).withStyle ("Bold"));
-    lastMidiLabel.setColour (juce::Label::textColourId, theme::highlight);
+    lastMidiLabel.setColour (juce::Label::textColourId, theme::highlight());
     lastMidiLabel.setMinimumHorizontalScale (0.6f);
     addAndMakeVisible (lastMidiLabel);
 
@@ -260,7 +260,7 @@ RigPanel::~RigPanel()
 //==============================================================================
 void RigPanel::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::background);
+    g.fillAll (theme::background());
 }
 
 void RigPanel::resized()

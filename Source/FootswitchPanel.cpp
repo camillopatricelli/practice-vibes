@@ -14,10 +14,10 @@ public:
         nameLabel.setText (Footswitch::switchName (index), juce::dontSendNotification);
         nameLabel.setFont (juce::FontOptions (26.0f).withStyle ("Bold"));
         nameLabel.setJustificationType (juce::Justification::centred);
-        nameLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.8f));
+        nameLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.8f));
         addAndMakeVisible (nameLabel);
 
-        triggerLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.85f));
+        triggerLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.85f));
         triggerLabel.setMinimumHorizontalScale (0.6f);
         addAndMakeVisible (triggerLabel);
 
@@ -32,7 +32,7 @@ public:
 
         for (auto* label : { &tapLabel, &holdLabel })
         {
-            label->setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.7f));
+            label->setColour (juce::Label::textColourId, theme::text().withAlpha (0.7f));
             addAndMakeVisible (*label);
         }
 
@@ -97,11 +97,11 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.setColour (lastLearning ? theme::accent.withAlpha (0.45f) : theme::panel);
+        g.setColour (lastLearning ? theme::accent().withAlpha (0.45f) : theme::panel());
         g.fillRoundedRectangle (getLocalBounds().toFloat().reduced (1.0f), 6.0f);
 
         const auto level = juce::jmax (lampLevel, lampDown ? 0.7f : 0.0f);
-        g.setColour (juce::Colours::white.withAlpha (0.12f).interpolatedWith (theme::highlight, level));
+        g.setColour (theme::text().withAlpha (0.12f).interpolatedWith (theme::highlight(), level));
         g.fillEllipse (lampArea.toFloat());
     }
 
@@ -167,11 +167,11 @@ FootswitchPanel::FootswitchPanel (AppEngine& e)
                    "M-VAVE Chocolate: in CubeSuite choose Custom Control, give each switch its own CC number "
                    "and set Visual behavior Off (momentary). Then tap Learn and press the switch.",
                    juce::dontSendNotification);
-    intro.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.8f));
+    intro.setColour (juce::Label::textColourId, theme::text().withAlpha (0.8f));
     intro.setJustificationType (juce::Justification::topLeft);
     addAndMakeVisible (intro);
 
-    devicesLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.6f));
+    devicesLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.6f));
     devicesLabel.setMinimumHorizontalScale (0.6f);
     addAndMakeVisible (devicesLabel);
 
@@ -245,7 +245,7 @@ void FootswitchPanel::timerCallback()
 
 void FootswitchPanel::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::background);
+    g.fillAll (theme::background());
 }
 
 void FootswitchPanel::resized()

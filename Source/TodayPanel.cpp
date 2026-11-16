@@ -39,7 +39,7 @@ public:
         : topicId (topic.id), title (topic.title.isNotEmpty() ? topic.title : juce::String ("(untitled)")),
           tags (topic.tags), summary (s), active (isActive)
     {
-        practiseButton.setColour (juce::TextButton::buttonColourId, theme::accent);
+        practiseButton.setColour (juce::TextButton::buttonColourId, theme::accent());
         practiseButton.onClick = [this] { if (onPractise) onPractise (topicId); };
         practiseButton.setButtonText (active ? "Practising" : "Practise");
         practiseButton.setEnabled (! active);
@@ -57,19 +57,19 @@ public:
     void paint (juce::Graphics& g) override
     {
         auto r = getLocalBounds().toFloat();
-        g.setColour (theme::panel);
+        g.setColour (theme::panel());
         g.fillRoundedRectangle (r, 6.0f);
 
         if (active)
         {
-            g.setColour (theme::accent.brighter (0.3f));
+            g.setColour (theme::accent());
             g.drawRoundedRectangle (r.reduced (1.0f), 6.0f, 2.0f);
         }
 
         auto inner = getLocalBounds().reduced (12, 8);
         inner.removeFromRight (getWidth() - historyButton.getX() + 12);
 
-        g.setColour (juce::Colours::white);
+        g.setColour (theme::text());
         g.setFont (juce::FontOptions (16.0f).withStyle ("Bold"));
         g.drawText (title, inner.removeFromTop (22), juce::Justification::centredLeft, true);
 
@@ -79,13 +79,13 @@ public:
                                                       : "Last practised " + formatPracticeAgo (summary.last, now);
         const juce::Font agoFont (juce::FontOptions (13.5f).withStyle ("Bold"));
         g.setFont (agoFont);
-        g.setColour (days >= 7.0 ? theme::highlight : juce::Colours::white.withAlpha (0.75f));
+        g.setColour (days >= 7.0 ? theme::highlight() : theme::text().withAlpha (0.75f));
         const auto agoWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (agoFont, ago)) + 16;
         auto line = inner.removeFromTop (20);
         g.drawText (ago, line.removeFromLeft (agoWidth), juce::Justification::centredLeft, true);
 
         g.setFont (juce::FontOptions (13.5f));
-        g.setColour (juce::Colours::white.withAlpha (0.6f));
+        g.setColour (theme::text().withAlpha (0.6f));
         auto detail = progressText (summary);
 
         if (! tags.isEmpty())
@@ -188,7 +188,7 @@ public:
     {
         if (lines.empty())
         {
-            g.setColour (juce::Colours::white.withAlpha (0.45f));
+            g.setColour (theme::text().withAlpha (0.45f));
             g.setFont (juce::FontOptions (14.0f));
             g.drawFittedText ("Nothing yet. Play, and the time you spend on each topic is recorded here by itself.",
                               getLocalBounds().reduced (4), juce::Justification::topLeft, 3);
@@ -205,7 +205,7 @@ public:
 
             if (l.entryId.isNotEmpty() && l.entryId == hoverId)
             {
-                g.setColour (juce::Colours::white.withAlpha (0.07f));
+                g.setColour (theme::text().withAlpha (0.07f));
                 g.fillRect (r);
             }
 
@@ -213,12 +213,12 @@ public:
             {
                 case Line::day:
                     r.removeFromTop (8);
-                    g.setColour (juce::Colours::white.withAlpha (0.12f));
+                    g.setColour (theme::text().withAlpha (0.12f));
                     g.fillRect (r.getX(), r.getBottom() - 1, r.getWidth(), 1);
-                    g.setColour (juce::Colours::white);
+                    g.setColour (theme::text());
                     g.setFont (juce::FontOptions (14.5f).withStyle ("Bold"));
                     g.drawText (l.text, r, juce::Justification::centredLeft, true);
-                    g.setColour (juce::Colours::white.withAlpha (0.7f));
+                    g.setColour (theme::text().withAlpha (0.7f));
                     g.drawText (l.detail, r, juce::Justification::centredRight, true);
                     break;
 
@@ -227,15 +227,15 @@ public:
                     g.setFont (juce::FontOptions (14.0f));
                     const auto detailWidth = juce::jmin (r.getWidth() / 2,
                                                          juce::roundToInt (juce::GlyphArrangement::getStringWidth (juce::Font (juce::FontOptions (14.0f)), l.detail)) + 8);
-                    g.setColour (juce::Colours::white.withAlpha (0.6f));
+                    g.setColour (theme::text().withAlpha (0.6f));
                     g.drawText (l.detail, r.removeFromRight (detailWidth), juce::Justification::centredRight, true);
-                    g.setColour (juce::Colours::white.withAlpha (0.9f));
+                    g.setColour (theme::text().withAlpha (0.9f));
                     g.drawText (l.text, r.withTrimmedLeft (10), juce::Justification::centredLeft, true);
                     break;
                 }
 
                 case Line::note:
-                    g.setColour (theme::highlight.withAlpha (0.8f));
+                    g.setColour (theme::highlight().withAlpha (0.8f));
                     g.setFont (juce::FontOptions (13.0f).withStyle ("Italic"));
                     g.drawText (l.text, r.withTrimmedLeft (22), juce::Justification::centredLeft, true);
                     break;
@@ -303,30 +303,30 @@ private:
 TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker (t), session (s)
 {
     titleLabel.setFont (juce::FontOptions (22.0f).withStyle ("Bold"));
-    titleLabel.setColour (juce::Label::textColourId, juce::Colours::white);
+    titleLabel.setColour (juce::Label::textColourId, theme::text());
     addAndMakeVisible (titleLabel);
 
-    totalsLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.75f));
+    totalsLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.75f));
     totalsLabel.setJustificationType (juce::Justification::centredRight);
     totalsLabel.setFont (juce::FontOptions (15.0f));
     addAndMakeVisible (totalsLabel);
 
     nowTitle.setFont (juce::FontOptions (19.0f).withStyle ("Bold"));
-    nowTitle.setColour (juce::Label::textColourId, juce::Colours::white);
+    nowTitle.setColour (juce::Label::textColourId, theme::text());
     nowTitle.setMinimumHorizontalScale (0.7f);
     addAndMakeVisible (nowTitle);
 
-    nowStatus.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.7f));
+    nowStatus.setColour (juce::Label::textColourId, theme::text().withAlpha (0.7f));
     nowStatus.setFont (juce::FontOptions (14.0f));
     nowStatus.setMinimumHorizontalScale (0.7f);
     addAndMakeVisible (nowStatus);
 
     noteEditor.setTextToShowWhenEmpty ("Note for this session (optional): what went well, what to fix next time",
-                                       juce::Colours::white.withAlpha (0.35f));
+                                       theme::text().withAlpha (0.35f));
     noteEditor.setFont (juce::FontOptions (14.5f));
-    noteEditor.setColour (juce::TextEditor::backgroundColourId, theme::background);
-    noteEditor.setColour (juce::TextEditor::outlineColourId, juce::Colours::white.withAlpha (0.15f));
-    noteEditor.setColour (juce::TextEditor::focusedOutlineColourId, theme::accent);
+    noteEditor.setColour (juce::TextEditor::backgroundColourId, theme::background());
+    noteEditor.setColour (juce::TextEditor::outlineColourId, theme::text().withAlpha (0.15f));
+    noteEditor.setColour (juce::TextEditor::focusedOutlineColourId, theme::accent());
     noteEditor.setJustification (juce::Justification::centredLeft);
     noteEditor.onTextChange = [this] { tracker.setNote (noteEditor.getText().trim()); };
     noteEditor.onReturnKey = [this] { unfocusAllComponents(); };
@@ -359,7 +359,7 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
     for (auto* l : { &rotationHeader, &recentHeader })
     {
         l->setFont (theme::headerFont());
-        l->setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.85f));
+        l->setColour (juce::Label::textColourId, theme::text().withAlpha (0.85f));
         addAndMakeVisible (*l);
     }
 
@@ -369,7 +369,7 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
     diceButton.setTooltip ("Pick one rotation topic at random - the longer you've left one, the likelier it comes up");
     diceButton.onClick = [this] { rollDice(); };
     planButton.setTooltip ("Say how long you have: a few rotation topics with time slots, ready to start");
-    planButton.setColour (juce::TextButton::buttonColourId, theme::accent);
+    planButton.setColour (juce::TextButton::buttonColourId, theme::accent());
     planButton.onClick = [this] { if (onPlanSession) onPlanSession (focusTag()); };
     focusBox.setTooltip ("Only topics with this tag, for the dice and the session planner");
     focusBox.addItem ("All tags", 1);
@@ -382,7 +382,7 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
         addAndMakeVisible (*c);
 
     diceLabel.setFont (juce::FontOptions (16.0f).withStyle ("Bold"));
-    diceLabel.setColour (juce::Label::textColourId, juce::Colours::black);
+    diceLabel.setColour (juce::Label::textColourId, theme::onAccent());
     diceLabel.setMinimumHorizontalScale (0.7f);
     dicePractiseButton.onClick = [this]
     {
@@ -400,9 +400,9 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
         addChildComponent (*c);
 
     sessionTitle.setFont (juce::FontOptions (17.0f).withStyle ("Bold"));
-    sessionTitle.setColour (juce::Label::textColourId, juce::Colours::white);
+    sessionTitle.setColour (juce::Label::textColourId, theme::text());
     addChildComponent (sessionTitle);
-    nextButton.setColour (juce::TextButton::buttonColourId, theme::accent);
+    nextButton.setColour (juce::TextButton::buttonColourId, theme::accent());
     nextButton.onClick = [this] { if (onSessionNext) onSessionNext(); };
     extendButton.onClick = [this] { if (onSessionExtend) onSessionExtend(); };
     endButton.onClick = [this]
@@ -416,7 +416,7 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
     recentHeader.setText ("Last two weeks", juce::dontSendNotification);
 
     rotationEmpty.setJustificationType (juce::Justification::topLeft);
-    rotationEmpty.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.55f));
+    rotationEmpty.setColour (juce::Label::textColourId, theme::text().withAlpha (0.55f));
     rotationEmpty.setFont (juce::FontOptions (15.0f));
     addChildComponent (rotationEmpty);
 
@@ -588,7 +588,7 @@ void TodayPanel::updateSession()
                                                               : tracker.clockMode() ? juce::String ("  -  paused: press Resume")
                                                                                     : juce::String ("  -  the clock runs while you play")),
                                   juce::dontSendNotification);
-            sessionTitle.setColour (juce::Label::textColourId, session.isTimeUp() ? theme::highlight : juce::Colours::white);
+            sessionTitle.setColour (juce::Label::textColourId, session.isTimeUp() ? theme::highlight() : theme::text());
             nextButton.setButtonText (session.getNext() != nullptr ? "Next topic" : "Finish");
             nextButton.setVisible (true);
             extendButton.setVisible (true);
@@ -600,7 +600,7 @@ void TodayPanel::updateSession()
             sessionTitle.setText ("Session over: " + formatPracticeDuration (session.getElapsedSeconds()) + ", "
                                       + juce::String (reached) + (reached == 1 ? " topic" : " topics"),
                                   juce::dontSendNotification);
-            sessionTitle.setColour (juce::Label::textColourId, juce::Colours::white);
+            sessionTitle.setColour (juce::Label::textColourId, theme::text());
             nextButton.setVisible (false);
             extendButton.setVisible (false);
             endButton.setButtonText ("Close");
@@ -661,7 +661,7 @@ void TodayPanel::updateNow()
         status << "  -  pick a topic from the Practice rotation, or just play: it's logged as free practice";
 
     nowStatus.setText (status, juce::dontSendNotification);
-    nowStatus.setColour (juce::Label::textColourId, tracker.isPlaying() ? juce::Colour (0xff7bd88f) : juce::Colours::white.withAlpha (0.65f));
+    nowStatus.setColour (juce::Label::textColourId, tracker.isPlaying() ? theme::good() : theme::text().withAlpha (0.65f));
     stopButton.setVisible (active);
 
     if (pauseButton.isVisible() != onClock)
@@ -703,24 +703,24 @@ void TodayPanel::visibilityChanged()
 //==============================================================================
 void TodayPanel::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::background);
-    g.setColour (theme::panel);
+    g.fillAll (theme::background());
+    g.setColour (theme::panel());
     g.fillRoundedRectangle (nowCard.toFloat(), 8.0f);
 
     if (! diceStrip.isEmpty())
     {
-        g.setColour (theme::highlight);
+        g.setColour (theme::highlight());
         g.fillRoundedRectangle (diceStrip.toFloat(), 6.0f);
     }
 
     if (sessionShown && ! sessionCard.isEmpty())
     {
-        g.setColour (theme::panel);
+        g.setColour (theme::panel());
         g.fillRoundedRectangle (sessionCard.toFloat(), 8.0f);
 
         if (session.isRunning() && session.isTimeUp())
         {
-            g.setColour (theme::highlight);
+            g.setColour (theme::highlight());
             g.drawRoundedRectangle (sessionCard.toFloat().reduced (1.0f), 8.0f, 2.0f);
         }
 
@@ -742,7 +742,7 @@ void TodayPanel::paint (juce::Graphics& g)
                 right = "done";
 
             g.setFont (current ? juce::FontOptions (15.0f).withStyle ("Bold") : juce::FontOptions (15.0f));
-            g.setColour (current ? theme::highlight : juce::Colours::white.withAlpha (done ? 0.45f : 0.8f));
+            g.setColour (current ? theme::highlight() : theme::text().withAlpha (done ? 0.45f : 0.8f));
             g.drawText (right, line, juce::Justification::centredRight, false);
             g.drawText (juce::String (i + 1) + ".  " + slots[(size_t) i].title,
                         line.withTrimmedRight (120), juce::Justification::centredLeft, true);

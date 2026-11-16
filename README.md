@@ -116,3 +116,6 @@ exported to ONNX with [demucs.onnx](https://github.com/sevagh/demucs.onnx), MIT)
 The acoustic drum kit is made from
 [Big Rusty Drums](https://github.com/sfzinstruments/karoryfer.big-rusty-drums)
 by Karoryfer Samples (CC0, public domain).
+The interface fonts [Outfit](https://github.com/Outfitio/Outfit-Fonts) and
+[DM Sans](https://github.com/googlefonts/dm-fonts) are used under the SIL Open Font
+License 1.1 (texts in `Resources/Fonts`).

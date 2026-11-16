@@ -36,7 +36,7 @@ inline void drawBadge (juce::Graphics& g, juce::Rectangle<float> r, const Resour
     const auto kind = kindOf (resource);
     g.setColour (badgeColour (kind));
     g.fillRoundedRectangle (r, 8.0f);
-    g.setColour (juce::Colours::white);
+    g.setColour (juce::Colours::white);     // on the badge colour, in both themes
 
     if (kind == ResourceKind::youtube)
     {
@@ -79,9 +79,9 @@ inline void drawTagChips (juce::Graphics& g, juce::Rectangle<int> area, const ju
         auto chip = area.removeFromLeft (w).toFloat();
         area.removeFromLeft (5);
         const auto on = highlighted.isNotEmpty() && tag.equalsIgnoreCase (highlighted);
-        g.setColour (on ? theme::highlight : juce::Colours::white.withAlpha (0.14f));
+        g.setColour (on ? theme::highlight() : theme::text().withAlpha (0.14f));
         g.fillRoundedRectangle (chip, chip.getHeight() * 0.5f);
-        g.setColour (on ? juce::Colours::black : juce::Colours::white.withAlpha (0.85f));
+        g.setColour (on ? theme::onAccent() : theme::text().withAlpha (0.85f));
         g.drawText (tag, chip, juce::Justification::centred, false);
     }
 }
@@ -115,16 +115,16 @@ inline juce::MessageBoxOptions confirmBox (juce::MessageBoxIconType icon, const 
 
 inline void styleEditor (juce::TextEditor& e)
 {
-    e.setColour (juce::TextEditor::backgroundColourId, theme::panel);
-    e.setColour (juce::TextEditor::outlineColourId, juce::Colours::white.withAlpha (0.15f));
-    e.setColour (juce::TextEditor::focusedOutlineColourId, theme::accent);
+    e.setColour (juce::TextEditor::backgroundColourId, theme::panel());
+    e.setColour (juce::TextEditor::outlineColourId, theme::text().withAlpha (0.15f));
+    e.setColour (juce::TextEditor::focusedOutlineColourId, theme::accent());
 }
 
 inline juce::Label& styleCaption (juce::Label& l, const juce::String& text)
 {
     l.setText (text, juce::dontSendNotification);
     l.setFont (theme::headerFont());
-    l.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.85f));
+    l.setColour (juce::Label::textColourId, theme::text().withAlpha (0.85f));
     return l;
 }
 
@@ -157,7 +157,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         auto r = getLocalBounds().toFloat();
-        g.setColour (theme::panel);
+        g.setColour (theme::panel());
         g.fillRoundedRectangle (r, 6.0f);
 
         auto inner = getLocalBounds().reduced (8);
@@ -173,7 +173,7 @@ public:
             drawTagChips (g, titleArea.removeFromRight (chipsWidth).reduced (0, 2), resource.tags, highlight);
         }
 
-        g.setColour (juce::Colours::white);
+        g.setColour (theme::text());
         g.setFont (juce::FontOptions (16.0f).withStyle ("Bold"));
         g.drawText (resource.title, titleArea, juce::Justification::centredLeft, true);
 
@@ -182,7 +182,7 @@ public:
         if (detail.isEmpty())
             detail = resource.isLink() ? resource.url : resource.fileName;
 
-        g.setColour (missing ? theme::highlight : juce::Colours::white.withAlpha (0.6f));
+        g.setColour (missing ? theme::highlight() : theme::text().withAlpha (0.6f));
         g.setFont (juce::FontOptions (13.5f));
         g.drawFittedText (detail.replaceCharacters ("\r\n", "  "), inner, juce::Justification::topLeft, 2, 1.0f);
     }
@@ -230,25 +230,25 @@ public:
         {
             setUp (urlLabel, "Link (URL)", urlEditor);
             urlEditor.setText (r.url, false);
-            urlEditor.setTextToShowWhenEmpty ("https://www.youtube.com/watch?v=...", juce::Colours::white.withAlpha (0.35f));
+            urlEditor.setTextToShowWhenEmpty ("https://www.youtube.com/watch?v=...", theme::text().withAlpha (0.35f));
         }
 
         setUp (titleLabel, "Title", titleEditor);
         titleEditor.setText (r.title, false);
 
         if (isLink)
-            titleEditor.setTextToShowWhenEmpty ("(optional: taken from the link)", juce::Colours::white.withAlpha (0.35f));
+            titleEditor.setTextToShowWhenEmpty ("(optional: taken from the link)", theme::text().withAlpha (0.35f));
 
         setUp (tagsLabel, "Tags", tagsEditor);
         tagsEditor.setText (joinTags (r.tags), false);
-        tagsEditor.setTextToShowWhenEmpty ("separated by commas", juce::Colours::white.withAlpha (0.35f));
+        tagsEditor.setTextToShowWhenEmpty ("separated by commas", theme::text().withAlpha (0.35f));
 
         setUp (descriptionLabel, "Description / instructions", descriptionEditor);
         descriptionEditor.setMultiLine (true, true);
         descriptionEditor.setReturnKeyStartsNewLine (true);
         descriptionEditor.setScrollbarsShown (true);
         descriptionEditor.setText (r.description, false);
-        descriptionEditor.setTextToShowWhenEmpty ("e.g. play along 10 times a day, 60 -> 90 bpm", juce::Colours::white.withAlpha (0.35f));
+        descriptionEditor.setTextToShowWhenEmpty ("e.g. play along 10 times a day, 60 -> 90 bpm", theme::text().withAlpha (0.35f));
 
         saveButton.onClick = [this]
         {
@@ -277,7 +277,7 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.setColour (theme::background);
+        g.setColour (theme::background());
         g.fillRoundedRectangle (getLocalBounds().toFloat(), 8.0f);
     }
 

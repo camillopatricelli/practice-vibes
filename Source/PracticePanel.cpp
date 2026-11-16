@@ -45,8 +45,8 @@ public:
             auto circle = juce::Rectangle<float> (x, 0.0f, size, size).withY (((float) getHeight() - size) * 0.5f);
             const auto lit = i == lastBeat;
 
-            g.setColour (lit ? (i == 0 ? theme::highlight : theme::accent.brighter (0.4f))
-                             : juce::Colours::white.withAlpha (0.12f));
+            g.setColour (lit ? (i == 0 ? theme::highlight() : theme::accent())
+                             : theme::text().withAlpha (0.12f));
             g.fillEllipse (circle.reduced (2.0f));
         }
     }
@@ -66,7 +66,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         auto r = getLocalBounds().toFloat().reduced (0.0f, 4.0f);
-        g.setColour (theme::panel);
+        g.setColour (theme::panel());
         g.fillRoundedRectangle (r, 4.0f);
 
         const auto duration = duration_();
@@ -78,20 +78,20 @@ public:
 
         if (dragging)
         {
-            g.setColour (theme::highlight.withAlpha (0.35f));
+            g.setColour (theme::highlight().withAlpha (0.35f));
             g.fillRect (juce::Rectangle<float>::leftTopRightBottom (xOf (juce::jmin (dragStart, dragEnd)), r.getY(),
                                                                     xOf (juce::jmax (dragStart, dragEnd)), r.getBottom()));
         }
         else if (owner.loopExists())
         {
-            g.setColour (owner.loopIsEnabled() ? theme::accent.withAlpha (0.55f) : juce::Colours::white.withAlpha (0.15f));
+            g.setColour (owner.loopIsEnabled() ? theme::accent().withAlpha (0.55f) : theme::text().withAlpha (0.15f));
             g.fillRect (juce::Rectangle<float>::leftTopRightBottom (xOf (owner.loopStartSeconds()), r.getY(),
                                                                     xOf (owner.loopEndSeconds()), r.getBottom()));
         }
 
-        g.setColour (juce::Colours::white.withAlpha (0.25f));
+        g.setColour (theme::text().withAlpha (0.25f));
         g.fillRect (juce::Rectangle<float> (r.getX(), r.getCentreY() - 1.0f, xOf (owner.positionSeconds()) - r.getX(), 2.0f));
-        g.setColour (theme::highlight);
+        g.setColour (theme::highlight());
         g.fillRect (juce::Rectangle<float> (xOf (owner.positionSeconds()) - 1.0f, r.getY() - 2.0f, 3.0f, r.getHeight() + 4.0f));
     }
 
@@ -144,7 +144,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         auto r = getLocalBounds().toFloat().reduced (0.0f, 8.0f);
-        g.setColour (theme::panel);
+        g.setColour (theme::panel());
         g.fillRoundedRectangle (r, 4.0f);
 
         const auto take = player.getTake();
@@ -164,14 +164,14 @@ public:
                 continue;
 
             const auto end = i + 1 < segments.size() ? segments[i + 1].takeSeconds : length;
-            g.setColour (theme::accent.withAlpha (0.35f));
+            g.setColour (theme::accent().withAlpha (0.35f));
             g.fillRect (juce::Rectangle<float>::leftTopRightBottom (xOf (segments[i].takeSeconds), r.getY(), xOf (end), r.getBottom()));
         }
 
         const auto x = xOf (player.getTakePosition());
-        g.setColour (juce::Colours::white.withAlpha (0.35f));
+        g.setColour (theme::text().withAlpha (0.35f));
         g.fillRect (juce::Rectangle<float> (r.getX(), r.getCentreY() - 1.5f, x - r.getX(), 3.0f));
-        g.setColour (theme::highlight);
+        g.setColour (theme::highlight());
         g.fillRect (juce::Rectangle<float> (x - 1.5f, r.getY() - 3.0f, 3.0f, r.getHeight() + 6.0f));
     }
 
@@ -195,14 +195,14 @@ namespace
     void styleLabel (juce::Label& label, const juce::String& text, float alpha = 0.85f)
     {
         label.setText (text, juce::dontSendNotification);
-        label.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (alpha));
+        label.setColour (juce::Label::textColourId, theme::text().withAlpha (alpha));
     }
 
     void styleHeader (juce::Label& label, const juce::String& text)
     {
         label.setText (text, juce::dontSendNotification);
         label.setFont (theme::headerFont());
-        label.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.9f));
+        label.setColour (juce::Label::textColourId, theme::text().withAlpha (0.9f));
     }
 
     void styleHorizontal (juce::Slider& slider, double min, double max, double step, double value, const juce::String& suffix)
@@ -411,7 +411,7 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
 
     styleLabel (hintLabel, waveformHint, 0.45f);
     hintLabel.setMinimumHorizontalScale (0.5f);
-    noteLabel.setColour (juce::Label::textColourId, theme::highlight);
+    noteLabel.setColour (juce::Label::textColourId, theme::highlight());
     noteLabel.setMinimumHorizontalScale (0.5f);
     addChildComponent (noteLabel);
 
@@ -432,7 +432,7 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
     styleHeader (metronomeHeader, "Metronome");
 
     bpmDisplay.setFont (juce::FontOptions (34.0f).withStyle ("Bold"));
-    bpmDisplay.setColour (juce::Label::textColourId, theme::highlight);
+    bpmDisplay.setColour (juce::Label::textColourId, theme::highlight());
     bpmDisplay.setJustificationType (juce::Justification::centredRight);
 
     metronomeButton.onClick = [this]
@@ -736,7 +736,7 @@ void PracticePanel::updateStems()
     {
         const auto active = text.startsWith ("Stems:");
         stemsButton.setButtonText (text);
-        stemsButton.setColour (juce::TextButton::buttonColourId, active ? theme::accent : findColour (juce::TextButton::buttonColourId, false));
+        stemsButton.setColour (juce::TextButton::buttonColourId, active ? theme::accent() : findColour (juce::TextButton::buttonColourId, false));
         resized();
     }
 }
@@ -1180,7 +1180,7 @@ void PracticePanel::updateLoopButtons()
     loopButton.setToggleState (loopIsEnabled(), juce::dontSendNotification);
     loopButton.setButtonText (loopExists() ? "Loop " + formatTime (loopStartSeconds()) + " - " + formatTime (loopEndSeconds())
                                            : juce::String ("Loop"));
-    loopButton.setColour (juce::TextButton::buttonOnColourId, theme::accent);
+    loopButton.setColour (juce::TextButton::buttonOnColourId, theme::accent());
     clearLoopButton.setEnabled (loopExists());
     zoomLoopButton.setEnabled (player.hasLoop());
 
@@ -1281,7 +1281,7 @@ void PracticePanel::timerCallback()
        #endif
 
         songLabel.setText (text, juce::dontSendNotification);
-        songLabel.setColour (juce::Label::textColourId, error.isNotEmpty() ? theme::highlight : juce::Colours::white.withAlpha (0.7f));
+        songLabel.setColour (juce::Label::textColourId, error.isNotEmpty() ? theme::highlight() : theme::text().withAlpha (0.7f));
 
         if (openOnYouTubeButton.isVisible() != (error.isNotEmpty()))
         {
@@ -1364,7 +1364,7 @@ void PracticePanel::timerCallback()
     bpmDisplay.setText (juce::String (juce::roundToInt (metronome.isRunning() ? metronome.getCurrentBpm()
                                                                                : metronome.startBpm.load())) + " bpm",
                         juce::dontSendNotification);
-    bpmDisplay.setColour (juce::Label::textColourId, metronome.isFollowing() ? theme::accent.brighter (0.6f) : theme::highlight);
+    bpmDisplay.setColour (juce::Label::textColourId, metronome.isFollowing() ? theme::good() : theme::highlight());   // green: following the song
     beatIndicator->update();
 }
 
@@ -1379,7 +1379,7 @@ void PracticePanel::updateSubdivisionControls()
 //==============================================================================
 void PracticePanel::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::background);
+    g.fillAll (theme::background());
 
     if (youTubeMode)
     {
@@ -1388,7 +1388,7 @@ void PracticePanel::paint (juce::Graphics& g)
 
         if (youtube != nullptr && youtube->isCompact())
         {
-            g.setColour (juce::Colours::white.withAlpha (0.5f));
+            g.setColour (theme::text().withAlpha (0.5f));
             g.setFont (juce::FontOptions (16.0f));
             g.drawText ("The video is in the compact player (press Expand on it to bring it back here).",
                         videoArea, juce::Justification::centred);

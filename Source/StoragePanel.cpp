@@ -244,7 +244,7 @@ public:
     {
         setModel (this);
         setRowHeight (48);
-        setColour (juce::ListBox::backgroundColourId, theme::panel);
+        setColour (juce::ListBox::backgroundColourId, theme::panel());
     }
 
     void rebuild()
@@ -286,7 +286,7 @@ private:
             const auto* text = kind == StorageItem::Kind::take ? "Takes"
                              : kind == StorageItem::Kind::loops ? "Saved loops"
                              : kind == StorageItem::Kind::stems ? "Stems (they can be made again)" : "Caches";
-            g.setColour (juce::Colours::white.withAlpha (0.9f));
+            g.setColour (theme::text().withAlpha (0.9f));
             g.setFont (theme::headerFont());
             g.drawText (text, r.withTrimmedTop (14), juce::Justification::centredLeft, true);
             return;
@@ -296,7 +296,7 @@ private:
         const auto on = owner.selected[(size_t) index];
 
         auto box = r.removeFromLeft (26).withSizeKeepingCentre (20, 20).toFloat();
-        g.setColour (on ? theme::accent : juce::Colours::white.withAlpha (0.35f));
+        g.setColour (on ? theme::accent() : theme::text().withAlpha (0.35f));
 
         if (on)
             g.fillRoundedRectangle (box, 4.0f);
@@ -309,18 +309,18 @@ private:
             tick.startNewSubPath (box.getX() + 4.5f, box.getCentreY());
             tick.lineTo (box.getX() + 8.5f, box.getBottom() - 5.0f);
             tick.lineTo (box.getRight() - 4.0f, box.getY() + 5.0f);
-            g.setColour (juce::Colours::white);
+            g.setColour (theme::onAccent());
             g.strokePath (tick, juce::PathStrokeType (2.2f));
         }
 
         r.removeFromLeft (8);
         g.setFont (juce::FontOptions (15.0f));
-        g.setColour (juce::Colours::white.withAlpha (0.85f));
+        g.setColour (theme::text().withAlpha (0.85f));
         g.drawText (StorageScan::formatBytes (item.bytes), r.removeFromRight (90), juce::Justification::centredRight, true);
-        g.setColour (juce::Colours::white.withAlpha (0.92f));
+        g.setColour (theme::text().withAlpha (0.92f));
         g.drawText (item.title, r.withTrimmedBottom (height / 2 - 2), juce::Justification::bottomLeft, true);
         g.setFont (juce::FontOptions (13.0f));
-        g.setColour (juce::Colours::white.withAlpha (0.55f));
+        g.setColour (theme::text().withAlpha (0.55f));
         g.drawText (item.detail, r.withTrimmedTop (height / 2 + 2), juce::Justification::topLeft, true);
     }
 
@@ -346,7 +346,7 @@ StoragePanel::StoragePanel (Library* lib, juce::File loops, juce::File appData)
     getProperties().set ("fillOverlay", true);
 
     totalsLabel.setFont (juce::FontOptions (16.0f));
-    totalsLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.92f));
+    totalsLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.92f));
     totalsLabel.setJustificationType (juce::Justification::topLeft);
     totalsLabel.setText ("Adding up the space used...", juce::dontSendNotification);
     addAndMakeVisible (totalsLabel);
@@ -392,7 +392,7 @@ StoragePanel::StoragePanel (Library* lib, juce::File loops, juce::File appData)
     };
     addAndMakeVisible (selectBox);
 
-    selectionLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.75f));
+    selectionLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.75f));
     selectionLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (selectionLabel);
 
@@ -401,7 +401,7 @@ StoragePanel::StoragePanel (Library* lib, juce::File loops, juce::File appData)
 
     emptyLabel.setText ("Nothing to clean up: no takes, saved loops, stems or caches.", juce::dontSendNotification);
     emptyLabel.setJustificationType (juce::Justification::centred);
-    emptyLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.55f));
+    emptyLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.55f));
     addChildComponent (emptyLabel);
 
     list = std::make_unique<List> (*this);
@@ -559,7 +559,7 @@ void StoragePanel::removeSelected()
 //==============================================================================
 void StoragePanel::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::background);
+    g.fillAll (theme::background());
 }
 
 void StoragePanel::resized()

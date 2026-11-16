@@ -6,8 +6,8 @@ namespace pv
 
 namespace
 {
-    const juce::Colour inTuneColour { 0xff5cc871 };
-    const juce::Colour offColour    { 0xffff9f43 };
+    juce::Colour inTuneColour()  { return theme::isDark() ? juce::Colour (0xff5cc871) : juce::Colour (0xff2f9e55); }
+    juce::Colour offColour()     { return theme::isDark() ? juce::Colour (0xffff9f43) : juce::Colour (0xffd9730d); }
 
     constexpr float inTuneCents = 3.0f;
     constexpr float strumInTuneCents = 4.0f;       // the strum check is a quick overview
@@ -85,7 +85,7 @@ TunerPanel::TunerPanel (AppEngine& e)
         {
             b->setClickingTogglesState (true);
             b->setRadioGroupId (group);
-            b->setColour (juce::TextButton::buttonOnColourId, theme::accent);
+            b->setColour (juce::TextButton::buttonOnColourId, theme::accent());
             addAndMakeVisible (*b);
         }
 
@@ -115,7 +115,7 @@ TunerPanel::TunerPanel (AppEngine& e)
         };
 
     hintLabel.setJustificationType (juce::Justification::centred);
-    hintLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.55f));
+    hintLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.55f));
     addAndMakeVisible (hintLabel);
 
     tuner.active = true;
@@ -262,7 +262,7 @@ void TunerPanel::timerCallback()
 //==============================================================================
 void TunerPanel::paint (juce::Graphics& g)
 {
-    g.setColour (theme::panel);
+    g.setColour (theme::panel());
     g.fillRoundedRectangle (getLocalBounds().toFloat(), 8.0f);
 
     if (tuner.strumMode)
@@ -282,8 +282,8 @@ void TunerPanel::paintNote (juce::Graphics& g, juce::Rectangle<float> area)
 {
     const bool hasNote = shownFrequency > 0.0f && note.midiNote >= 0;
     const bool inTune = hasNote && std::abs (needleCents) <= inTuneCents;
-    const auto noteColour = ! hasNote ? juce::Colours::white.withAlpha (0.25f)
-                                      : inTune ? inTuneColour : juce::Colours::white;
+    const auto noteColour = ! hasNote ? theme::text().withAlpha (0.25f)
+                                      : inTune ? inTuneColour() : theme::text();
 
     // Note name with its octave; flat / sharp arrows either side.
     auto centre = area.withSizeKeepingCentre (juce::jmin (area.getWidth(), 260.0f), area.getHeight());
@@ -313,7 +313,7 @@ void TunerPanel::paintNote (juce::Graphics& g, juce::Rectangle<float> area)
         else
             p.addTriangle (c.x + s, c.y - s, c.x + s, c.y + s, c.x - s, c.y);
 
-        g.setColour (lit ? offColour : juce::Colours::white.withAlpha (0.06f));
+        g.setColour (lit ? offColour() : theme::text().withAlpha (0.06f));
         g.fillPath (p);
     };
 
@@ -336,28 +336,28 @@ void TunerPanel::paintMeter (juce::Graphics& g, juce::Rectangle<float> area)
         const auto x = [&] (float cents) { return scale.getX() + (cents + 50.0f) / 100.0f * scale.getWidth(); };
 
         // In-tune zone.
-        g.setColour (inTuneColour.withAlpha (0.18f));
+        g.setColour (inTuneColour().withAlpha (0.18f));
         g.fillRect (juce::Rectangle<float> (x (-inTuneCents), scale.getY(), x (inTuneCents) - x (-inTuneCents), scale.getHeight()));
 
         // Ticks every 10 cents, taller at the ends and the centre.
         for (int c = -50; c <= 50; c += 10)
         {
             const auto tall = c == 0 ? 1.0f : c % 50 == 0 ? 0.7f : 0.45f;
-            g.setColour (juce::Colours::white.withAlpha (c == 0 ? 0.8f : 0.35f));
+            g.setColour (theme::text().withAlpha (c == 0 ? 0.8f : 0.35f));
             g.fillRect (juce::Rectangle<float> (x ((float) c) - 1.0f, scale.getBottom() - scale.getHeight() * tall, 2.0f, scale.getHeight() * tall));
         }
 
         if (hasNote)
         {
             const auto cents = juce::jlimit (-50.0f, 50.0f, needleCents);
-            g.setColour (std::abs (cents) <= inTuneCents ? inTuneColour : offColour);
+            g.setColour (std::abs (cents) <= inTuneCents ? inTuneColour() : offColour());
             g.fillRoundedRectangle (juce::Rectangle<float> (x (cents) - 3.0f, scale.getY() - 4.0f, 6.0f, scale.getHeight() + 8.0f), 3.0f);
         }
     }
 
     // Readout: cents and frequency.
     auto text = area.reduced (12.0f, 2.0f);
-    g.setColour (juce::Colours::white.withAlpha (0.45f));
+    g.setColour (theme::text().withAlpha (0.45f));
     g.setFont (juce::FontOptions (13.0f));
     g.drawText (tuner.strobe ? "<< flat" : "-50", text, juce::Justification::topLeft);
     g.drawText (tuner.strobe ? "sharp >>" : "+50", text, juce::Justification::topRight);
@@ -365,7 +365,7 @@ void TunerPanel::paintMeter (juce::Graphics& g, juce::Rectangle<float> area)
     if (hasNote)
     {
         const auto cents = tuner.strobe ? juce::String (needleCents, 1) : juce::String (juce::roundToInt (needleCents));
-        g.setColour (juce::Colours::white.withAlpha (0.85f));
+        g.setColour (theme::text().withAlpha (0.85f));
         g.setFont (juce::FontOptions (18.0f));
         g.drawText ((needleCents > 0.0f ? "+" : "") + cents + " cents   " + juce::String (shownFrequency, 1) + " Hz",
                     text, juce::Justification::centred);
@@ -376,10 +376,10 @@ void TunerPanel::paintStrobe (juce::Graphics& g, juce::Rectangle<float> area)
 {
     const bool hasNote = shownFrequency > 0.0f;
     const bool inTune = hasNote && std::abs (needleCents) <= inTuneCents;
-    const auto stripe = ! hasNote ? juce::Colours::white.withAlpha (0.12f)
-                                  : inTune ? inTuneColour : juce::Colours::white.withAlpha (0.75f);
+    const auto stripe = ! hasNote ? theme::text().withAlpha (0.12f)
+                                  : inTune ? inTuneColour() : theme::text().withAlpha (0.75f);
 
-    g.setColour (theme::background);
+    g.setColour (theme::background());
     g.fillRoundedRectangle (area, 6.0f);
 
     juce::Graphics::ScopedSaveState state (g);
@@ -405,7 +405,7 @@ void TunerPanel::paintStrobe (juce::Graphics& g, juce::Rectangle<float> area)
     band (coarse, strobePeriod * 2.0f, strobePhase * 0.25f);
 
     // Centre mark.
-    g.setColour (theme::panel);
+    g.setColour (theme::panel());
     g.fillRect (area.withSizeKeepingCentre (2.0f, area.getHeight()));
 }
 
@@ -418,7 +418,7 @@ void TunerPanel::paintStrum (juce::Graphics& g, juce::Rectangle<float> area)
         auto cell = juce::Rectangle<float> (area.getX() + cellWidth * (float) i, area.getY(), cellWidth, area.getHeight()).reduced (6.0f, 4.0f);
         const auto reading = strum ? (*strum)[(size_t) i] : StringReading {};
         const bool inTune = reading.heard && std::abs (reading.cents) <= strumInTuneCents;
-        const auto colour = ! reading.heard ? juce::Colours::white.withAlpha (0.25f) : inTune ? inTuneColour : offColour;
+        const auto colour = ! reading.heard ? theme::text().withAlpha (0.25f) : inTune ? inTuneColour() : offColour();
 
         // Number and words on top.
         auto top = cell.removeFromTop (juce::jmin (90.0f, cell.getHeight() * 0.35f));
@@ -428,7 +428,7 @@ void TunerPanel::paintStrum (juce::Graphics& g, juce::Rectangle<float> area)
         g.drawText (! reading.heard ? "-" : cents > 0 ? "+" + juce::String (cents) : juce::String (cents),
                     top.removeFromTop (top.getHeight() * 0.65f), juce::Justification::centredBottom);
         g.setFont (juce::FontOptions (13.0f));
-        g.setColour (juce::Colours::white.withAlpha (0.55f));
+        g.setColour (theme::text().withAlpha (0.55f));
         g.drawText (! strum ? "" : ! reading.heard ? "not heard" : inTune ? "in tune" : reading.cents < 0.0f ? "flat" : "sharp",
                     top, juce::Justification::centred);
 
@@ -436,11 +436,11 @@ void TunerPanel::paintStrum (juce::Graphics& g, juce::Rectangle<float> area)
         auto scale = cell.reduced (cell.getWidth() * 0.3f, 8.0f);
         const auto y = [&] (float c) { return scale.getCentreY() - c / 50.0f * scale.getHeight() * 0.5f; };
 
-        g.setColour (theme::background);
+        g.setColour (theme::background());
         g.fillRoundedRectangle (scale, 4.0f);
-        g.setColour (inTuneColour.withAlpha (0.18f));
+        g.setColour (inTuneColour().withAlpha (0.18f));
         g.fillRect (scale.withY (y (strumInTuneCents)).withHeight (y (-strumInTuneCents) - y (strumInTuneCents)));
-        g.setColour (juce::Colours::white.withAlpha (0.5f));
+        g.setColour (theme::text().withAlpha (0.5f));
         g.fillRect (scale.withY (y (0.0f) - 1.0f).withHeight (2.0f));
 
         if (reading.heard)
@@ -473,17 +473,17 @@ void TunerPanel::paintStrings (juce::Graphics& g, juce::Rectangle<float>)
         const bool lit = i == nearest;
         const bool tuned = lit && std::abs (away) <= inTuneCents;
 
-        g.setColour (lit ? (tuned ? inTuneColour : offColour).withAlpha (0.25f) : theme::background);
+        g.setColour (lit ? (tuned ? inTuneColour() : offColour()).withAlpha (0.25f) : theme::background());
         g.fillRoundedRectangle (cell, 6.0f);
-        g.setColour (lit ? (tuned ? inTuneColour : offColour) : juce::Colours::white.withAlpha (0.12f));
+        g.setColour (lit ? (tuned ? inTuneColour() : offColour()) : theme::text().withAlpha (0.12f));
         g.drawRoundedRectangle (cell, 6.0f, 1.5f);
 
         auto top = cell.removeFromTop (cell.getHeight() * 0.6f);
-        g.setColour (lit ? juce::Colours::white : juce::Colours::white.withAlpha (0.6f));
+        g.setColour (lit ? theme::text() : theme::text().withAlpha (0.6f));
         g.setFont (juce::FontOptions (juce::jmin (22.0f, top.getHeight() * 0.8f)).withStyle ("Bold"));
         g.drawText (noteName (midi), top, juce::Justification::centredBottom);
 
-        g.setColour (lit && std::abs (away) >= 50.0f ? offColour : juce::Colours::white.withAlpha (0.4f));
+        g.setColour (lit && std::abs (away) >= 50.0f ? offColour() : theme::text().withAlpha (0.4f));
         g.setFont (juce::FontOptions (12.0f));
         g.drawText (lit && std::abs (away) >= 50.0f ? semitonesText (away, cell.getWidth() > 150.0f)
                                                     : "string " + juce::String (6 - i),

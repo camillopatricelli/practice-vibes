@@ -7,7 +7,7 @@ namespace pv
 
 LinksPanel::LinksPanel()
 {
-    searchBox.setTextToShowWhenEmpty ("Search links", juce::Colours::white.withAlpha (0.4f));
+    searchBox.setTextToShowWhenEmpty ("Search links", theme::text().withAlpha (0.4f));
     searchBox.setFont (juce::FontOptions (15.0f));
     searchBox.setJustification (juce::Justification::centredLeft);
     styleEditor (searchBox);
@@ -26,7 +26,7 @@ LinksPanel::LinksPanel()
 
     emptyLabel.setJustificationType (juce::Justification::centred);
     emptyLabel.setFont (juce::FontOptions (16.0f));
-    emptyLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.6f));
+    emptyLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.6f));
     addChildComponent (emptyLabel);
 
     viewport.setViewedComponent (&rowHolder, false);
@@ -103,7 +103,7 @@ void LinksPanel::rebuild()
 
 void LinksPanel::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::background);
+    g.fillAll (theme::background());
 }
 
 void LinksPanel::resized()
@@ -318,7 +318,7 @@ void LinksPanel::updateTagButton()
 {
     tagsButton.setButtonText (tagFilter.isEmpty() ? "Tags" : "Tag: " + tagFilter + "   (change / clear)");
     tagsButton.setColour (juce::TextButton::buttonColourId,
-                          tagFilter.isEmpty() ? getLookAndFeel().findColour (juce::TextButton::buttonColourId) : theme::accent);
+                          tagFilter.isEmpty() ? getLookAndFeel().findColour (juce::TextButton::buttonColourId) : theme::accent());
 }
 
 } // namespace pv

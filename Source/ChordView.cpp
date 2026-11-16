@@ -33,12 +33,12 @@ void ChordView::update (double positionSeconds, int semitones)
 void ChordView::paint (juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
-    g.setColour (theme::panel);
+    g.setColour (theme::panel());
     g.fillRoundedRectangle (bounds, 6.0f);
 
     if (track == nullptr || track->chords.empty())
     {
-        g.setColour (juce::Colours::white.withAlpha (0.45f));
+        g.setColour (theme::text().withAlpha (0.45f));
         g.setFont (juce::FontOptions (16.0f));
         g.drawFittedText (status.isNotEmpty() ? status : juce::String ("Chords appear here after you open a song."),
                           getLocalBounds().reduced (12), juce::Justification::centred, 3);
@@ -58,7 +58,7 @@ void ChordView::paint (juce::Graphics& g)
 
     auto caption = [&g] (juce::Rectangle<int>& r, const juce::String& text)
     {
-        g.setColour (juce::Colours::white.withAlpha (0.45f));
+        g.setColour (theme::text().withAlpha (0.45f));
         g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
         g.drawText (text, r.removeFromTop (16), juce::Justification::centredLeft);
     };
@@ -67,7 +67,7 @@ void ChordView::paint (juce::Graphics& g)
     caption (left, "NOW");
     auto dotsRow = left.removeFromBottom (14);
     const auto bigSize = juce::jlimit (24.0f, 84.0f, (float) left.getHeight() * 0.9f);
-    g.setColour (now.root < 0 ? juce::Colours::white.withAlpha (0.4f) : theme::highlight.withAlpha (started ? 1.0f : 0.5f));
+    g.setColour (now.root < 0 ? theme::text().withAlpha (0.4f) : theme::highlight().withAlpha (started ? 1.0f : 0.5f));
     g.setFont (juce::FontOptions (bigSize).withStyle ("Bold"));
     g.drawFittedText (track->chordName (now, transpose), left, juce::Justification::centredLeft, 1, 0.6f);
 
@@ -80,8 +80,8 @@ void ChordView::paint (juce::Graphics& g)
         for (int i = 0; i < numDots; ++i)
         {
             const auto isDownbeat = track->isDownbeat (now.startBeat + i);
-            g.setColour (i < done ? (isDownbeat ? theme::highlight : theme::accent.brighter (0.4f))
-                                  : juce::Colours::white.withAlpha (isDownbeat ? 0.25f : 0.12f));
+            g.setColour (i < done ? (isDownbeat ? theme::highlight() : theme::accent())
+                                  : theme::text().withAlpha (isDownbeat ? 0.25f : 0.12f));
             g.fillEllipse ((float) dotsRow.getX() + (float) i * (size + 5.0f), (float) dotsRow.getCentreY() - size * 0.5f, size, size);
         }
     }
@@ -95,12 +95,12 @@ void ChordView::paint (juce::Graphics& g)
     {
         const auto& next = chords[(size_t) nextIndex];
         auto countRow = right.removeFromBottom (20);
-        g.setColour (juce::Colours::white.withAlpha (0.9f));
+        g.setColour (theme::text().withAlpha (0.9f));
         g.setFont (juce::FontOptions (juce::jlimit (18.0f, 48.0f, (float) right.getHeight() * 0.7f)).withStyle ("Bold"));
         g.drawFittedText (track->chordName (next, transpose), right, juce::Justification::centredLeft, 1, 0.6f);
 
         const auto beatsLeft = next.startBeat - juce::jmax (0, beatIndex);
-        g.setColour (juce::Colours::white.withAlpha (0.55f));
+        g.setColour (theme::text().withAlpha (0.55f));
         g.setFont (juce::FontOptions (14.0f));
         g.drawText (beatsLeft <= 1 ? juce::String ("next beat") : "in " + juce::String (beatsLeft) + " beats",
                     countRow, juce::Justification::centredLeft);
@@ -112,7 +112,7 @@ void ChordView::paint (juce::Graphics& g)
         auto x = (float) strip.getX();
         const auto y = (float) strip.getY(), h = (float) strip.getHeight();
 
-        g.setColour (juce::Colours::white.withAlpha (0.4f));
+        g.setColour (theme::text().withAlpha (0.4f));
         g.drawText ("then", juce::Rectangle<float> (x, y, 40.0f, h), juce::Justification::centredLeft);
         x += 42.0f;
 
@@ -125,9 +125,9 @@ void ChordView::paint (juce::Graphics& g)
             if (x + width > (float) strip.getRight())
                 break;
 
-            g.setColour (juce::Colours::white.withAlpha (0.75f));
+            g.setColour (theme::text().withAlpha (0.75f));
             g.drawText (text, juce::Rectangle<float> (x, y, width, h), juce::Justification::centredLeft);
-            g.setColour (juce::Colours::white.withAlpha (0.35f));
+            g.setColour (theme::text().withAlpha (0.35f));
             g.setFont (juce::FontOptions (11.0f));
             g.drawText (juce::String (c.numBeats), juce::Rectangle<float> (x + width - 24.0f, y, 20.0f, h * 0.6f),
                         juce::Justification::centredLeft);
@@ -137,7 +137,7 @@ void ChordView::paint (juce::Graphics& g)
     }
 
     // Footer -------------------------------------------------------------------
-    g.setColour (juce::Colours::white.withAlpha (0.35f));
+    g.setColour (theme::text().withAlpha (0.35f));
     g.setFont (juce::FontOptions (12.0f));
     g.drawText ("Key " + track->keyName (transpose) + "  |  ~" + juce::String (juce::roundToInt (track->bpm)) + " bpm  |  "
                     + track->timeSignatureAt (juce::jmax (0, beatIndex)) + (track->hasMeterChanges() ? " (changes)" : "")

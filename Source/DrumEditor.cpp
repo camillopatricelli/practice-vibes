@@ -14,7 +14,7 @@ namespace
     void styleLabel (juce::Label& label, const juce::String& text, float alpha = 0.85f)
     {
         label.setText (text, juce::dontSendNotification);
-        label.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (alpha));
+        label.setColour (juce::Label::textColourId, theme::text().withAlpha (alpha));
     }
 
     int ticksForId (int id)     { return id == 2 ? 3 : id == 3 ? 4 : 2; }
@@ -33,7 +33,7 @@ public:
             auto& row = rows[(size_t) d];
             row.mute.setButtonText ("M");
             row.mute.setClickingTogglesState (true);
-            row.mute.setColour (juce::TextButton::buttonOnColourId, juce::Colours::darkred);
+            row.mute.setColour (juce::TextButton::buttonOnColourId, theme::record());
             row.mute.setTooltip (juce::String ("Mute the ") + juce::String (drumName ((Drum) d)).toLowerCase());
             row.mute.onClick = [this, d] { owner.drums.drumMuted[(size_t) d] = rows[(size_t) d].mute.getToggleState(); };
 
@@ -85,33 +85,33 @@ public:
         for (int d = 0; d < numDrums; ++d)
         {
             const auto r = rowArea (d);
-            g.setColour (juce::Colours::white.withAlpha (owner.drums.drumMuted[(size_t) d].load() ? 0.35f : 0.8f));
+            g.setColour (theme::text().withAlpha (owner.drums.drumMuted[(size_t) d].load() ? 0.35f : 0.8f));
             g.drawText (drumName ((Drum) d), r.withWidth (labelWidth() - 4), juce::Justification::centredLeft, true);
 
             for (int step = 0; step < steps; ++step)
             {
                 const auto cell = cellBounds (cells, d, step, steps);
                 const auto beat = step / pattern.ticks;
-                auto base = juce::Colours::white.withAlpha (beat % 2 == 0 ? 0.08f : 0.04f);
+                auto base = theme::text().withAlpha (beat % 2 == 0 ? 0.08f : 0.04f);
 
                 if (step == playingStep)
-                    base = juce::Colours::white.withAlpha (0.22f);
+                    base = theme::text().withAlpha (0.22f);
 
                 g.setColour (base);
                 g.fillRoundedRectangle (cell, 3.0f);
 
                 switch (pattern.get (owner.shownBar, step, (Drum) d))
                 {
-                    case DrumPattern::ghost:  g.setColour (theme::accent.withAlpha (0.45f)); g.fillRoundedRectangle (cell.reduced (cell.getWidth() * 0.22f, cell.getHeight() * 0.22f), 2.0f); break;
-                    case DrumPattern::normal: g.setColour (theme::accent.brighter (0.3f)); g.fillRoundedRectangle (cell, 3.0f); break;
-                    case DrumPattern::accent: g.setColour (theme::highlight); g.fillRoundedRectangle (cell, 3.0f); break;
+                    case DrumPattern::ghost:  g.setColour (theme::accent().withAlpha (0.45f)); g.fillRoundedRectangle (cell.reduced (cell.getWidth() * 0.22f, cell.getHeight() * 0.22f), 2.0f); break;
+                    case DrumPattern::normal: g.setColour (theme::accent()); g.fillRoundedRectangle (cell, 3.0f); break;
+                    case DrumPattern::accent: g.setColour (theme::palette().wavePlayed2); g.fillRoundedRectangle (cell, 3.0f); break;
                     default: break;
                 }
             }
         }
 
         // Beat numbers under the grid.
-        g.setColour (juce::Colours::white.withAlpha (0.5f));
+        g.setColour (theme::text().withAlpha (0.5f));
         g.setFont (juce::FontOptions (11.0f));
 
         for (int beat = 0; beat < pattern.beatsPerBar; ++beat)
@@ -224,7 +224,7 @@ DrumSection::DrumSection (AppEngine& e)
     status.setMinimumHorizontalScale (0.6f);
 
     playButton.setClickingTogglesState (false);
-    playButton.setColour (juce::TextButton::buttonOnColourId, theme::accent);
+    playButton.setColour (juce::TextButton::buttonOnColourId, theme::accent());
     playButton.setTooltip ("Play the pattern with the metronome (starts it if needed): same tempo and bars as the loops.");
     playButton.onClick = [this] { togglePlay(); };
 
@@ -405,7 +405,7 @@ void DrumSection::refreshControls()
         for (int bar = 0; p.bars > 1 && bar < p.bars; ++bar)
         {
             auto* tab = barTabs.add (new juce::TextButton ("Bar " + juce::String (bar + 1)));
-            tab->setColour (juce::TextButton::buttonOnColourId, theme::accent);
+            tab->setColour (juce::TextButton::buttonOnColourId, theme::accent());
             tab->onClick = [this, bar] { setShownBar (bar); };
             addChildComponent (*tab);
         }
@@ -668,7 +668,7 @@ void DrumSection::paint (juce::Graphics& g)
 {
     if (editorShown)
     {
-        g.setColour (theme::panel);
+        g.setColour (theme::panel());
         g.fillRoundedRectangle (getLocalBounds().withTrimmedTop (controlRowHeight).toFloat(), 6.0f);
     }
 }

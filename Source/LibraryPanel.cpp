@@ -49,7 +49,7 @@ public:
     explicit TopicView (LibraryPanel& p) : owner (p)
     {
         titleEditor.setFont (juce::FontOptions (22.0f).withStyle ("Bold"));
-        titleEditor.setTextToShowWhenEmpty ("Topic title", juce::Colours::white.withAlpha (0.35f));
+        titleEditor.setTextToShowWhenEmpty ("Topic title", theme::text().withAlpha (0.35f));
         titleEditor.setJustification (juce::Justification::centredLeft);
         styleEditor (titleEditor);
         titleEditor.onTextChange = [this] { edited(); };
@@ -57,7 +57,7 @@ public:
         titleEditor.onFocusLost = [this] { owner.titleSettled (topicId); };
         addAndMakeVisible (titleEditor);
 
-        tagsEditor.setTextToShowWhenEmpty ("Tags, separated by commas (e.g. technique, jazz, lesson)", juce::Colours::white.withAlpha (0.35f));
+        tagsEditor.setTextToShowWhenEmpty ("Tags, separated by commas (e.g. technique, jazz, lesson)", theme::text().withAlpha (0.35f));
         tagsEditor.setFont (juce::FontOptions (14.0f));
         styleEditor (tagsEditor);
         tagsEditor.onTextChange = [this] { edited(); };
@@ -73,7 +73,7 @@ public:
         };
         addAndMakeVisible (tagsEditor);
 
-        createdLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.55f));
+        createdLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.55f));
         addAndMakeVisible (createdLabel);
 
         deleteButton.onClick = [this] { owner.deleteTopic (topicId); };
@@ -81,7 +81,7 @@ public:
 
         practiseButton.onClick = [this] { if (owner.onPractise) owner.onPractise (topicId); };
         practiseButton.setTooltip ("Make this the topic you're practising, and bring back the song, loop, speed and tempo you used last time");
-        practiseButton.setColour (juce::TextButton::buttonColourId, theme::accent);
+        practiseButton.setColour (juce::TextButton::buttonColourId, theme::accent());
         addAndMakeVisible (practiseButton);
 
         historyButton.onClick = [this] { if (owner.onShowHistory) owner.onShowHistory (topicId); };
@@ -102,13 +102,13 @@ public:
         descriptionEditor.setReturnKeyStartsNewLine (true);
         descriptionEditor.setScrollbarsShown (true);
         descriptionEditor.setFont (juce::FontOptions (15.0f));
-        descriptionEditor.setTextToShowWhenEmpty ("What to practise, how, lesson notes...", juce::Colours::white.withAlpha (0.35f));
+        descriptionEditor.setTextToShowWhenEmpty ("What to practise, how, lesson notes...", theme::text().withAlpha (0.35f));
         styleEditor (descriptionEditor);
         descriptionEditor.onTextChange = [this] { edited(); };
         descriptionEditor.onFocusLost = [this] { owner.flush(); };
         addAndMakeVisible (descriptionEditor);
 
-        conflictLabel.setColour (juce::Label::textColourId, theme::highlight);
+        conflictLabel.setColour (juce::Label::textColourId, theme::highlight());
         conflictLabel.setMinimumHorizontalScale (0.6f);
         addChildComponent (conflictLabel);
         conflictButton.setTooltip ("Shows each copy's title and when it was saved; the ones you don't keep go to the bin");
@@ -128,7 +128,7 @@ public:
         addAndMakeVisible (addLinkButton);
 
         noResourcesLabel.setText ("No resources yet: add documents, audio files or links.", juce::dontSendNotification);
-        noResourcesLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.45f));
+        noResourcesLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.45f));
         addChildComponent (noResourcesLabel);
 
         viewport.setViewedComponent (&rowHolder, false);
@@ -194,7 +194,7 @@ public:
     {
         if (dragOver)
         {
-            g.setColour (theme::accent.withAlpha (0.25f));
+            g.setColour (theme::accent().withAlpha (0.25f));
             g.fillRoundedRectangle (viewport.getBounds().toFloat().expanded (4.0f), 8.0f);
         }
     }
@@ -300,7 +300,7 @@ public:
         addAndMakeVisible (styleCaption (header, "Inbox"));
         info.setText ("Files placed directly in the library folder (for example from another device). "
                       "Move each one into a topic.", juce::dontSendNotification);
-        info.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.6f));
+        info.setColour (juce::Label::textColourId, theme::text().withAlpha (0.6f));
         info.setJustificationType (juce::Justification::topLeft);
         addAndMakeVisible (info);
         viewport.setViewedComponent (&rowHolder, false);
@@ -437,7 +437,7 @@ LibraryPanel::LibraryPanel()
    #endif
     addChildComponent (chooseFolderButton);
 
-    searchBox.setTextToShowWhenEmpty ("Search topics", juce::Colours::white.withAlpha (0.4f));
+    searchBox.setTextToShowWhenEmpty ("Search topics", theme::text().withAlpha (0.4f));
     searchBox.setFont (juce::FontOptions (15.0f));
     searchBox.setJustification (juce::Justification::centredLeft);
     styleEditor (searchBox);
@@ -450,11 +450,11 @@ LibraryPanel::LibraryPanel()
     tagsButton.setTooltip ("Show only topics with a tag (on the topic or one of its resources)");
 
     topicList.setRowHeight (54);
-    topicList.setColour (juce::ListBox::backgroundColourId, theme::panel);
+    topicList.setColour (juce::ListBox::backgroundColourId, theme::panel());
     topicList.setOutlineThickness (0);
 
     emptyLabel.setJustificationType (juce::Justification::centred);
-    emptyLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.5f));
+    emptyLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.5f));
 
     topicView = std::make_unique<TopicView> (*this);
     inboxView = std::make_unique<InboxView> (*this);
@@ -601,7 +601,7 @@ void LibraryPanel::showStorage()
 //==============================================================================
 void LibraryPanel::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::background);
+    g.fillAll (theme::background());
 }
 
 void LibraryPanel::resized()
@@ -671,11 +671,11 @@ void LibraryPanel::paintListBoxItem (int row, juce::Graphics& g, int width, int 
 
     if (selected)
     {
-        g.setColour (theme::accent);
+        g.setColour (theme::selection());
         g.fillRect (0, 0, width, height);
     }
 
-    g.setColour (juce::Colours::black.withAlpha (0.25f));
+    g.setColour (theme::line());
     g.fillRect (0, height - 1, width, 1);
 
     auto r = juce::Rectangle<int> (0, 0, width, height).reduced (12, 6);
@@ -683,10 +683,10 @@ void LibraryPanel::paintListBoxItem (int row, juce::Graphics& g, int width, int 
 
     if (id == inboxId)
     {
-        g.setColour (theme::highlight);
+        g.setColour (theme::highlight());
         g.setFont (juce::FontOptions (15.0f).withStyle ("Bold"));
         g.drawText ("Inbox", r.removeFromTop (22), juce::Justification::centredLeft);
-        g.setColour (juce::Colours::white.withAlpha (0.65f));
+        g.setColour (theme::text().withAlpha (0.65f));
         g.setFont (juce::FontOptions (12.5f));
         const auto n = library->getInbox().size();
         g.drawText (juce::String (n) + (n == 1 ? " file" : " files") + " to sort into topics", r, juce::Justification::centredLeft);
@@ -695,10 +695,10 @@ void LibraryPanel::paintListBoxItem (int row, juce::Graphics& g, int width, int 
 
     if (auto* t = library->findTopic (id))
     {
-        g.setColour (juce::Colours::white);
+        g.setColour (theme::text());
         g.setFont (juce::FontOptions (15.0f).withStyle ("Bold"));
         g.drawText (t->title.isNotEmpty() ? t->title : juce::String ("(untitled)"), r.removeFromTop (22), juce::Justification::centredLeft, true);
-        g.setColour (juce::Colours::white.withAlpha (0.6f));
+        g.setColour (theme::text().withAlpha (0.6f));
         g.setFont (juce::FontOptions (12.5f));
         const auto n = (int) t->resources.size();
         auto info = formatDate (t->created) + (n > 0 ? "   " + juce::String (n) + (n == 1 ? " resource" : " resources") : juce::String());
@@ -706,7 +706,7 @@ void LibraryPanel::paintListBoxItem (int row, juce::Graphics& g, int width, int 
         // When the search or tag filter matched something not shown in this row, say where instead.
         if (const auto why = t->describeMatch (searchBox.getText(), tagFilter); why.isNotEmpty())
         {
-            g.setColour (selected ? juce::Colours::white.withAlpha (0.85f) : theme::highlight.withAlpha (0.9f));
+            g.setColour (selected ? theme::text().withAlpha (0.85f) : theme::highlight().withAlpha (0.9f));
             info = why;
         }
 
@@ -765,7 +765,7 @@ void LibraryPanel::updateTagButton()
 {
     tagsButton.setButtonText (tagFilter.isEmpty() ? "Tags" : "Tag: " + tagFilter + "   (change / clear)");
     tagsButton.setColour (juce::TextButton::buttonColourId,
-                          tagFilter.isEmpty() ? getLookAndFeel().findColour (juce::TextButton::buttonColourId) : theme::accent);
+                          tagFilter.isEmpty() ? getLookAndFeel().findColour (juce::TextButton::buttonColourId) : theme::accent());
 }
 
 void LibraryPanel::rebuildList (const juce::String& idToSelect)

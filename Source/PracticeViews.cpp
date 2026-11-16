@@ -6,16 +6,17 @@ namespace pv
 
 namespace
 {
-    const juce::Colour seriesColour { 0xff5b8fd0 };              // the accent, lifted for marks on the dark surface
-    const juce::Colour gridColour = juce::Colours::white.withAlpha (0.08f);
-    const juce::Colour axisText = juce::Colours::white.withAlpha (0.55f);
-    const juce::Colour primaryText = juce::Colours::white.withAlpha (0.92f);
+    // Functions, not constants: they follow the theme.
+    juce::Colour seriesColour()  { return theme::isDark() ? theme::accent() : theme::highlight(); }   // chart marks
+    juce::Colour gridColour()    { return theme::text().withAlpha (0.08f); }
+    juce::Colour axisText()      { return theme::text().withAlpha (0.55f); }
+    juce::Colour primaryText()   { return theme::text().withAlpha (0.92f); }
 
     juce::Label& styleCaption (juce::Label& l, const juce::String& text)
     {
         l.setText (text, juce::dontSendNotification);
         l.setFont (theme::headerFont());
-        l.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.85f));
+        l.setColour (juce::Label::textColourId, theme::text().withAlpha (0.85f));
         return l;
     }
 
@@ -44,11 +45,11 @@ namespace
             box.setY (anchor.y + 12.0f);
 
         box = box.constrainedWithin (bounds.toFloat());
-        g.setColour (juce::Colour (0xff111216));
+        g.setColour (theme::raised());
         g.fillRoundedRectangle (box, 5.0f);
-        g.setColour (juce::Colours::white.withAlpha (0.25f));
+        g.setColour (theme::text().withAlpha (0.25f));
         g.drawRoundedRectangle (box, 5.0f, 1.0f);
-        g.setColour (primaryText);
+        g.setColour (primaryText());
         g.setFont (font);
         g.drawText (text, box, juce::Justification::centred, false);
     }
@@ -75,7 +76,7 @@ public:
 
         randomButton.setClickingTogglesState (true);
         randomButton.setToggleState (slot.random, juce::dontSendNotification);
-        randomButton.setColour (juce::TextButton::buttonOnColourId, theme::accent);
+        randomButton.setColour (juce::TextButton::buttonOnColourId, theme::accent());
         randomButton.setTooltip ("On: in a saved plan this slot picks a rotation topic again every time the plan is used. "
                                  "Off: the plan keeps this topic.");
         randomButton.onClick = [this] { if (onRandom) onRandom (randomButton.getToggleState()); };
@@ -90,10 +91,10 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.setColour (theme::panel);
+        g.setColour (theme::panel());
         g.fillRoundedRectangle (getLocalBounds().toFloat(), 6.0f);
         auto r = getLocalBounds().reduced (12, 0).withRight (minutesBox.getX() - 8);
-        g.setColour (axisText);
+        g.setColour (axisText());
         g.setFont (juce::FontOptions (15.0f).withStyle ("Bold"));
         g.drawText (juce::String (index) + ".", r.removeFromLeft (28), juce::Justification::centredLeft);
 
@@ -101,13 +102,13 @@ public:
         {
             const juce::Font small (juce::FontOptions (12.0f));
             g.setFont (small);
-            g.setColour (axisText);
+            g.setColour (axisText());
             const auto note = tag.isNotEmpty() ? "random #" + tag : juce::String ("random");
             g.drawText (note, r.removeFromRight (juce::jmin (r.getWidth() / 2, (int) textWidth (small, note) + 8)),
                         juce::Justification::centredRight, true);
         }
 
-        g.setColour (missing ? juce::Colour (0xffe07a6a) : primaryText);
+        g.setColour (missing ? theme::record() : primaryText());
         g.setFont (juce::FontOptions (15.0f).withStyle (missing ? "Italic" : "Bold"));
         g.drawText (title, r, juce::Justification::centredLeft, true);
     }
@@ -188,21 +189,21 @@ SessionPlanner::SessionPlanner (CandidatesFn fn, TopicTitleFn titles, PlanList* 
     rowViewport.setScrollBarsShown (true, false);
     addAndMakeVisible (rowViewport);
 
-    totalLabel.setColour (juce::Label::textColourId, primaryText);
+    totalLabel.setColour (juce::Label::textColourId, primaryText());
     totalLabel.setFont (juce::FontOptions (15.0f));
     addAndMakeVisible (totalLabel);
 
-    statusLabel.setColour (juce::Label::textColourId, axisText);
+    statusLabel.setColour (juce::Label::textColourId, axisText());
     statusLabel.setFont (juce::FontOptions (13.0f));
     addAndMakeVisible (statusLabel);
 
-    emptyLabel.setColour (juce::Label::textColourId, axisText);
+    emptyLabel.setColour (juce::Label::textColourId, axisText());
     emptyLabel.setJustificationType (juce::Justification::centred);
     emptyLabel.setText ("No rotation topics to pick from. Tick \"In practice rotation\" on topics in the Topics tab.",
                         juce::dontSendNotification);
     addChildComponent (emptyLabel);
 
-    startButton.setColour (juce::TextButton::buttonColourId, theme::accent);
+    startButton.setColour (juce::TextButton::buttonColourId, theme::accent());
     startButton.onClick = [this]
     {
         auto playable = playableSlots (slots);
@@ -569,7 +570,7 @@ void SessionPlanner::showPlanMenu()
 
 void SessionPlanner::paint (juce::Graphics& g)
 {
-    g.setColour (theme::background);
+    g.setColour (theme::background());
     g.fillRoundedRectangle (getLocalBounds().toFloat(), 8.0f);
 }
 
@@ -637,7 +638,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         auto area = getLocalBounds();
-        g.setColour (primaryText);
+        g.setColour (primaryText());
         g.setFont (juce::FontOptions (15.0f).withStyle ("Bold"));
         g.drawText (title, area.removeFromTop (24), juce::Justification::centredLeft);
 
@@ -652,14 +653,14 @@ public:
         for (auto v = yMin; v <= yMax + yStep * 0.5; v += yStep)
         {
             const auto y = yFor (v);
-            g.setColour (gridColour);
+            g.setColour (gridColour());
             g.fillRect (plot.getX(), juce::roundToInt (y), plot.getWidth(), 1);
-            g.setColour (axisText);
+            g.setColour (axisText());
             g.drawText (juce::String (juce::roundToInt (v)), 0, juce::roundToInt (y) - 8, plot.getX() - 8, 16, juce::Justification::centredRight);
         }
 
         // X labels: first, last (and the middle when there's room).
-        g.setColour (axisText);
+        g.setColour (axisText());
         const auto labelY = plot.getBottom() + 4;
         g.drawText (points.front().when.formatted ("%d %b"), plot.getX(), labelY, 80, 16, juce::Justification::centredLeft);
 
@@ -679,7 +680,7 @@ public:
                 else        line.lineTo (p);
             }
 
-            g.setColour (seriesColour);
+            g.setColour (seriesColour());
             g.strokePath (line, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
 
@@ -688,16 +689,16 @@ public:
             const auto p = posFor (points[i]);
             const auto hovered = (int) i == hoverIndex;
             const auto r = hovered ? 6.0f : 4.0f;
-            g.setColour (theme::background);
+            g.setColour (theme::background());
             g.fillEllipse (p.x - r - 2.0f, p.y - r - 2.0f, (r + 2.0f) * 2.0f, (r + 2.0f) * 2.0f);
-            g.setColour (seriesColour);
+            g.setColour (seriesColour());
             g.fillEllipse (p.x - r, p.y - r, r * 2.0f, r * 2.0f);
         }
 
         // Direct labels: the latest value, and the best one if it isn't the latest.
         auto best = std::max_element (points.begin(), points.end(), [] (const Point& a, const Point& b) { return a.value < b.value; });
         g.setFont (juce::FontOptions (12.5f).withStyle ("Bold"));
-        g.setColour (primaryText);
+        g.setColour (primaryText());
         labelPoint (g, points.back(), "now " + format (points.back().value));
 
         if (best != points.end() - 1 && best->value > points.back().value)
@@ -813,7 +814,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         auto area = getLocalBounds();
-        g.setColour (primaryText);
+        g.setColour (primaryText());
         g.setFont (juce::FontOptions (15.0f).withStyle ("Bold"));
         g.drawText ("Minutes per week", area.removeFromTop (24), juce::Justification::centredLeft);
 
@@ -834,9 +835,9 @@ public:
         for (auto v = 0.0; v <= top + step * 0.5; v += step)
         {
             const auto y = juce::roundToInt (juce::jmap (v, 0.0, top, (double) plot.getBottom(), (double) plot.getY()));
-            g.setColour (gridColour);
+            g.setColour (gridColour());
             g.fillRect (plot.getX(), y, plot.getWidth(), 1);
-            g.setColour (axisText);
+            g.setColour (axisText());
             g.drawText (juce::String (juce::roundToInt (v)), 0, y - 8, plot.getX() - 8, 16, juce::Justification::centredRight);
         }
 
@@ -852,7 +853,7 @@ public:
             {
                 const auto h = (float) juce::jmap (minutes, 0.0, top, 0.0, (double) plot.getHeight());
                 auto bar = juce::Rectangle<float> (x, (float) plot.getBottom() - h, w, h);
-                g.setColour ((int) i == hoverIndex ? seriesColour.brighter (0.25f) : seriesColour);
+                g.setColour ((int) i == hoverIndex ? seriesColour().brighter (0.25f) : seriesColour());
 
                 // Rounded only at the data end; square on the baseline.
                 juce::Path p;
@@ -863,7 +864,7 @@ public:
 
             if (i == 0 || i == weeks.size() - 1 || (weeks.size() > 6 && i == weeks.size() / 2))
             {
-                g.setColour (axisText);
+                g.setColour (axisText());
                 g.drawText (weekStart (i).formatted ("%d %b"), juce::roundToInt (x + w * 0.5f) - 40, plot.getBottom() + 4, 80, 16,
                             juce::Justification::centred);
             }
@@ -949,7 +950,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         auto area = getLocalBounds();
-        g.setColour (primaryText);
+        g.setColour (primaryText());
         g.setFont (juce::FontOptions (15.0f).withStyle ("Bold"));
         g.drawText (title, area.removeFromTop (24), juce::Justification::centredLeft);
 
@@ -974,11 +975,11 @@ public:
 
             if (hovered)
             {
-                g.setColour (juce::Colours::white.withAlpha (0.07f));
+                g.setColour (theme::text().withAlpha (0.07f));
                 g.fillRoundedRectangle (line.toFloat(), 4.0f);
             }
 
-            g.setColour (r.clickable ? primaryText : axisText);
+            g.setColour (r.clickable ? primaryText() : axisText());
             g.drawText (r.title, line.removeFromLeft (labelW).reduced (4, 0), juce::Justification::centredLeft, true);
 
             const auto valueText = formatPracticeDuration (r.seconds);
@@ -991,10 +992,10 @@ public:
             juce::Path p;   // rounded only at the data end; square on the baseline
             const auto radius = juce::jmin (4.0f, bar.getWidth() * 0.5f, bar.getHeight() * 0.5f);
             p.addRoundedRectangle (bar.getX(), bar.getY(), bar.getWidth(), bar.getHeight(), radius, radius, false, true, false, true);
-            g.setColour (hovered ? seriesColour.brighter (0.25f) : seriesColour);
+            g.setColour (hovered ? seriesColour().brighter (0.25f) : seriesColour());
             g.fillPath (p);
 
-            g.setColour (axisText);
+            g.setColour (axisText());
             g.drawText (valueText, juce::roundToInt (bar.getRight()) + 6, line.getY(), valueW, rowH, juce::Justification::centredLeft, false);
         }
     }
@@ -1083,7 +1084,7 @@ public:
 
             if ((int) i == hoverIndex)
             {
-                g.setColour (juce::Colours::white.withAlpha (0.07f));
+                g.setColour (theme::text().withAlpha (0.07f));
                 g.fillRoundedRectangle (r.withHeight (heightOf (item)).toFloat(), 4.0f);
             }
 
@@ -1092,9 +1093,9 @@ public:
             if (item.isTake)
             {
                 g.setFont (juce::FontOptions (14.0f));
-                g.setColour (axisText);
+                g.setColour (axisText());
                 g.drawText (formatTakeLength (item.take.seconds) + "  -  tap to replay", r, juce::Justification::centredRight, true);
-                g.setColour (theme::accent.brighter (0.5f));
+                g.setColour (seriesColour());
                 g.drawText (juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xb6  Take  ")) + item.when.formatted ("%a %d %b %Y, %H:%M")
                                 + "  -  " + item.take.title,
                             r, juce::Justification::centredLeft, true);
@@ -1113,18 +1114,18 @@ public:
             const juce::Font rowFont (juce::FontOptions (14.0f));
             const auto detailText = detail.joinIntoString ("  -  ");
             g.setFont (rowFont);
-            g.setColour (axisText);
+            g.setColour (axisText());
             g.drawText (detailText, r, juce::Justification::centredRight, true);
 
             auto left = r.withTrimmedRight (juce::roundToInt (textWidth (rowFont, detailText)) + 16);
             const auto when = e.start.formatted ("%a %d %b %Y, %H:%M");
-            g.setColour (primaryText);
+            g.setColour (primaryText());
 
             if (showTopics)
             {
                 const auto whenW = juce::roundToInt (textWidth (rowFont, when)) + 18;
                 g.drawText (when, left.removeFromLeft (whenW), juce::Justification::centredLeft, true);
-                g.setColour (e.isFree() ? axisText : theme::accent.brighter (0.5f));
+                g.setColour (e.isFree() ? axisText() : seriesColour());
                 g.drawText (e.topicTitle, left, juce::Justification::centredLeft, true);
             }
             else
@@ -1134,7 +1135,7 @@ public:
 
             if (e.note.isNotEmpty())
             {
-                g.setColour (theme::highlight.withAlpha (0.85f));
+                g.setColour (theme::highlight().withAlpha (0.85f));
                 g.setFont (juce::FontOptions (13.0f).withStyle ("Italic"));
                 g.drawText (e.note.replaceCharacters ("\r\n", "  "), r.translated (16, 20).withHeight (18), juce::Justification::centredLeft, true);
             }
@@ -1319,14 +1320,14 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId,
     }
 
     statsLabel.setFont (juce::FontOptions (16.0f));
-    statsLabel.setColour (juce::Label::textColourId, primaryText);
+    statsLabel.setColour (juce::Label::textColourId, primaryText());
     addAndMakeVisible (statsLabel);
 
     emptyLabel.setText (all ? "Nothing logged yet. Practise a topic, or just play: your sessions show up here by themselves."
                             : "Not practised yet. Press Practise and play: your sessions, tempo and song speed show up here by themselves.",
                         juce::dontSendNotification);
     emptyLabel.setJustificationType (juce::Justification::centred);
-    emptyLabel.setColour (juce::Label::textColourId, axisText);
+    emptyLabel.setColour (juce::Label::textColourId, axisText());
     addChildComponent (emptyLabel);
     emptyLabel.setVisible (entries.empty() && takes.empty());
 
@@ -1360,7 +1361,7 @@ TopicHistory::~TopicHistory() = default;
 
 void TopicHistory::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::background);
+    g.fillAll (theme::background());
 }
 
 void TopicHistory::resized()
@@ -1442,7 +1443,7 @@ EntryEditor::EntryEditor (NewEntry, const PracticeEntry& defaults, std::vector<s
                           juce::dontSendNotification);
     setUpFields (defaults);
     minutesEditor.clear();
-    minutesEditor.setTextToShowWhenEmpty ("e.g. 20", juce::Colours::white.withAlpha (0.35f));
+    minutesEditor.setTextToShowWhenEmpty ("e.g. 20", theme::text().withAlpha (0.35f));
     deleteButton.setVisible (false);
     saveButton.setButtonText ("Add");
 
@@ -1478,16 +1479,16 @@ juce::String EntryEditor::getTopicTitle() const
 void EntryEditor::setUpFields (const PracticeEntry& entry)
 {
     summaryLabel.setFont (juce::FontOptions (16.0f));
-    summaryLabel.setColour (juce::Label::textColourId, primaryText);
+    summaryLabel.setColour (juce::Label::textColourId, primaryText());
     summaryLabel.setJustificationType (juce::Justification::topLeft);
     addAndMakeVisible (summaryLabel);
 
     auto setUp = [this] (juce::Label& label, const juce::String& text, juce::TextEditor& editor)
     {
         addAndMakeVisible (styleCaption (label, text));
-        editor.setColour (juce::TextEditor::backgroundColourId, theme::panel);
-        editor.setColour (juce::TextEditor::outlineColourId, juce::Colours::white.withAlpha (0.15f));
-        editor.setColour (juce::TextEditor::focusedOutlineColourId, theme::accent);
+        editor.setColour (juce::TextEditor::backgroundColourId, theme::panel());
+        editor.setColour (juce::TextEditor::outlineColourId, theme::text().withAlpha (0.15f));
+        editor.setColour (juce::TextEditor::focusedOutlineColourId, theme::accent());
         editor.setFont (juce::FontOptions (15.0f));
         addAndMakeVisible (editor);
     };
@@ -1506,7 +1507,7 @@ void EntryEditor::setUpFields (const PracticeEntry& entry)
     noteEditor.setReturnKeyStartsNewLine (true);
     noteEditor.setText (entry.note, false);
 
-    errorLabel.setColour (juce::Label::textColourId, theme::highlight);
+    errorLabel.setColour (juce::Label::textColourId, theme::highlight());
     addAndMakeVisible (errorLabel);
 
     saveButton.onClick = [this] { save(); };
@@ -1524,7 +1525,7 @@ void EntryEditor::setUpFields (const PracticeEntry& entry)
                 safe->onDelete();
         });
     };
-    deleteButton.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff8a2b2b));
+    deleteButton.setColour (juce::TextButton::buttonColourId, theme::record());
     addAndMakeVisible (saveButton);
     addAndMakeVisible (cancelButton);
     addAndMakeVisible (deleteButton);
@@ -1556,7 +1557,7 @@ void EntryEditor::save()
 
 void EntryEditor::paint (juce::Graphics& g)
 {
-    g.setColour (theme::background);
+    g.setColour (theme::background());
     g.fillRoundedRectangle (getLocalBounds().toFloat(), 8.0f);
 }
 
