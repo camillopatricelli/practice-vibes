@@ -653,7 +653,7 @@ void TodayPanel::updateNow()
     if (active)
         status << "  -  " << formatPracticeDuration (tracker.getActiveSeconds()) << " on this topic so far";
     else
-        status << "  -  pick a topic below, or just play: it's logged as free practice";
+        status << "  -  pick a topic from the Practice rotation, or just play: it's logged as free practice";
 
     nowStatus.setText (status, juce::dontSendNotification);
     nowStatus.setColour (juce::Label::textColourId, tracker.isPlaying() ? juce::Colour (0xff7bd88f) : juce::Colours::white.withAlpha (0.65f));
