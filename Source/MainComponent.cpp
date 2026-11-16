@@ -276,6 +276,7 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     todayPanel->onShowHistory = [this] (const juce::String& id) { showTopicHistory (id); };
     todayPanel->onEditEntry = [this] (const juce::String& id) { editLogEntry (id, {}); };
     todayPanel->onAddTime = [this] (const juce::String& id) { addLogTime (id, {}); };
+    todayPanel->onShowAllHistory = [this] { showTopicHistory (TopicHistory::allTopicsId); };
     practicePanel->onSongPicked = [this] (const juce::URL& url) { offerAddToInbox (url); };
 
     // Ear training, theory...: those topics are timed on the clock instead of from the guitar input.
@@ -869,6 +870,12 @@ void MainComponent::sessionEnd()
 
 void MainComponent::showTopicHistory (const juce::String& topicId)
 {
+    if (topicId == TopicHistory::allTopicsId)
+    {
+        showAllHistory();
+        return;
+    }
+
     auto* lib = libraryPanel->getLibrary();
     auto* topic = lib != nullptr ? lib->findTopic (topicId) : nullptr;
 
@@ -936,6 +943,50 @@ void MainComponent::showTopicHistory (const juce::String& topicId)
         });
     };
     showOverlay ("History: " + topic->title, std::move (history));
+}
+
+void MainComponent::showAllHistory()
+{
+    if (practiceLog == nullptr)
+        return;
+
+    tracker.flush();   // include what you're playing right now
+
+    std::map<juce::String, juce::String> titles;
+
+    if (auto* lib = libraryPanel->getLibrary())
+        for (auto& t : lib->getTopics())
+            titles[t.id] = t.title.isNotEmpty() ? t.title : juce::String ("(untitled)");
+
+    const juce::String allId (TopicHistory::allTopicsId);
+    auto history = std::make_unique<TopicHistory> (*practiceLog, allId, std::vector<TakeRow> {}, titles);
+
+    history->onShowTopic = [this] (const juce::String& id)
+    {
+        // Not from inside the history's own click: showing another history deletes this one.
+        juce::MessageManager::callAsync ([safe = SafePointer<MainComponent> (this), id]
+        {
+            if (safe != nullptr)
+                safe->showTopicHistory (id);
+        });
+    };
+    history->onEditEntry = [this, allId] (const juce::String& entryId)
+    {
+        juce::MessageManager::callAsync ([safe = SafePointer<MainComponent> (this), entryId, allId]
+        {
+            if (safe != nullptr)
+                safe->editLogEntry (entryId, allId);
+        });
+    };
+    history->onAddTime = [this, allId]
+    {
+        juce::MessageManager::callAsync ([safe = SafePointer<MainComponent> (this), allId]
+        {
+            if (safe != nullptr)
+                safe->addLogTime ({}, allId);
+        });
+    };
+    showOverlay ("History: all topics", std::move (history));
 }
 
 void MainComponent::editLogEntry (const juce::String& entryId, const juce::String& historyTopicId)

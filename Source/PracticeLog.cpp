@@ -475,6 +475,16 @@ juce::Time PracticeLog::startOfWeek (juce::Time t)
 
 std::vector<double> PracticeLog::weeklySeconds (const juce::String& topicId, juce::Time now, int weeks) const
 {
+    return weeklySecondsWhere ([&topicId] (const PracticeEntry& e) { return e.topicId == topicId; }, now, weeks);
+}
+
+std::vector<double> PracticeLog::weeklySecondsAll (juce::Time now, int weeks) const
+{
+    return weeklySecondsWhere ([] (const PracticeEntry&) { return true; }, now, weeks);
+}
+
+std::vector<double> PracticeLog::weeklySecondsWhere (const std::function<bool (const PracticeEntry&)>& include, juce::Time now, int weeks) const
+{
     std::vector<double> result ((size_t) juce::jmax (0, weeks), 0.0);
 
     if (weeks <= 0)
@@ -488,7 +498,7 @@ std::vector<double> PracticeLog::weeklySeconds (const juce::String& topicId, juc
 
     for (auto& e : entries)
     {
-        if (e.topicId != topicId || e.start < starts.front())
+        if (! include (e) || e.start < starts.front())
             continue;
 
         for (int i = weeks - 1; i >= 0; --i)

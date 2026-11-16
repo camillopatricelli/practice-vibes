@@ -1,5 +1,7 @@
 #pragma once
 
+#include <map>
+
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "PracticeLog.h"
 #include "PracticePlanner.h"
@@ -111,12 +113,20 @@ struct TakeRow
 };
 
 /** Overlay: one topic's practice history - tempo and song speed over time, minutes per week, every session
-    and every recorded take (tap a take to replay it). */
+    and every recorded take (tap a take to replay it).
+
+    With topicId == allTopicsId it shows everything instead: minutes per week over all topics, time per topic
+    (tap a bar for that topic's history) and every session labelled with its topic. `topicTitles` (id -> current
+    title) names the topics there; entries of topics not in it keep the title they were logged with. */
 class TopicHistory final : public juce::Component
 {
 public:
-    TopicHistory (const PracticeLog&, const juce::String& topicId, std::vector<TakeRow> takes = {});
+    static constexpr const char* allTopicsId = "*all-topics*";
 
+    TopicHistory (const PracticeLog&, const juce::String& topicId, std::vector<TakeRow> takes = {},
+                  const std::map<juce::String, juce::String>& topicTitles = {});
+
+    std::function<void (const juce::String& topicId)> onShowTopic;    // all-topics view: a topic's bar was tapped
     std::function<void (const juce::File&)> onOpenTake;
     std::function<void (const juce::String& entryId)> onEditEntry;     // a session row was tapped
     std::function<void()> onAddTime;                                   // "+ Add time..."
@@ -128,9 +138,11 @@ public:
 private:
     class LineChart;
     class WeekBars;
+    class TopicBars;
     class SessionList;
 
     juce::Label statsLabel, emptyLabel, sessionsHeader;
+    std::unique_ptr<TopicBars> topicBars;
     juce::TextButton addTimeButton { "+ Add time..." };
     std::unique_ptr<LineChart> tempoChart, speedChart;
     std::unique_ptr<WeekBars> weekBars;

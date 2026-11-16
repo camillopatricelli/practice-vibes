@@ -2,6 +2,7 @@
 
 #include <juce_core/juce_core.h>
 #include <deque>
+#include <functional>
 #include <map>
 #include <optional>
 #include <vector>
@@ -115,6 +116,9 @@ public:
     /** Played seconds per calendar week (Monday to Sunday) for the topic, oldest first; the last one is this week. */
     std::vector<double> weeklySeconds (const juce::String& topicId, juce::Time now, int weeks) const;
 
+    /** The same over every entry (all topics and free practice). */
+    std::vector<double> weeklySecondsAll (juce::Time now, int weeks) const;
+
     /** Monday 00:00 of the week holding `t` (local time). */
     static juce::Time startOfWeek (juce::Time t);
 
@@ -132,6 +136,7 @@ private:
         juce::String note;
     };
 
+    std::vector<double> weeklySecondsWhere (const std::function<bool (const PracticeEntry&)>&, juce::Time now, int weeks) const;
     juce::File fileFor (int year) const;
     juce::File editsFile() const;
     bool writeYear (int year);

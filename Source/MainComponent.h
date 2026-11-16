@@ -71,6 +71,7 @@ private:
     void sessionExtend();
     void sessionEnd();
     void showTopicHistory (const juce::String& topicId);
+    void showAllHistory();
     /** Correct / delete a log entry; `historyTopicId` = reopen that topic's History afterwards (empty: just close). */
     void editLogEntry (const juce::String& entryId, const juce::String& historyTopicId);
     /** "Add time": a log entry typed by hand. Empty topicId = choose the topic in the form (from the Today tab). */

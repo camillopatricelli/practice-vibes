@@ -352,6 +352,10 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
     addTimeButton.onClick = [this] { if (onAddTime) onAddTime ({}); };
     addAndMakeVisible (addTimeButton);
 
+    allHistoryButton.setTooltip ("Your practice across all topics: minutes per week, time per topic and every session");
+    allHistoryButton.onClick = [this] { if (onShowAllHistory) onShowAllHistory(); };
+    addAndMakeVisible (allHistoryButton);
+
     for (auto* l : { &rotationHeader, &recentHeader })
     {
         l->setFont (theme::headerFont());
@@ -478,6 +482,7 @@ void TodayPanel::refresh()
     rotationEmpty.setVisible (rows.empty());
 
     recentView->setEntries (log != nullptr ? log->getEntries() : std::vector<PracticeEntry> {});
+    allHistoryButton.setEnabled (log != nullptr && ! log->getEntries().empty());
     shownActiveId = tracker.getActiveTopicId();
 
     // Focus tags: keep the choice if the tag still exists.
@@ -861,6 +866,8 @@ void TodayPanel::resized()
 
     auto recentTop = right.removeFromTop (30);
     addTimeButton.setBounds (recentTop.removeFromRight (110).reduced (0, 2));
+    recentTop.removeFromRight (6);
+    allHistoryButton.setBounds (recentTop.removeFromRight (84).reduced (0, 2));
     recentHeader.setBounds (recentTop);
     recentViewport.setBounds (right);
     recentView->setSize (juce::jmax (1, recentViewport.getMaximumVisibleWidth()), recentView->getContentHeight());

@@ -3075,6 +3075,11 @@ static void testPracticePlanner()
             total += w;
 
         check (total == 75 * 60.0, "older entries and other topics aren't counted");
+
+        add (now, 5, "");                                          // free practice, this week
+        const auto allWeeks = log.weeklySecondsAll (now, 12);
+        check (allWeeks.size() == 12 && allWeeks[11] == 85 * 60.0 && allWeeks[10] == 15 * 60.0 && allWeeks[7] == 30 * 60.0,
+               "all topics: this week 30 + 50 (other topic) + 5 (free practice), older weeks as before");
         check (log.historyFor ("T").size() == 5 && log.historyFor ("T").front()->playedSeconds == 99 * 60.0, "a topic's history, oldest first");
         folder.deleteRecursively();
     }

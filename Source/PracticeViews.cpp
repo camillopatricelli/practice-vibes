@@ -912,12 +912,144 @@ private:
 };
 
 //==============================================================================
+/** All-topics view: played time per topic over the last weeks, longest first, as horizontal bars.
+    Tapping a topic's bar opens its own history. */
+class TopicHistory::TopicBars final : public juce::Component
+{
+public:
+    struct Row { juce::String topicId, title; double seconds = 0.0; bool clickable = false; };
+
+    TopicBars (const juce::String& titleText, std::vector<Row> allRows) : title (titleText)
+    {
+        std::stable_sort (allRows.begin(), allRows.end(), [] (const Row& a, const Row& b) { return a.seconds > b.seconds; });
+
+        constexpr size_t maxRows = 8;
+
+        if (allRows.size() > maxRows + 1)
+        {
+            Row other;
+            const auto rest = allRows.size() - maxRows;
+
+            for (auto i = maxRows; i < allRows.size(); ++i)
+                other.seconds += allRows[i].seconds;
+
+            other.title = "Other (" + juce::String ((int) rest) + " topics)";
+            allRows.resize (maxRows);
+            allRows.push_back (other);
+        }
+
+        rows = std::move (allRows);
+        setRepaintsOnMouseActivity (true);
+    }
+
+    bool hasData() const noexcept    { return ! rows.empty(); }
+
+    std::function<void (const juce::String&)> onClick;
+
+    void paint (juce::Graphics& g) override
+    {
+        auto area = getLocalBounds();
+        g.setColour (primaryText);
+        g.setFont (juce::FontOptions (15.0f).withStyle ("Bold"));
+        g.drawText (title, area.removeFromTop (24), juce::Justification::centredLeft);
+
+        if (rows.empty())
+            return;
+
+        auto maxSeconds = 0.0;
+
+        for (auto& r : rows)
+            maxSeconds = juce::jmax (maxSeconds, r.seconds);
+
+        const auto rowH = rowHeight();
+        const auto labelW = labelWidth();
+        const juce::Font font (juce::FontOptions (juce::jmin (14.0f, (float) rowH - 4.0f)));
+        g.setFont (font);
+
+        for (size_t i = 0; i < rows.size(); ++i)
+        {
+            const auto& r = rows[i];
+            auto line = juce::Rectangle<int> (0, top + (int) i * rowH, getWidth(), rowH);
+            const auto hovered = (int) i == hoverIndex && r.clickable;
+
+            if (hovered)
+            {
+                g.setColour (juce::Colours::white.withAlpha (0.07f));
+                g.fillRoundedRectangle (line.toFloat(), 4.0f);
+            }
+
+            g.setColour (r.clickable ? primaryText : axisText);
+            g.drawText (r.title, line.removeFromLeft (labelW).reduced (4, 0), juce::Justification::centredLeft, true);
+
+            const auto valueText = formatPracticeDuration (r.seconds);
+            const auto valueW = juce::roundToInt (textWidth (font, valueText)) + 12;
+            const auto barSpace = juce::jmax (1, line.getWidth() - valueW);
+            const auto w = maxSeconds > 0.0 ? (float) (r.seconds / maxSeconds) * (float) barSpace : 0.0f;
+            const auto bar = juce::Rectangle<float> ((float) line.getX(), (float) line.getY() + 3.0f,
+                                                     juce::jmax (2.0f, w), (float) rowH - 6.0f);
+
+            juce::Path p;   // rounded only at the data end; square on the baseline
+            const auto radius = juce::jmin (4.0f, bar.getWidth() * 0.5f, bar.getHeight() * 0.5f);
+            p.addRoundedRectangle (bar.getX(), bar.getY(), bar.getWidth(), bar.getHeight(), radius, radius, false, true, false, true);
+            g.setColour (hovered ? seriesColour.brighter (0.25f) : seriesColour);
+            g.fillPath (p);
+
+            g.setColour (axisText);
+            g.drawText (valueText, juce::roundToInt (bar.getRight()) + 6, line.getY(), valueW, rowH, juce::Justification::centredLeft, false);
+        }
+    }
+
+    void mouseMove (const juce::MouseEvent& e) override
+    {
+        const auto i = indexAt (e.y);
+        setMouseCursor (i >= 0 && rows[(size_t) i].clickable ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+
+        if (i != hoverIndex)
+        {
+            hoverIndex = i;
+            repaint();
+        }
+    }
+
+    void mouseExit (const juce::MouseEvent&) override     { hoverIndex = -1; repaint(); }
+
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        const auto i = indexAt (e.y);
+
+        if (i >= 0 && e.mouseWasClicked() && rows[(size_t) i].clickable && onClick)
+            onClick (rows[(size_t) i].topicId);
+    }
+
+private:
+    static constexpr int top = 32;
+
+    int rowHeight() const
+    {
+        return juce::jlimit (16, 28, (getHeight() - top) / juce::jmax (1, (int) rows.size()));
+    }
+
+    int labelWidth() const     { return juce::jlimit (110, 260, getWidth() / 3); }
+
+    int indexAt (int y) const
+    {
+        const auto i = (y - top) / rowHeight();
+        return y >= top && juce::isPositiveAndBelow (i, (int) rows.size()) ? i : -1;
+    }
+
+    juce::String title;
+    std::vector<Row> rows;
+    int hoverIndex = -1;
+};
+
+//==============================================================================
 /** Every session and take of the topic, newest first; sessions show their note, takes can be tapped. */
 class TopicHistory::SessionList final : public juce::Component
 {
 public:
-    SessionList (std::vector<PracticeEntry> entries, std::vector<TakeRow> takes, std::function<void (const juce::File&)> open)
-        : onOpen (std::move (open))
+    SessionList (std::vector<PracticeEntry> entries, std::vector<TakeRow> takes, std::function<void (const juce::File&)> open,
+                 bool showTopicTitles = false)
+        : onOpen (std::move (open)), showTopics (showTopicTitles)
     {
         for (auto& e : entries)
             items.push_back ({ e.start, false, e, {} });
@@ -978,11 +1110,27 @@ public:
             if (e.noGuitar)        detail.add ("no guitar");
             if (e.manual)          detail.add ("added by hand");
 
-            g.setFont (juce::FontOptions (14.0f));
+            const juce::Font rowFont (juce::FontOptions (14.0f));
+            const auto detailText = detail.joinIntoString ("  -  ");
+            g.setFont (rowFont);
             g.setColour (axisText);
-            g.drawText (detail.joinIntoString ("  -  "), r, juce::Justification::centredRight, true);
+            g.drawText (detailText, r, juce::Justification::centredRight, true);
+
+            auto left = r.withTrimmedRight (juce::roundToInt (textWidth (rowFont, detailText)) + 16);
+            const auto when = e.start.formatted ("%a %d %b %Y, %H:%M");
             g.setColour (primaryText);
-            g.drawText (e.start.formatted ("%a %d %b %Y, %H:%M"), r, juce::Justification::centredLeft, true);
+
+            if (showTopics)
+            {
+                const auto whenW = juce::roundToInt (textWidth (rowFont, when)) + 18;
+                g.drawText (when, left.removeFromLeft (whenW), juce::Justification::centredLeft, true);
+                g.setColour (e.isFree() ? axisText : theme::accent.brighter (0.5f));
+                g.drawText (e.topicTitle, left, juce::Justification::centredLeft, true);
+            }
+            else
+            {
+                g.drawText (when, left, juce::Justification::centredLeft, true);
+            }
 
             if (e.note.isNotEmpty())
             {
@@ -1063,35 +1211,102 @@ private:
 
     std::vector<Item> items;
     std::function<void (const juce::File&)> onOpen;
+    bool showTopics = false;
     int hoverIndex = -1;
 };
 
 //==============================================================================
-TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId, std::vector<TakeRow> takes)
+TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId, std::vector<TakeRow> takes,
+                            const std::map<juce::String, juce::String>& topicTitles)
 {
     getProperties().set ("fillOverlay", true);
+
+    const auto all = topicId == allTopicsId;
+    const auto now = juce::Time::getCurrentTime();
+    constexpr int numWeeks = 12;
 
     std::vector<PracticeEntry> entries;
     std::vector<LineChart::Point> tempo, speed;
 
-    for (auto* e : log.historyFor (topicId))
+    if (all)
     {
-        entries.push_back (*e);
+        for (auto& e : log.getEntries())
+        {
+            entries.push_back (e);
+            auto& copy = entries.back();
 
-        if (e->maxBpm > 0.0)
-            tempo.push_back ({ e->end, e->maxBpm, e->playedSeconds / 60.0 });
-
-        if (e->maxSpeed > 0.0)
-            speed.push_back ({ e->end, e->maxSpeed * 100.0, e->playedSeconds / 60.0 });
+            if (copy.isFree())
+                copy.topicTitle = "Free practice";
+            else if (auto it = topicTitles.find (copy.topicId); it != topicTitles.end() && it->second.isNotEmpty())
+                copy.topicTitle = it->second;
+            else if (copy.topicTitle.isEmpty())
+                copy.topicTitle = "(untitled)";
+        }
     }
+    else
+    {
+        for (auto* e : log.historyFor (topicId))
+        {
+            entries.push_back (*e);
 
-    const auto now = juce::Time::getCurrentTime();
-    const auto summary = log.summarise (topicId);
+            if (e->maxBpm > 0.0)
+                tempo.push_back ({ e->end, e->maxBpm, e->playedSeconds / 60.0 });
+
+            if (e->maxSpeed > 0.0)
+                speed.push_back ({ e->end, e->maxSpeed * 100.0, e->playedSeconds / 60.0 });
+        }
+    }
 
     const auto numTakes = (int) takes.size();
 
-    if (! entries.empty())
+    if (all && ! entries.empty())
     {
+        // Totals, and time per topic over the same weeks as the bar chart.
+        const auto from = PracticeLog::startOfWeek (now) - juce::RelativeTime::weeks (numWeeks - 1);
+        std::map<juce::String, TopicBars::Row> perTopic;
+        juce::StringArray topicsEver;
+        auto total = 0.0;
+
+        for (auto& e : entries)
+        {
+            total += e.playedSeconds;
+
+            if (! e.isFree())
+                topicsEver.addIfNotAlreadyThere (e.topicId);
+
+            if (e.start < from)
+                continue;
+
+            auto& row = perTopic[e.topicId];
+            row.topicId = e.topicId;
+            row.title = e.topicTitle;
+            row.clickable = ! e.isFree() && topicTitles.count (e.topicId) > 0;
+            row.seconds += e.playedSeconds;
+        }
+
+        juce::StringArray stats;
+        stats.add (juce::String ((int) entries.size()) + (entries.size() == 1 ? " session" : " sessions"));
+        stats.add (formatPracticeDuration (total) + " in total");
+        stats.add (juce::String (topicsEver.size()) + (topicsEver.size() == 1 ? " topic" : " topics"));
+        stats.add ("since " + entries.front().start.formatted ("%d %b %Y"));
+        stats.add ("this week " + formatPracticeDuration (log.playedBetween (PracticeLog::startOfWeek (now),
+                                                                             now + juce::RelativeTime::days (1))));
+        statsLabel.setText (stats.joinIntoString ("     "), juce::dontSendNotification);
+
+        std::vector<TopicBars::Row> rows;
+
+        for (auto& [id, row] : perTopic)
+            if (row.seconds > 0.0)
+                rows.push_back (row);
+
+        topicBars = std::make_unique<TopicBars> ("Time per topic (last " + juce::String (numWeeks) + " weeks)", std::move (rows));
+        topicBars->onClick = [this] (const juce::String& id) { if (onShowTopic) onShowTopic (id); };
+        addChildComponent (*topicBars);
+        topicBars->setVisible (topicBars->hasData());
+    }
+    else if (! entries.empty())
+    {
+        const auto summary = log.summarise (topicId);
         juce::StringArray stats;
         stats.add (juce::String (summary.sessions) + (summary.sessions == 1 ? " session" : " sessions"));
         stats.add (formatPracticeDuration (summary.totalSeconds) + " in total");
@@ -1107,7 +1322,8 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId,
     statsLabel.setColour (juce::Label::textColourId, primaryText);
     addAndMakeVisible (statsLabel);
 
-    emptyLabel.setText ("Not practised yet. Press Practise and play: your sessions, tempo and song speed show up here by themselves.",
+    emptyLabel.setText (all ? "Nothing logged yet. Practise a topic, or just play: your sessions show up here by themselves."
+                            : "Not practised yet. Press Practise and play: your sessions, tempo and song speed show up here by themselves.",
                         juce::dontSendNotification);
     emptyLabel.setJustificationType (juce::Justification::centred);
     emptyLabel.setColour (juce::Label::textColourId, axisText);
@@ -1116,7 +1332,8 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId,
 
     tempoChart = std::make_unique<LineChart> ("Metronome tempo you played along to (bpm)", " bpm", std::move (tempo));
     speedChart = std::make_unique<LineChart> ("Song speed you played along to (%)", " %", std::move (speed));
-    weekBars = std::make_unique<WeekBars> (log.weeklySeconds (topicId, now, 12), PracticeLog::startOfWeek (now));
+    weekBars = std::make_unique<WeekBars> (all ? log.weeklySecondsAll (now, numWeeks) : log.weeklySeconds (topicId, now, numWeeks),
+                                           PracticeLog::startOfWeek (now));
     addChildComponent (*tempoChart);
     addChildComponent (*speedChart);
     addChildComponent (*weekBars);
@@ -1128,7 +1345,7 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId,
                                                          + (entries.empty() ? "" : "  (tap a session to correct or delete it)")));
     sessionsHeader.setVisible (! entries.empty() || ! takes.empty());
     sessionList = std::make_unique<SessionList> (std::move (entries), std::move (takes),
-                                                 [this] (const juce::File& f) { if (onOpenTake) onOpenTake (f); });
+                                                 [this] (const juce::File& f) { if (onOpenTake) onOpenTake (f); }, all);
     sessionList->onEdit = [this] (const juce::String& id) { if (onEditEntry) onEditEntry (id); };
 
     addTimeButton.setTooltip ("Add practice time by hand (e.g. theory done away from the app)");
@@ -1172,8 +1389,9 @@ void TopicHistory::resized()
 
     std::vector<juce::Component*> visibleCharts;
 
-    for (juce::Component* c : { (juce::Component*) tempoChart.get(), (juce::Component*) speedChart.get(), (juce::Component*) weekBars.get() })
-        if (c->isVisible())
+    for (juce::Component* c : { (juce::Component*) tempoChart.get(), (juce::Component*) speedChart.get(),
+                                (juce::Component*) weekBars.get(), (juce::Component*) topicBars.get() })
+        if (c != nullptr && c->isVisible())
             visibleCharts.push_back (c);
 
     if (! visibleCharts.empty())
