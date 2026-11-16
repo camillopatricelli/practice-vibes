@@ -80,11 +80,61 @@ jobs:
           name: PracticeVibes-ios
           path: PracticeVibes.ipa
 
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout\v4
+
+      - name: Configure
+        run: cmake --preset macos
+
+      # Universal (arm64 + x86_64). Built unsigned, then ad-hoc signed as a whole once the bundle is complete.
+      - name: Build
+        run: |
+          cmake --build --preset macos-release --target PracticeVibes PracticeVibesTests -- \
+            -quiet CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+
+      - name: Run DSP tests
+        run: build/macos/PracticeVibesTests_artefacts/Release/PracticeVibesTests
+
+      # No paid Apple account: no notarisation. Ad-hoc signature (Apple Silicon refuses unsigned code), no sandbox
+      # and no hardened runtime, which would stop third-party plugins from loading. Testers follow READ ME FIRST.txt.
+      - name: Sign and package DMG
+        run: |
+          APP="build/macos/PracticeVibes_artefacts/Release/Practice Vibes.app"
+          test -d "$APP"
+          lipo -info "$APP/Contents/MacOS/Practice Vibes"
+          lipo -info "$APP/Contents/Frameworks/libonnxruntime.dylib"
+          codesign --force --deep --sign - --timestamp=none "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+          mkdir dmg
+          cp -R "$APP" dmg/
+          ln -s /Applications dmg/Applications
+          cp "Resources/macOS/READ ME FIRST.txt" dmg/
+
+          # hdiutil sometimes fails with "Resource busy" on CI runners: retry a few times.
+          for attempt in 1 2 3 4 5; do
+            hdiutil create -volname "Practice Vibes" -srcfolder dmg -ov -format UDZO PracticeVibes-macos.dmg && break
+            echo "hdiutil failed (attempt $attempt), retrying"
+            sleep 10
+          done
+          test -f PracticeVibes-macos.dmg
+
+      - uses: actions/upload-artifact\v4
+        with:
+          name: PracticeVibes-macos
+          path: PracticeVibes-macos.dmg
+
   # Every push to main refreshes a "latest-build" pre-release, so the .ipa can be
   # downloaded straight from Safari on the iPad.
+  # The macOS build is optional here: if it fails, the Windows and iPad builds are still published.
   publish:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [windows, ios]
+    if: >-
+      always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && needs.windows.result == 'success' && needs.ios.result == 'success'
+    needs: [windows, ios, macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -98,10 +148,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          FILES="PracticeVibes.ipa PracticeVibes-windows.zip"
+          NOTES="Automatic build of commit ${GITHUB_SHA::7}. Not a stable release."
+          if [ -f PracticeVibes-macos.dmg ]; then
+            FILES="$FILES PracticeVibes-macos.dmg"
+          else
+            NOTES="$NOTES (No macOS build this time: the macOS job failed.)"
+          fi
           gh release delete latest-build --cleanup-tag --yes || true
           gh release create latest-build \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Latest build" \
-            --notes "Automatic build of commit ${GITHUB_SHA::7}. Not a stable release." \
-            PracticeVibes.ipa PracticeVibes-windows.zip
+            --notes "$NOTES" \
+            $FILES

@@ -69,15 +69,17 @@ public:
         engine->start();
         mainWindow->showMaximised();    // desktop: shown only once the blocking start-up work is done
 
-       #if ! (JUCE_IOS || JUCE_ANDROID)
-        // Desktop: a song file passed on the command line is opened in the player.
-        const auto argument = commandLine.trim().unquoted();
+        openSongFrom (commandLine);
+    }
 
-        if (argument.isNotEmpty() && juce::File::isAbsolutePath (argument) && juce::File (argument).existsAsFile())
-            engine->player->loadAsync (juce::URL (juce::File (argument)), {});
-       #else
-        juce::ignoreUnused (commandLine);
-       #endif
+    /** Desktop: a song opened while the app is running (Windows: a second launch with the file on its command line;
+        macOS: Finder's "Open With" / a file dropped on the Dock icon, which also arrives here at start-up). */
+    void anotherInstanceStarted (const juce::String& commandLine) override
+    {
+        openSongFrom (commandLine);
+
+        if (mainWindow != nullptr)
+            mainWindow->toFront (true);
     }
 
     void shutdown() override
@@ -103,6 +105,33 @@ public:
     }
 
 private:
+    /** Opens the first existing absolute file path in a command line in the player (desktop only). The whole line is
+        tried first (an unquoted path with spaces), then each token (JUCE on macOS quotes paths that contain spaces). */
+    void openSongFrom (const juce::String& commandLine)
+    {
+       #if ! (JUCE_IOS || JUCE_ANDROID)
+        if (engine == nullptr)
+            return;
+
+        juce::StringArray candidates { commandLine.trim().unquoted() };
+        candidates.addTokens (commandLine, " ", "\"");
+
+        for (auto candidate : candidates)
+        {
+            candidate = candidate.trim().unquoted();
+
+            if (candidate.isNotEmpty() && juce::File::isAbsolutePath (candidate) && juce::File (candidate).existsAsFile())
+            {
+                juce::Logger::writeToLog ("Opening " + candidate);
+                engine->player->loadAsync (juce::URL (juce::File (candidate)), {});
+                return;
+            }
+        }
+       #else
+        juce::ignoreUnused (commandLine);
+       #endif
+    }
+
     std::unique_ptr<AppLog> log;
     std::unique_ptr<AppEngine> engine;
     std::unique_ptr<MainWindow> mainWindow;

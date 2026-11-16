@@ -10,11 +10,16 @@ namespace pv
     On iOS this is the app's Documents folder, which (with file sharing enabled)
     is visible in the Files app under "On My iPad > Practice Vibes". That makes
     the log file easy to retrieve when debugging on a device without a Mac.
+    macOS: ~/Library/Application Support/Practice Vibes (JUCE's userApplicationDataDirectory is ~/Library there).
+    Windows: %APPDATA%\Practice Vibes.
 */
 inline juce::File getAppDataFolder()
 {
    #if JUCE_IOS
     auto folder = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+   #elif JUCE_MAC
+    auto folder = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                      .getChildFile ("Application Support").getChildFile ("Practice Vibes");
    #else
     auto folder = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
                       .getChildFile ("Practice Vibes");

@@ -7,6 +7,14 @@
 namespace pv
 {
 
+/** The hint under the waveform (the zoom modifier is Cmd on macOS, Ctrl elsewhere). */
+static const char* const waveformHint =
+   #if JUCE_MAC
+    "Click the waveform to jump, drag to loop, drag a loop edge to adjust it. Zoom: pinch the trackpad, or Cmd+wheel. Double-click a slider to reset it.";
+   #else
+    "Tap the waveform to jump, drag to loop, drag a loop edge to adjust it. Zoom: pinch, or Ctrl+wheel. Double-click a slider to reset it.";
+   #endif
+
 //==============================================================================
 class PracticePanel::BeatIndicator final : public juce::Component
 {
@@ -401,7 +409,7 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
     guitarVolumeSlider.setTooltip ("Volume of the recorded take");
     guitarVolumeSlider.onValueChange = [this] { player.takeGain = juce::Decibels::decibelsToGain ((float) guitarVolumeSlider.getValue(), -40.0f); };
 
-    styleLabel (hintLabel, "Tap the waveform to jump, drag to loop, drag a loop edge to adjust it. Zoom: pinch, or Ctrl+wheel. Double-click a slider to reset it.", 0.45f);
+    styleLabel (hintLabel, waveformHint, 0.45f);
     hintLabel.setMinimumHorizontalScale (0.5f);
     noteLabel.setColour (juce::Label::textColourId, theme::highlight);
     noteLabel.setMinimumHorizontalScale (0.5f);
@@ -689,7 +697,7 @@ void PracticePanel::updateModeVisibility()
     stemsButton.setVisible (! youTubeMode);
 
     hintLabel.setText (youTubeMode ? "YouTube: tap the timeline to jump, drag on it to set a loop. Speed snaps to the speeds the video offers."
-                                   : "Tap the waveform to jump, drag to loop, drag a loop edge to adjust it. Zoom: pinch, or Ctrl+wheel. Double-click a slider to reset it.",
+                                   : waveformHint,
                        juce::dontSendNotification);
 }
 
@@ -1047,7 +1055,7 @@ void PracticePanel::updateTakeMode()
         c->setEnabled (! on);
 
     hintLabel.setText (on ? "Replaying a take: the song does what it did while you recorded (position, speed, pitch, loop). Tap the bar to jump."
-                          : "Tap the waveform to jump, drag to loop, drag a loop edge to adjust it. Zoom: pinch, or Ctrl+wheel. Double-click a slider to reset it.",
+                          : waveformHint,
                        juce::dontSendNotification);
     updateLoopButtons();
     resized();

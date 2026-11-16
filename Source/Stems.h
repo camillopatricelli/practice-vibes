@@ -82,7 +82,7 @@ private:
 };
 
 //==============================================================================
-/** The ONNX Runtime network (Windows: onnxruntime.dll next to the app). */
+/** The ONNX Runtime network (Windows: onnxruntime.dll next to the app; macOS: libonnxruntime.dylib in Contents/Frameworks). */
 namespace StemSeparator
 {
     bool isSupported();                              // this platform can separate (Windows)

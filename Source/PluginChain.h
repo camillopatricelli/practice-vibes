@@ -11,7 +11,7 @@ namespace pv
         device input (one selected channel)
           -> input stage (gain + meter, mono)
           -> [looper, before FX: records the dry guitar, adds "before FX" loops]
-          -> plugin 1 -> plugin 2 -> ...        (AUv3 on iPad, VST3 on Windows)
+          -> plugin 1 -> plugin 2 -> ...        (AUv3 on iPad, VST3 on Windows, AU + VST3 on macOS)
           -> guitar output stage (gain + mute + meter, stereo)  --+
           -> [looper, after FX: records the processed guitar,    |
               plays "after FX" loops]  ----------------------------+-> master (meter) -> device output

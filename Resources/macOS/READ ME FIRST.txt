@@ -1,0 +1,35 @@
+Practice Vibes for macOS (test build)
+=====================================
+
+This build is not notarised by Apple (no paid developer account), so macOS will
+warn the first time you open it. That is expected.
+
+Install
+-------
+1. Drag "Practice Vibes" onto the Applications folder in this window.
+2. Open Applications and try to open Practice Vibes once. macOS says it can't
+   check the app for malicious software: click Done / Cancel.
+3. Allow it:
+   - macOS 15 (Sequoia) or later: System Settings > Privacy & Security, scroll
+     down to "Practice Vibes was blocked..." and click "Open Anyway", then
+     confirm with your password.
+   - macOS 12 to 14: right-click (or Control-click) the app > Open > Open.
+   - Or, in Terminal:  xattr -dr com.apple.quarantine "/Applications/Practice Vibes.app"
+4. When asked, allow microphone access: it is needed for your guitar input.
+   (After installing a new build macOS may ask again.)
+
+Plugins
+-------
+Audio Units are listed automatically. For VST3 plugins, open the Rig tab and
+click "Scan VST3" once.
+
+Bluetooth MIDI footswitch
+-------------------------
+Use the Bluetooth button in the top bar, or pair it in
+Audio MIDI Setup > Window > Show MIDI Studio > Bluetooth.
+
+Problems?
+---------
+The log file is here (Finder > Go > Go to Folder... and paste the path):
+  ~/Library/Application Support/Practice Vibes/PracticeVibes.log
+Please send it along with a short description of what happened.

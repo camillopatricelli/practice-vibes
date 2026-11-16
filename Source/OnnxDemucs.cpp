@@ -1,9 +1,16 @@
-// The Demucs network run by ONNX Runtime (Windows). onnxruntime.dll sits next to the app and is loaded on first use,
+// The Demucs network run by ONNX Runtime (Windows and macOS). The runtime library ships with the app (Windows:
+// onnxruntime.dll next to the exe; macOS: libonnxruntime.dylib in Contents/Frameworks) and is loaded on first use,
 // so the app starts (and everything else works) even without it.
 
 #include "Stems.h"
 
-#if JUCE_WINDOWS && PV_HAS_ONNX
+#if (JUCE_WINDOWS || JUCE_MAC) && PV_HAS_ONNX
+ #define PV_ONNX_RUNTIME 1
+#else
+ #define PV_ONNX_RUNTIME 0
+#endif
+
+#if PV_ONNX_RUNTIME && JUCE_WINDOWS
  #ifndef NOMINMAX
   #define NOMINMAX
  #endif
@@ -11,6 +18,11 @@
   #define WIN32_LEAN_AND_MEAN
  #endif
  #include <windows.h>
+#elif PV_ONNX_RUNTIME
+ #include <dlfcn.h>
+#endif
+
+#if PV_ONNX_RUNTIME
  #define ORT_API_MANUAL_INIT
  #include <onnxruntime_cxx_api.h>
 #endif
@@ -18,16 +30,44 @@
 namespace pv::StemSeparator
 {
 
-#if JUCE_WINDOWS && PV_HAS_ONNX
+#if PV_ONNX_RUNTIME
 
 static juce::File runtimeFile()
 {
-    return juce::File::getSpecialLocation (juce::File::currentExecutableFile).getSiblingFile ("onnxruntime.dll");
+    const auto exe = juce::File::getSpecialLocation (juce::File::currentExecutableFile);
+
+   #if JUCE_WINDOWS
+    return exe.getSiblingFile ("onnxruntime.dll");
+   #else
+    // App bundle: Contents/MacOS/<exe> -> Contents/Frameworks. Console tools: next to the executable.
+    const auto inBundle = exe.getParentDirectory().getSiblingFile ("Frameworks").getChildFile ("libonnxruntime.dylib");
+    return inBundle.existsAsFile() ? inBundle : exe.getSiblingFile ("libonnxruntime.dylib");
+   #endif
 }
 
 bool isSupported()      { return runtimeFile().existsAsFile(); }
 
-/** Loads onnxruntime.dll from the app's folder (not the older copy Windows keeps in System32). */
+/** Finds OrtGetApiBase in the runtime shipped with the app (on Windows not the older copy kept in System32). */
+static void* loadGetApiBase (const juce::File& library)
+{
+   #if JUCE_WINDOWS
+    auto* module = LoadLibraryExW (library.getFullPathName().toWideCharPointer(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+    return module != nullptr ? reinterpret_cast<void*> (GetProcAddress (module, "OrtGetApiBase")) : nullptr;
+   #else
+    auto* handle = dlopen (library.getFullPathName().toRawUTF8(), RTLD_NOW | RTLD_LOCAL);
+
+    if (handle == nullptr)
+    {
+        if (const auto* message = dlerror())
+            juce::Logger::writeToLog ("ONNX Runtime: " + juce::String (message));
+
+        return nullptr;
+    }
+
+    return dlsym (handle, "OrtGetApiBase");
+   #endif
+}
+
 static bool initRuntime (juce::String& error)
 {
     static juce::CriticalSection lock;
@@ -37,22 +77,22 @@ static bool initRuntime (juce::String& error)
     if (ready)
         return true;
 
-    const auto dll = runtimeFile();
-    auto* module = LoadLibraryExW (dll.getFullPathName().toWideCharPointer(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+    const auto library = runtimeFile();
+    auto* symbol = loadGetApiBase (library);
 
-    if (module == nullptr)
+    if (symbol == nullptr)
     {
-        error = "can't load " + dll.getFileName();
+        error = "can't load " + library.getFileName();
         return false;
     }
 
     using GetApiBase = const OrtApiBase* (ORT_API_CALL*) ();
-    auto getApiBase = reinterpret_cast<GetApiBase> (reinterpret_cast<void*> (GetProcAddress (module, "OrtGetApiBase")));
-    const auto* api = getApiBase != nullptr ? getApiBase()->GetApi (ORT_API_VERSION) : nullptr;
+    auto getApiBase = reinterpret_cast<GetApiBase> (symbol);
+    const auto* api = getApiBase()->GetApi (ORT_API_VERSION);
 
     if (api == nullptr)
     {
-        error = "this onnxruntime.dll is too old";
+        error = "this " + library.getFileName() + " is too old";
         return false;
     }
 
@@ -70,7 +110,11 @@ public:
         options.SetIntraOpNumThreads (threads);
         options.SetInterOpNumThreads (1);
         options.SetGraphOptimizationLevel (GraphOptimizationLevel::ORT_ENABLE_ALL);
+               #if JUCE_WINDOWS
         session = std::make_unique<Ort::Session> (env, file.getFullPathName().toWideCharPointer(), options);
+       #else
+        session = std::make_unique<Ort::Session> (env, file.getFullPathName().toRawUTF8(), options);
+       #endif
 
         Ort::AllocatorWithDefaultOptions allocator;
 

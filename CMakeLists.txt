@@ -37,14 +37,36 @@ if(WIN32)
         URL https://github.com/microsoft/onnxruntime/releases/download/v${PV_ONNXRUNTIME_VERSION}/onnxruntime-win-x64-${PV_ONNXRUNTIME_VERSION}.zip)
     FetchContent_MakeAvailable(onnxruntime)
     set(PV_ONNXRUNTIME_DIR ${onnxruntime_SOURCE_DIR})
+    set(PV_ONNXRUNTIME_LIB ${PV_ONNXRUNTIME_DIR}/lib/onnxruntime.dll)
 else()
     set(PV_WEBVIEW2 FALSE)
+endif()
+
+# macOS desktop (not iOS): the same ONNX Runtime as a universal (arm64 + x86_64) dylib, bundled in
+# Contents/Frameworks and loaded with dlopen on first use.
+if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(PV_MACOS TRUE)
+    set(PV_ONNXRUNTIME_VERSION 1.20.1)
+    FetchContent_Declare(onnxruntime
+        URL https://github.com/microsoft/onnxruntime/releases/download/v${PV_ONNXRUNTIME_VERSION}/onnxruntime-osx-universal2-${PV_ONNXRUNTIME_VERSION}.tgz)
+    FetchContent_MakeAvailable(onnxruntime)
+    set(PV_ONNXRUNTIME_DIR ${onnxruntime_SOURCE_DIR})
+    set(PV_ONNXRUNTIME_LIB ${PV_ONNXRUNTIME_DIR}/lib/libonnxruntime.${PV_ONNXRUNTIME_VERSION}.dylib)
+    if(NOT EXISTS ${PV_ONNXRUNTIME_LIB})
+        file(GLOB found ${PV_ONNXRUNTIME_DIR}/lib/*)
+        message(FATAL_ERROR "ONNX Runtime dylib not found at ${PV_ONNXRUNTIME_LIB}; lib/ holds: ${found}")
+    endif()
+    # Finder's "Open With" lists the app for these song files (they arrive in anotherInstanceStarted).
+    set(PV_DOCUMENT_EXTENSIONS wav aif aiff flac mp3 m4a aac ogg)
+else()
+    set(PV_MACOS FALSE)
+    set(PV_DOCUMENT_EXTENSIONS "")
 endif()
 
 # Treat third-party headers as system headers so our strict warnings don't apply to them.
 set_target_properties(signalsmith-stretch signalsmith-linear PROPERTIES SYSTEM TRUE)
 
-# AUv3 hosting exists only on Apple platforms, VST3 hosting only on desktop.
+# AudioUnit hosting exists only on Apple platforms (AUv3 on iPad, AUv2 + AUv3 on macOS), VST3 hosting only on desktop.
 if(APPLE)
     set(PV_HOST_AU TRUE)
 else()
@@ -78,7 +100,8 @@ juce_add_gui_app(PracticeVibes
     PLUGINHOST_AU                  ${PV_HOST_AU}
     NEEDS_WEB_BROWSER              TRUE
     NEEDS_WEBVIEW2                 ${PV_WEBVIEW2}
-    NEEDS_CURL                     FALSE)
+    NEEDS_CURL                     FALSE
+    DOCUMENT_EXTENSIONS            ${PV_DOCUMENT_EXTENSIONS})
 
 target_sources(PracticeVibes PRIVATE
     Source/Main.cpp
@@ -150,15 +173,37 @@ if(WIN32)
         JUCE_DIRECTSOUND=0)
 endif()
 
-# Adds ONNX Runtime's headers to a target and puts onnxruntime.dll next to its executable.
+# macOS: VST3 plugins too (AudioUnits are hosted on all Apple platforms via PLUGINHOST_AU).
+if(PV_MACOS)
+    target_compile_definitions(PracticeVibes PRIVATE JUCE_PLUGINHOST_VST3=1)
+endif()
+
+# Adds ONNX Runtime's headers to a target and ships the runtime library with it: next to the executable
+# (Windows, console tools) or in the app bundle's Contents/Frameworks (macOS app; licences in Contents/Resources).
 function(pv_use_onnxruntime target)
     if(PV_ONNXRUNTIME_DIR)
         target_include_directories(${target} SYSTEM PRIVATE ${PV_ONNXRUNTIME_DIR}/include)
         target_compile_definitions(${target} PRIVATE PV_HAS_ONNX=1)
+
+        get_filename_component(library_name ${PV_ONNXRUNTIME_LIB} NAME)
+        set(library_dir $<TARGET_FILE_DIR:${target}>)
+        set(notices_dir $<TARGET_FILE_DIR:${target}>)
+
+        if(PV_MACOS)
+            set(library_name libonnxruntime.dylib)
+            get_target_property(is_bundle ${target} MACOSX_BUNDLE)
+
+            if(is_bundle)
+                set(library_dir $<TARGET_BUNDLE_CONTENT_DIR:${target}>/Frameworks)
+                set(notices_dir $<TARGET_BUNDLE_CONTENT_DIR:${target}>/Resources)
+            endif()
+        endif()
+
         add_custom_command(TARGET ${target} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PV_ONNXRUNTIME_DIR}/lib/onnxruntime.dll $<TARGET_FILE_DIR:${target}>
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PV_ONNXRUNTIME_DIR}/LICENSE $<TARGET_FILE_DIR:${target}>/onnxruntime-LICENSE.txt
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PV_ONNXRUNTIME_DIR}/ThirdPartyNotices.txt $<TARGET_FILE_DIR:${target}>/onnxruntime-ThirdPartyNotices.txt)
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${library_dir} ${notices_dir}
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PV_ONNXRUNTIME_LIB} ${library_dir}/${library_name}
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PV_ONNXRUNTIME_DIR}/LICENSE ${notices_dir}/onnxruntime-LICENSE.txt
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PV_ONNXRUNTIME_DIR}/ThirdPartyNotices.txt ${notices_dir}/onnxruntime-ThirdPartyNotices.txt)
     endif()
 endfunction()
 

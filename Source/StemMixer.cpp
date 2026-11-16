@@ -503,11 +503,11 @@ void StemMixer::update()
         case Mode::none:
             title.setText ("Stems", juce::dontSendNotification);
            #if JUCE_IOS
-            message.setText ("Stem separation runs in the Windows app. Stems made there reach the iPad with the song "
+            message.setText ("Stem separation runs in the Windows and Mac apps. Stems made there reach the iPad with the song "
                              "through the library folder, and then show up here.", juce::dontSendNotification);
            #else
             message.setText (host.getStemFolder() == juce::File() ? "Load a song file first (YouTube videos can't be separated)."
-                                                                  : "Stem separation isn't available in this copy of the app (onnxruntime.dll is missing).",
+                                                                  : "Stem separation isn't available in this copy of the app (the ONNX Runtime library is missing).",
                              juce::dontSendNotification);
            #endif
             break;

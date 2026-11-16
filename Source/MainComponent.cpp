@@ -230,8 +230,15 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
         if (juce::BluetoothMidiDevicePairingDialogue::isAvailable())
             juce::BluetoothMidiDevicePairingDialogue::open();
         else
-            juce::Logger::writeToLog ("Bluetooth MIDI pairing is done by the operating system here: "
-                                      "pair the footswitch in Windows Settings > Bluetooth & devices.");
+            juce::Logger::writeToLog ("Bluetooth MIDI pairing is done by the operating system here: pair the footswitch in "
+                                     #if JUCE_WINDOWS
+                                      "Windows Settings > Bluetooth & devices."
+                                     #elif JUCE_MAC
+                                      "Audio MIDI Setup > Window > Show MIDI Studio > Bluetooth."
+                                     #else
+                                      "the system's Bluetooth settings."
+                                     #endif
+                                      );
     };
 
     saveButton.onClick = [this] { engine.saveState(); };

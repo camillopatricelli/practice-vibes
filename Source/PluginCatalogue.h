@@ -9,7 +9,7 @@ namespace pv
 
     - AudioUnits (AUv3 on iPad) are listed instantly from the system registry,
       without loading each plugin. A plugin is only instantiated when chosen.
-    - Desktop formats (VST3 on Windows) need a one-off scan, which runs on a
+    - Desktop formats (VST3 on Windows and macOS) need a one-off scan, which runs on a
       background thread and is cached to disk.
 */
 class PluginCatalogue final : public juce::ChangeBroadcaster,
