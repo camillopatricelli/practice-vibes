@@ -8,6 +8,7 @@
 #include "TodayPanel.h"
 #include "TunerPanel.h"
 #include "YouTubePlayer.h"
+#include "Icons.h"
 #include "Theme.h"
 #include "WebView.h"
 #include "AppPaths.h"
@@ -258,6 +259,17 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
 
     saveButton.onClick = [this] { engine.saveState(); };
 
+    // Top bar icons (as in the mock-up): Tuner keeps its label; settings, Bluetooth and Save are icon-only.
+    icons::setIcon (tunerButton, icons::Icon::tuner, false);
+    audioSettingsButton.setTooltip ("Audio settings (devices, theme, Log tab)");
+    icons::setIcon (audioSettingsButton, icons::Icon::gear, true);
+    if (bluetoothButton.getTooltip().isEmpty())
+        bluetoothButton.setTooltip ("Bluetooth MIDI (pair a footswitch)");
+    icons::setIcon (bluetoothButton, icons::Icon::bluetooth, true);
+    if (saveButton.getTooltip().isEmpty())
+        saveButton.setTooltip ("Save (settings, rig and session)");
+    icons::setIcon (saveButton, icons::Icon::save, true);
+
     todayPanel = std::make_unique<TodayPanel> (tracker, session);
     practicePanel = std::make_unique<PracticePanel> (*engine.player, *engine.metronome);
     libraryPanel = std::make_unique<LibraryPanel>();
@@ -396,6 +408,12 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
 
     libraryOpened();   // the Topics tab opened the saved library folder before the callbacks were set
     tabs.setCurrentTabIndex (0);
+
+   #if JUCE_DEBUG
+    // Debug builds: PV_START_TAB=<index> opens that tab at start (screenshots without clicking).
+    if (const auto startTab = juce::SystemStats::getEnvironmentVariable ("PV_START_TAB", {}); startTab.isNotEmpty())
+        tabs.setCurrentTabIndex (juce::jlimit (0, tabs.getNumTabs() - 1, startTab.getIntValue()));
+   #endif
     startTimerHz (10);
 
     // Theme switch: the look and feel refreshes every window; the tab panels not on screen aren't in a window.
@@ -467,11 +485,13 @@ void MainComponent::resized()
     overlay->setBounds (area);
 
     auto top = area.removeFromTop (52).reduced (12, 4);
-    saveButton.setBounds (top.removeFromRight (100).reduced (4));
-    bluetoothButton.setBounds (top.removeFromRight (150).reduced (4));
-    audioSettingsButton.setBounds (top.removeFromRight (150).reduced (4));
-    tunerButton.setBounds (top.removeFromRight (90).reduced (4));
-    recordButton.setBounds (top.removeFromRight (juce::jlimit (90, 140, top.getWidth() / 6)).reduced (4));
+    const auto iconButton = [&top] (juce::Component& b) { b.setBounds (top.removeFromRight (50).withSizeKeepingCentre (42, 42)); };
+    iconButton (saveButton);
+    iconButton (bluetoothButton);
+    iconButton (audioSettingsButton);
+    top.removeFromRight (4);
+    tunerButton.setBounds (top.removeFromRight (112).reduced (4));
+    recordButton.setBounds (top.removeFromRight (juce::jlimit (96, 140, top.getWidth() / 6)).reduced (4));
     practisingButton.setBounds (top.removeFromRight (juce::jlimit (150, 320, top.getWidth() - 180)).reduced (4));
     iconBounds = top.removeFromLeft (iconSize + 6).withSizeKeepingCentre (iconSize, iconSize);
     titleLabel.setBounds (top);
@@ -1503,9 +1523,11 @@ void MainComponent::updateRecordButton()
         }
         else
         {
-            text = juce::String (juce::CharPointer_UTF8 ("\xe2\x97\x8f Rec"));
+            text = "Rec";       // with the red dot icon
         }
     }
+
+    icons::setIcon (recordButton, text == "Rec" ? icons::Icon::record : icons::Icon::none, false);
 
     if (recordButton.getButtonText() != text)
         recordButton.setButtonText (text);

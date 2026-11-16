@@ -75,7 +75,7 @@ RigPanel::RigPanel (AppEngine& e)
     auto setupHeader = [this] (juce::Label& label, const juce::String& text)
     {
         label.setText (text, juce::dontSendNotification);
-        label.setFont (theme::headerFont());
+        theme::styleHeader (label);
         label.setColour (juce::Label::textColourId, theme::text().withAlpha (0.9f));
         addAndMakeVisible (label);
     };
@@ -214,7 +214,7 @@ RigPanel::RigPanel (AppEngine& e)
     addAndMakeVisible (midiDevicesLabel);
 
     lastMidiLabel.setText ("No MIDI received yet", juce::dontSendNotification);
-    lastMidiLabel.setFont (juce::FontOptions (19.0f).withStyle ("Bold"));
+    lastMidiLabel.setFont (theme::displayFont (19.0f, "SemiBold"));
     lastMidiLabel.setColour (juce::Label::textColourId, theme::highlight());
     lastMidiLabel.setMinimumHorizontalScale (0.6f);
     addAndMakeVisible (lastMidiLabel);

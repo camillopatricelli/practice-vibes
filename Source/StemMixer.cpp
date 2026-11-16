@@ -327,7 +327,7 @@ StemControls StemControls::fromString (const juce::String& text)
 //==============================================================================
 StemMixer::StemMixer (Host& h) : host (h)
 {
-    title.setFont (theme::headerFont());
+    theme::styleHeader (title);
     title.setColour (juce::Label::textColourId, theme::text());
     addAndMakeVisible (title);
 

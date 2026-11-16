@@ -15,7 +15,7 @@ namespace
     juce::Label& styleCaption (juce::Label& l, const juce::String& text)
     {
         l.setText (text, juce::dontSendNotification);
-        l.setFont (theme::headerFont());
+        theme::styleHeader (l);
         l.setColour (juce::Label::textColourId, theme::text().withAlpha (0.85f));
         return l;
     }

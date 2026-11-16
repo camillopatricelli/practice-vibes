@@ -33,8 +33,7 @@ void ChordView::update (double positionSeconds, int semitones)
 void ChordView::paint (juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
-    g.setColour (theme::panel());
-    g.fillRoundedRectangle (bounds, 6.0f);
+    theme::paintCard (g, bounds);
 
     if (track == nullptr || track->chords.empty())
     {
@@ -68,7 +67,7 @@ void ChordView::paint (juce::Graphics& g)
     auto dotsRow = left.removeFromBottom (14);
     const auto bigSize = juce::jlimit (24.0f, 84.0f, (float) left.getHeight() * 0.9f);
     g.setColour (now.root < 0 ? theme::text().withAlpha (0.4f) : theme::highlight().withAlpha (started ? 1.0f : 0.5f));
-    g.setFont (juce::FontOptions (bigSize).withStyle ("Bold"));
+    g.setFont (theme::displayFont (bigSize, "SemiBold"));
     g.drawFittedText (track->chordName (now, transpose), left, juce::Justification::centredLeft, 1, 0.6f);
 
     // One dot per beat of the current chord, lit up to the current beat.
@@ -96,7 +95,7 @@ void ChordView::paint (juce::Graphics& g)
         const auto& next = chords[(size_t) nextIndex];
         auto countRow = right.removeFromBottom (20);
         g.setColour (theme::text().withAlpha (0.9f));
-        g.setFont (juce::FontOptions (juce::jlimit (18.0f, 48.0f, (float) right.getHeight() * 0.7f)).withStyle ("Bold"));
+        g.setFont (theme::displayFont (juce::jlimit (18.0f, 48.0f, (float) right.getHeight() * 0.7f), "SemiBold"));
         g.drawFittedText (track->chordName (next, transpose), right, juce::Justification::centredLeft, 1, 0.6f);
 
         const auto beatsLeft = next.startBeat - juce::jmax (0, beatIndex);

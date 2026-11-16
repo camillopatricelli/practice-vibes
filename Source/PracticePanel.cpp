@@ -1,6 +1,7 @@
 #include "PracticePanel.h"
 #include "AacFile.h"
 #include "Library.h"
+#include "Icons.h"
 #include "Theme.h"
 #include "YouTubePlayer.h"
 
@@ -37,7 +38,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         const auto beats = juce::jmax (1, lastBeats);
-        const auto size = juce::jmin ((float) getHeight(), (float) getWidth() / (float) beats - 6.0f);
+        const auto size = juce::jmin (18.0f, (float) getHeight(), (float) getWidth() / (float) beats - 6.0f);   // small dots (mock-up)
 
         for (int i = 0; i < beats; ++i)
         {
@@ -46,7 +47,7 @@ public:
             const auto lit = i == lastBeat;
 
             g.setColour (lit ? (i == 0 ? theme::highlight() : theme::accent())
-                             : theme::text().withAlpha (0.12f));
+                             : theme::track());
             g.fillEllipse (circle.reduced (2.0f));
         }
     }
@@ -201,7 +202,7 @@ namespace
     void styleHeader (juce::Label& label, const juce::String& text)
     {
         label.setText (text, juce::dontSendNotification);
-        label.setFont (theme::headerFont());
+        theme::styleHeader (label);
         label.setColour (juce::Label::textColourId, theme::text().withAlpha (0.9f));
     }
 
@@ -364,6 +365,26 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
         updateLoopButtons();
     };
 
+    // Icons (mock-up): round Play, icon-only back / stop / zoom; icon + text elsewhere.
+    icons::setRound (playButton);
+    icons::setIcon (playButton, icons::Icon::play, true);
+    playButton.setTooltip ("Play / pause (space)");
+    rewindButton.setTooltip ("Back to the start");
+    icons::setIcon (rewindButton, icons::Icon::back, true);
+    stopButton.setTooltip ("Stop");
+    icons::setIcon (stopButton, icons::Icon::stop, true);
+    zoomOutButton.setTooltip ("Zoom out");
+    icons::setIcon (zoomOutButton, icons::Icon::zoomOut, true);
+    zoomInButton.setTooltip ("Zoom in");
+    icons::setIcon (zoomInButton, icons::Icon::zoomIn, true);
+    fitButton.setTooltip ("Show the whole song");
+    icons::setIcon (fitButton, icons::Icon::fit, true);
+    icons::setIcon (openButton, icons::Icon::folder, false);
+    icons::setIcon (stemsButton, icons::Icon::stems, false);
+    icons::setIcon (snapButton, icons::Icon::magnet, false);
+    icons::setIcon (loopButton, icons::Icon::loop, false);
+    icons::setIcon (metronomeButton, icons::Icon::metronome, false);
+
     loopButton.setClickingTogglesState (true);
     loopButton.onClick = [this]
     {
@@ -431,7 +452,7 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
 
     styleHeader (metronomeHeader, "Metronome");
 
-    bpmDisplay.setFont (juce::FontOptions (34.0f).withStyle ("Bold"));
+    bpmDisplay.setFont (theme::displayFont (34.0f, "SemiBold"));
     bpmDisplay.setColour (juce::Label::textColourId, theme::highlight());
     bpmDisplay.setJustificationType (juce::Justification::centredRight);
 
@@ -456,14 +477,15 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
     for (int i = 1; i <= 12; ++i)
         beatsBox.addItem (juce::String (i), i);
 
+    beatsBox.setSegments ({ 2, 3, 4, 5, 6, 7 });     // 1 and 8-12 under "..."
     beatsBox.setSelectedId (metronome.beatsPerBar.load(), juce::dontSendNotification);
     beatsBox.onChange = [this] { metronome.beatsPerBar = juce::jmax (1, beatsBox.getSelectedId()); };
 
     styleLabel (subdivisionLabel, "Subdivision");
-    subdivisionBox.addItem ("Quarter notes", 1);
-    subdivisionBox.addItem ("8th notes", 2);
+    subdivisionBox.addItem ("Quarters", 1);
+    subdivisionBox.addItem ("8ths", 2);
     subdivisionBox.addItem ("Triplets", 3);
-    subdivisionBox.addItem ("16th notes", 4);
+    subdivisionBox.addItem ("16ths", 4);
     subdivisionBox.setSelectedId (metronome.subdivision.load() + 1, juce::dontSendNotification);
     subdivisionBox.onChange = [this]
     {
@@ -1380,6 +1402,8 @@ void PracticePanel::updateSubdivisionControls()
 void PracticePanel::paint (juce::Graphics& g)
 {
     g.fillAll (theme::background());
+    theme::paintCard (g, playbackCard.toFloat());
+    theme::paintCard (g, metronomeCard.toFloat());
 
     if (youTubeMode)
     {
@@ -1403,10 +1427,10 @@ void PracticePanel::resized()
     // Song header row
     auto top = area.removeFromTop (44);
     songHeader.setBounds (top.removeFromLeft (70));
-    openButton.setBounds (top.removeFromLeft (170).reduced (3));
+    openButton.setBounds (top.removeFromLeft (196).reduced (3));
 
     if (! youTubeMode)
-        stemsButton.setBounds (top.removeFromLeft (juce::jmin (230, juce::jmax (110, stemsButton.getBestWidthForHeight (38) + 24))).reduced (3));
+        stemsButton.setBounds (top.removeFromLeft (juce::jmin (256, juce::jmax (120, stemsButton.getBestWidthForHeight (38) + 50))).reduced (3));
     timeLabel.setBounds (top.removeFromRight (190));
     top.removeFromRight (12);
 
@@ -1421,9 +1445,9 @@ void PracticePanel::resized()
     else
     {
         zoomLoopButton.setBounds (top.removeFromRight (130).reduced (3));
-        fitButton.setBounds (top.removeFromRight (60).reduced (3));
-        zoomInButton.setBounds (top.removeFromRight (48).reduced (3));
-        zoomOutButton.setBounds (top.removeFromRight (48).reduced (3));
+        fitButton.setBounds (top.removeFromRight (44).reduced (3));
+        zoomInButton.setBounds (top.removeFromRight (44).reduced (3));
+        zoomOutButton.setBounds (top.removeFromRight (44).reduced (3));
     }
 
     songLabel.setBounds (top.reduced (8, 0));
@@ -1435,13 +1459,16 @@ void PracticePanel::resized()
     youTubeTimeline->setBounds (songArea.removeFromBottom (30));
     videoArea = songArea.withTrimmedBottom (4);
 
-    // Transport
-    auto transport = area.removeFromTop (52).reduced (0, 4);
+    // Transport: back, the big round Play, stop; the rest of the row at button height.
+    auto transportRow = area.removeFromTop (66);
     const auto small = 80;
-    rewindButton.setBounds (transport.removeFromLeft (60).reduced (2, 0));
-    playButton.setBounds (transport.removeFromLeft (110).reduced (2, 0));
-    stopButton.setBounds (transport.removeFromLeft (small).reduced (2, 0));
-    transport.removeFromLeft (20);
+    rewindButton.setBounds (transportRow.removeFromLeft (48).withSizeKeepingCentre (42, 42));
+    transportRow.removeFromLeft (4);
+    playButton.setBounds (transportRow.removeFromLeft (66));
+    transportRow.removeFromLeft (4);
+    stopButton.setBounds (transportRow.removeFromLeft (48).withSizeKeepingCentre (42, 42));
+    transportRow.removeFromLeft (20);
+    auto transport = transportRow.withSizeKeepingCentre (transportRow.getWidth(), 44);
 
     if (takeShown)
     {
@@ -1455,18 +1482,26 @@ void PracticePanel::resized()
     }
 
     clearLoopButton.setBounds (transport.removeFromRight (110).reduced (2, 0));
-    loopButton.setBounds (transport.removeFromRight (200).reduced (2, 0));
+    loopButton.setBounds (transport.removeFromRight (220).reduced (2, 0));
     setBButton.setBounds (transport.removeFromRight (small).reduced (2, 0));
     setAButton.setBounds (transport.removeFromRight (120).reduced (2, 0));
-    snapButton.setBounds (transport.removeFromRight (120).reduced (2, 0));
+    snapButton.setBounds (transport.removeFromRight (140).reduced (2, 0));
 
-    area.removeFromTop (10);
+    area.removeFromTop (8);
 
-    // Two columns: song controls | metronome
-    const auto gap = 24;
+    // Two columns of cards: playback + chords | metronome
+    const auto gap = 16, pad = 14;
     auto left = area.removeFromLeft ((area.getWidth() - gap) / 2);
     area.removeFromLeft (gap);
     auto right = area;
+
+    playbackCard = left.removeFromTop (juce::jmin (left.getHeight(), 3 * 40 + 30 + 2 * pad));
+    left.removeFromTop (gap);
+    const auto chordArea = left;
+    left = playbackCard.reduced (pad);
+
+    metronomeCard = right.withHeight (juce::jmin (right.getHeight(), 48 + 4 * 40 + 36 + 2 * 44 + 2 * pad - 6));
+    right = metronomeCard.reduced (pad, pad - 6);
 
     auto sliderRow = [] (juce::Rectangle<int>& column, juce::Label& label, juce::Component& control, int height = 40)
     {
@@ -1480,8 +1515,7 @@ void PracticePanel::resized()
     sliderRow (left, songVolumeLabel, songVolumeSlider);
     hintLabel.setBounds (left.removeFromTop (30));
     noteLabel.setBounds (hintLabel.getBounds());
-    left.removeFromTop (6);
-    chordView.setBounds (left.withHeight (juce::jmin (left.getHeight(), 220)));
+    chordView.setBounds (chordArea.withHeight (juce::jmin (chordArea.getHeight(), 230)));
 
     // Metronome column
     auto metroTop = right.removeFromTop (48);
@@ -1495,7 +1529,7 @@ void PracticePanel::resized()
     {
         auto row = right.removeFromTop (40);
         beatsLabel.setBounds (row.removeFromLeft (110));
-        beatsBox.setBounds (row.removeFromLeft (80).reduced (0, 5));
+        beatsBox.setBounds (row.removeFromLeft (juce::jmin (250, row.getWidth() / 2)).reduced (0, 4));
         row.removeFromLeft (20);
         clickVolumeLabel.setBounds (row.removeFromLeft (100));
         clickVolumeSlider.setBounds (row.reduced (0, 4));
@@ -1504,7 +1538,7 @@ void PracticePanel::resized()
     {
         auto row = right.removeFromTop (40);
         subdivisionLabel.setBounds (row.removeFromLeft (110));
-        subdivisionBox.setBounds (row.removeFromLeft (150).reduced (0, 5));
+        subdivisionBox.setBounds (row.removeFromLeft (juce::jmin (300, row.getWidth() - 200)).reduced (0, 4));
         row.removeFromLeft (20);
         soundLabel.setBounds (row.removeFromLeft (60));
         soundBox.setBounds (row.removeFromLeft (120).reduced (0, 5));

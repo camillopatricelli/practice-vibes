@@ -118,6 +118,7 @@ target_sources(PracticeVibes PRIVATE
     Source/FolderAccess.cpp
     Source/Footswitch.cpp
     Source/FootswitchPanel.cpp
+    Source/Icons.cpp
     Source/Library.cpp
     Source/LibraryPanel.cpp
     Source/Links.cpp

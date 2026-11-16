@@ -302,7 +302,7 @@ private:
 //==============================================================================
 TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker (t), session (s)
 {
-    titleLabel.setFont (juce::FontOptions (22.0f).withStyle ("Bold"));
+    titleLabel.setFont (theme::displayFont (22.0f, "SemiBold"));
     titleLabel.setColour (juce::Label::textColourId, theme::text());
     addAndMakeVisible (titleLabel);
 
@@ -311,7 +311,7 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
     totalsLabel.setFont (juce::FontOptions (15.0f));
     addAndMakeVisible (totalsLabel);
 
-    nowTitle.setFont (juce::FontOptions (19.0f).withStyle ("Bold"));
+    nowTitle.setFont (theme::displayFont (19.0f, "SemiBold"));
     nowTitle.setColour (juce::Label::textColourId, theme::text());
     nowTitle.setMinimumHorizontalScale (0.7f);
     addAndMakeVisible (nowTitle);
@@ -358,7 +358,7 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
 
     for (auto* l : { &rotationHeader, &recentHeader })
     {
-        l->setFont (theme::headerFont());
+        theme::styleHeader (*l);
         l->setColour (juce::Label::textColourId, theme::text().withAlpha (0.85f));
         addAndMakeVisible (*l);
     }
@@ -399,7 +399,7 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
     for (auto* c : std::initializer_list<juce::Component*> { &diceLabel, &dicePractiseButton, &diceAgainButton, &diceCloseButton })
         addChildComponent (*c);
 
-    sessionTitle.setFont (juce::FontOptions (17.0f).withStyle ("Bold"));
+    sessionTitle.setFont (theme::displayFont (17.0f, "SemiBold"));
     sessionTitle.setColour (juce::Label::textColourId, theme::text());
     addChildComponent (sessionTitle);
     nextButton.setColour (juce::TextButton::buttonColourId, theme::accent());

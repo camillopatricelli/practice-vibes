@@ -59,6 +59,9 @@ public:
     void drawScrollbar (juce::Graphics&, juce::ScrollBar&, int x, int y, int width, int height, bool isVertical,
                         int thumbStart, int thumbSize, bool isMouseOver, bool isMouseDown) override;
 
+    // Labels: section headings get a dot; slider value boxes are rounded.
+    void drawLabel (juce::Graphics&, juce::Label&) override;
+
     // Alerts
     juce::Font getAlertWindowTitleFont() override;
     juce::Font getAlertWindowMessageFont() override;

@@ -48,7 +48,7 @@ class LibraryPanel::TopicView final : public juce::Component,
 public:
     explicit TopicView (LibraryPanel& p) : owner (p)
     {
-        titleEditor.setFont (juce::FontOptions (22.0f).withStyle ("Bold"));
+        titleEditor.setFont (theme::displayFont (22.0f, "SemiBold"));
         titleEditor.setTextToShowWhenEmpty ("Topic title", theme::text().withAlpha (0.35f));
         titleEditor.setJustification (juce::Justification::centredLeft);
         styleEditor (titleEditor);

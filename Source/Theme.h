@@ -83,4 +83,30 @@ namespace pv::theme
     inline juce::FontOptions textFont (float size, const char* style = "Regular")    { return juce::FontOptions (textFamily, size, juce::Font::plain).withStyle (style); }
     inline juce::FontOptions displayFont (float size, const char* style = "SemiBold") { return juce::FontOptions (displayFamily, size, juce::Font::plain).withStyle (style); }
     inline juce::FontOptions headerFont()  { return displayFont (18.0f, "SemiBold"); }
+
+    /** A section heading: Outfit, with the mock-up's small amber dot before it (drawn by WarmLookAndFeel). */
+    inline void styleHeader (juce::Label& label)
+    {
+        label.setFont (headerFont());
+        label.getProperties().set ("pvSection", true);
+        label.repaint();
+    }
+
+    /** A rounded card (the mock-up's sections): card colour, hairline, soft depth in light. */
+    inline void paintCard (juce::Graphics& g, juce::Rectangle<float> r, float corner = 18.0f)
+    {
+        if (r.isEmpty())
+            return;
+
+        if (! isDark())
+        {
+            g.setColour (palette().shadow.withAlpha (0.07f));
+            g.fillRoundedRectangle (r.translated (0.0f, 3.0f).expanded (1.0f), corner + 1.0f);
+        }
+
+        g.setColour (card());
+        g.fillRoundedRectangle (r, corner);
+        g.setColour (line());
+        g.drawRoundedRectangle (r.reduced (0.5f), corner, 1.0f);
+    }
 }

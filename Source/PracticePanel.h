@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SegmentedControl.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "ChordView.h"
 #include "MetronomeProcessor.h"
@@ -117,6 +118,7 @@ private:
     bool youTubeMode = false, compactShown = false;
     double lastShownRate = 1.0;
     juce::Rectangle<int> videoArea;
+    juce::Rectangle<int> playbackCard, metronomeCard;   // painted as rounded cards
     std::unique_ptr<YouTubeTimeline> youTubeTimeline;
     juce::TextButton compactButton { "Compact player" }, closeVideoButton { "Close video" }, openOnYouTubeButton { "Open on YouTube" };
     void updateModeVisibility();
@@ -170,7 +172,8 @@ private:
     std::unique_ptr<BeatIndicator> beatIndicator;
     juce::Slider bpmSlider, clickVolumeSlider;
     juce::Label bpmLabel, beatsLabel, clickVolumeLabel;
-    juce::ComboBox beatsBox, subdivisionBox, soundBox;
+    SegmentedControl beatsBox, subdivisionBox;     // segmented (mock-up); ComboBox-like calls
+    juce::ComboBox soundBox;
     juce::Label subdivisionLabel, soundLabel, subLevelLabel, swingLabel;
     juce::Slider subLevelSlider, swingSlider;
     void updateSubdivisionControls();

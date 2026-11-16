@@ -12,7 +12,7 @@ public:
     SwitchRow (Footswitch& f, int i) : footswitch (f), index (i)
     {
         nameLabel.setText (Footswitch::switchName (index), juce::dontSendNotification);
-        nameLabel.setFont (juce::FontOptions (26.0f).withStyle ("Bold"));
+        nameLabel.setFont (theme::displayFont (26.0f, "SemiBold"));
         nameLabel.setJustificationType (juce::Justification::centred);
         nameLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.8f));
         addAndMakeVisible (nameLabel);

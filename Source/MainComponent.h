@@ -131,6 +131,7 @@ private:
     juce::TabbedComponent tabs { juce::TabbedButtonBar::TabsAtTop };
 
     std::unique_ptr<Overlay> overlay;
+    juce::TooltipWindow tooltipWindow { this, 700 };     // the icon-only buttons say what they do on hover
 
     // Docked over the Practice tab's video area, or floating ("compact"); never reparented (native web view).
     std::unique_ptr<YouTubePlayer> youtube;

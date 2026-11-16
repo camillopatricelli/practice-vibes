@@ -3,6 +3,7 @@
 #include "AppPaths.h"
 #include "LoopFiles.h"
 #include "Theme.h"
+#include "Icons.h"
 
 namespace pv
 {
@@ -44,14 +45,14 @@ public:
     void paint (juce::Graphics& g) override
     {
         const auto beats = juce::jmax (1, lastBeats);
-        const auto size = juce::jmin ((float) getHeight(), (float) getWidth() / (float) beats - 6.0f);
+        const auto size = juce::jmin (18.0f, (float) getHeight(), (float) getWidth() / (float) beats - 6.0f);   // small dots (mock-up)
 
         for (int i = 0; i < beats; ++i)
         {
             const auto x = (float) i * ((float) getWidth() / (float) beats);
             auto circle = juce::Rectangle<float> (x, 0.0f, size, size).withY (((float) getHeight() - size) * 0.5f);
             g.setColour (i == lastBeat ? (i == 0 ? theme::highlight() : theme::accent())
-                                       : theme::text().withAlpha (0.12f));
+                                       : theme::track());
             g.fillEllipse (circle.reduced (2.0f));
         }
     }
@@ -69,7 +70,7 @@ public:
     TrackRow (Looper& l, int index) : looper (l), track (index)
     {
         nameLabel.setText (juce::String (track + 1), juce::dontSendNotification);
-        nameLabel.setFont (juce::FontOptions (26.0f).withStyle ("Bold"));
+        nameLabel.setFont (theme::displayFont (26.0f, "SemiBold"));
         nameLabel.setJustificationType (juce::Justification::centred);
         nameLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.7f));
         addAndMakeVisible (nameLabel);
@@ -136,6 +137,7 @@ public:
         }
 
         pedalButton.setButtonText (text);
+        icons::setIcon (pedalButton, state == Looper::State::empty ? icons::Icon::record : icons::Icon::none, false);
         pedalButton.setColour (juce::TextButton::buttonColourId, colour);
         muteButton.setButtonText (muted ? "Unmute" : "Mute");
         muteButton.setEnabled (state == Looper::State::playing || state == Looper::State::overdubbing);
@@ -251,7 +253,7 @@ LooperPanel::LooperPanel (AppEngine& e)
     setWantsKeyboardFocus (true);
 
     header.setText ("Looper", juce::dontSendNotification);
-    header.setFont (theme::headerFont());
+    theme::styleHeader (header);
     header.setColour (juce::Label::textColourId, theme::text().withAlpha (0.9f));
     addAndMakeVisible (header);
 
@@ -323,6 +325,7 @@ LooperPanel::LooperPanel (AppEngine& e)
     beatsBox.setSelectedId (metronome.beatsPerBar.load(), juce::dontSendNotification);
     beatsBox.onChange = [this] { metronome.beatsPerBar = juce::jmax (1, beatsBox.getSelectedId()); };
 
+    icons::setIcon (metronomeButton, icons::Icon::metronome, false);
     metronomeButton.onClick = [this]
     {
         if (metronome.isRunning())
@@ -331,7 +334,7 @@ LooperPanel::LooperPanel (AppEngine& e)
             metronome.start();
     };
 
-    tempoDisplay.setFont (juce::FontOptions (30.0f).withStyle ("Bold"));
+    tempoDisplay.setFont (theme::displayFont (30.0f, "SemiBold"));
     tempoDisplay.setColour (juce::Label::textColourId, theme::highlight());
     tempoDisplay.setJustificationType (juce::Justification::centredRight);
 

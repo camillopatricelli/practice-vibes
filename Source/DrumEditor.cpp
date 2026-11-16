@@ -1,5 +1,6 @@
 #include "DrumEditor.h"
 #include "Theme.h"
+#include "Icons.h"
 
 namespace pv
 {
@@ -219,7 +220,7 @@ DrumSection::DrumSection (AppEngine& e)
     savedVersion = drums.getPattern();
 
     styleLabel (title, "Drums");
-    title.setFont (theme::headerFont());
+    theme::styleHeader (title);
     styleLabel (status, {}, 0.6f);
     status.setMinimumHorizontalScale (0.6f);
 
@@ -377,6 +378,7 @@ void DrumSection::refreshControls()
 
     playButton.setToggleState (drums.enabled.load(), juce::dontSendNotification);
     playButton.setButtonText (drums.enabled.load() ? "Stop drums" : "Play drums");
+    icons::setIcon (playButton, drums.enabled.load() ? icons::Icon::stop : icons::Icon::play, false);
     patternButton.setButtonText ("Pattern: " + displayName());
     kitBox.setSelectedId (drums.getKitType() == DrumKitType::electronic ? 2 : 1, juce::dontSendNotification);
 
@@ -684,7 +686,7 @@ void DrumSection::resized()
     if (! narrow)
         title.setBounds (row.removeFromLeft (70));
 
-    playButton.setBounds (row.removeFromLeft (110).reduced (2, 4));
+    playButton.setBounds (row.removeFromLeft (130).reduced (2, 4));
     showButton.setBounds (row.removeFromRight (narrow ? 120 : 140).reduced (2, 4));
     clicksMutedButton.setBounds (row.removeFromRight (narrow ? 110 : 120).reduced (2, 4));
     volume.setBounds (row.removeFromRight (narrow ? 80 : 140).reduced (4, 8));

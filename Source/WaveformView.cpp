@@ -139,8 +139,9 @@ void WaveformView::paint (juce::Graphics& g)
 {
     g.fillAll (theme::background());
     g.setColour (theme::palette().waveBackground);
-    g.fillRect (mainArea);
-    g.fillRect (overviewArea);
+    g.fillRoundedRectangle (mainArea.toFloat(), 16.0f);
+    g.setColour (theme::raised().withAlpha (theme::isDark() ? 0.7f : 1.0f));
+    g.fillRoundedRectangle (overviewArea.toFloat(), 9.0f);
 
     if (song == nullptr)
     {
@@ -152,7 +153,9 @@ void WaveformView::paint (juce::Graphics& g)
 
     {
         juce::Graphics::ScopedSaveState state (g);
-        g.reduceClipRegion (mainArea);
+        juce::Path rounded;
+        rounded.addRoundedRectangle (mainArea.toFloat(), 16.0f);
+        g.reduceClipRegion (rounded);
         paintWaveform (g, mainArea);
         paintChordLane (g, mainArea);
         paintTimeRuler (g, mainArea.withHeight (rulerHeight));
@@ -165,19 +168,29 @@ void WaveformView::paintWaveform (juce::Graphics& g, juce::Rectangle<int> area)
 {
     const auto top = (float) area.getY() + rulerHeight + (chords != nullptr ? chordLaneHeight : 0);
     const auto height = (float) area.getBottom() - top;
-    const auto mid = top + height * 0.5f;
-    const auto halfHeight = height * 0.5f - 3.0f;
+    const auto mid = top + height * 0.48f;
+    const auto halfHeight = height * 0.46f - 4.0f;
+    const auto& pal = theme::palette();
 
-    // Loop region
+    // Loop region: a soft rounded band with amber edges and A / B tags.
     if (player.hasLoop())
     {
         const auto x1 = secondsToX (player.getLoopStartSeconds());
         const auto x2 = secondsToX (player.getLoopEndSeconds());
-        g.setColour (theme::accent().withAlpha (player.isLoopEnabled() ? 0.35f : 0.15f));
-        g.fillRect (juce::Rectangle<float> (x1, (float) area.getY(), x2 - x1, (float) area.getHeight()));
-        g.setColour (theme::accent());
-        g.fillRect (juce::Rectangle<float> (x1 - 1.0f, (float) area.getY(), 2.0f, (float) area.getHeight()));
-        g.fillRect (juce::Rectangle<float> (x2 - 1.0f, (float) area.getY(), 2.0f, (float) area.getHeight()));
+        const bool on = player.isLoopEnabled();
+        g.setColour (pal.accent.withAlpha ((theme::isDark() ? 0.13f : 0.17f) * (on ? 1.0f : 0.5f)));
+        g.fillRoundedRectangle (juce::Rectangle<float> (x1, top + 2.0f, x2 - x1, height - 4.0f), 10.0f);
+        g.setFont (theme::textFont (10.5f, "Bold"));
+
+        for (auto [x, tag] : { std::pair<float, const char*> { x1, "A" }, std::pair<float, const char*> { x2, "B" } })
+        {
+            g.setColour (pal.accent.withAlpha (on ? 1.0f : 0.45f));
+            g.fillRect (juce::Rectangle<float> (x - 1.0f, top + 2.0f, 2.0f, height - 4.0f));
+            const auto pill = juce::Rectangle<float> (20.0f, 15.0f).withCentre ({ x, (float) area.getBottom() - 11.0f });
+            g.fillRoundedRectangle (pill, 7.5f);
+            g.setColour (pal.onAccent);
+            g.drawText (tag, pill, juce::Justification::centred, false);
+        }
     }
 
     // Waveform
@@ -189,9 +202,11 @@ void WaveformView::paintWaveform (juce::Graphics& g, juce::Rectangle<int> area)
     const auto* right = song->audio.getReadPointer (1);
     auto mono = [left, right] (int i) { return 0.5f * (left[i] + right[i]); };
 
-    // The part already played in amber, the rest in the quiet waveform colour.
-    const auto played = theme::palette().wavePlayed, notPlayed = theme::palette().wave;
+    // The part already played: amber gradient with a soft glow; the rest in the quiet waveform colour.
     const auto playX = secondsToX (player.getPositionSeconds());
+    const auto playedClip = juce::Rectangle<float> ((float) area.getX(), (float) area.getY(),
+                                                    juce::jmax (0.0f, playX - (float) area.getX()), (float) area.getHeight()).toNearestInt();
+    const juce::ColourGradient playedFill (pal.wavePlayed, 0.0f, mid - halfHeight, pal.wavePlayed2, 0.0f, mid + halfHeight * 0.8f, false);
 
     if (samplesPerPixel < 1.0)
     {
@@ -211,14 +226,16 @@ void WaveformView::paintWaveform (juce::Graphics& g, juce::Rectangle<int> area)
                 path.lineTo (x, y);
         }
 
-        g.setColour (notPlayed);
-        g.strokePath (path, juce::PathStrokeType (1.5f));
+        g.setColour (pal.wave);
+        g.strokePath (path, juce::PathStrokeType (1.8f));
 
-        juce::Graphics::ScopedSaveState state (g);
-        g.reduceClipRegion (juce::Rectangle<float> ((float) area.getX(), (float) area.getY(),
-                                                    playX - (float) area.getX(), (float) area.getHeight()).toNearestInt());
-        g.setColour (played);
-        g.strokePath (path, juce::PathStrokeType (1.5f));
+        if (! playedClip.isEmpty())
+        {
+            juce::Graphics::ScopedSaveState state (g);
+            g.reduceClipRegion (playedClip);
+            g.setGradientFill (playedFill);
+            g.strokePath (path, juce::PathStrokeType (2.0f));
+        }
     }
     else
     {
@@ -229,41 +246,75 @@ void WaveformView::paintWaveform (juce::Graphics& g, juce::Rectangle<int> area)
             if (candidate.samplesPerBucket <= samplesPerPixel)
                 level = &candidate;
 
-        for (int x = 0; x < width; ++x)
+        // A filled, mirrored shape (the lower half a little smaller, as in the mock-up).
+        constexpr int stepPx = 2;
+        std::vector<juce::Point<float>> points;
+        points.reserve ((size_t) (width / stepPx + 2));
+
+        for (int x = 0; x <= width; x += stepPx)
         {
             const auto s0 = (juce::int64) ((viewStart * sampleRate) + x * samplesPerPixel);
-            const auto s1 = (juce::int64) ((viewStart * sampleRate) + (x + 1) * samplesPerPixel);
+            const auto s1 = (juce::int64) ((viewStart * sampleRate) + (x + stepPx) * samplesPerPixel);
+            auto peak = 0.0f;
 
-            if (s0 >= numSamples || s1 <= 0)
-                continue;
-
-            auto lo = 0.0f, hi = 0.0f;
-
-            if (level != nullptr)
+            if (s0 < numSamples && s1 > 0)
             {
-                const auto b0 = (size_t) juce::jmax<juce::int64> (0, s0 / level->samplesPerBucket);
-                const auto b1 = (size_t) juce::jmax<juce::int64> ((juce::int64) b0 + 1, s1 / level->samplesPerBucket);
-
-                for (auto b = b0; b < b1 && b < level->mins.size(); ++b)
+                if (level != nullptr)
                 {
-                    lo = juce::jmin (lo, level->mins[b]);
-                    hi = juce::jmax (hi, level->maxs[b]);
+                    const auto b0 = (size_t) juce::jmax<juce::int64> (0, s0 / level->samplesPerBucket);
+                    const auto b1 = (size_t) juce::jmax<juce::int64> ((juce::int64) b0 + 1, s1 / level->samplesPerBucket);
+
+                    for (auto b = b0; b < b1 && b < level->mins.size(); ++b)
+                        peak = juce::jmax (peak, level->maxs[b], -level->mins[b]);
                 }
-            }
-            else
-            {
-                for (auto i = juce::jmax<juce::int64> (0, s0); i < juce::jmin<juce::int64> (numSamples, juce::jmax (s1, s0 + 1)); ++i)
+                else
                 {
-                    lo = juce::jmin (lo, mono ((int) i));
-                    hi = juce::jmax (hi, mono ((int) i));
+                    for (auto i = juce::jmax<juce::int64> (0, s0); i < juce::jmin<juce::int64> (numSamples, juce::jmax (s1, s0 + 1)); ++i)
+                        peak = juce::jmax (peak, std::abs (mono ((int) i)));
                 }
             }
 
-            const auto y1 = mid - hi * halfHeight;
-            const auto y2 = mid - lo * halfHeight;
-            g.setColour ((float) (area.getX() + x) < playX ? played : notPlayed);
-            g.fillRect (juce::Rectangle<float> ((float) (area.getX() + x), y1, 1.0f, juce::jmax (1.0f, y2 - y1)));
+            points.push_back ({ (float) (area.getX() + x), juce::jmax (0.75f, juce::jmin (1.0f, peak) * halfHeight) });
         }
+
+        juce::Path shape;
+
+        if (! points.empty())
+        {
+            shape.startNewSubPath (points.front().x, mid - points.front().y);
+
+            for (auto& pt : points)
+                shape.lineTo (pt.x, mid - pt.y);
+
+            for (auto it = points.rbegin(); it != points.rend(); ++it)
+                shape.lineTo (it->x, mid + it->y * 0.8f);
+
+            shape.closeSubPath();
+        }
+
+        g.setColour (pal.wave);
+        g.fillPath (shape);
+
+        if (! playedClip.isEmpty())
+        {
+            juce::Graphics::ScopedSaveState state (g);
+            g.reduceClipRegion (playedClip);
+
+            // Glow: a few wide, faint strokes of the outline under the fill.
+            const float glowAlpha = theme::isDark() ? 1.0f : 0.45f;
+
+            for (auto [w, a] : { std::pair<float, float> { 12.0f, 0.05f }, std::pair<float, float> { 7.0f, 0.08f }, std::pair<float, float> { 3.5f, 0.12f } })
+            {
+                g.setColour (pal.wavePlayed.withAlpha (a * glowAlpha));
+                g.strokePath (shape, juce::PathStrokeType (w, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            }
+
+            g.setGradientFill (playedFill);
+            g.fillPath (shape);
+        }
+
+        g.setColour (theme::shade (0.18f));
+        g.fillRect (juce::Rectangle<float> ((float) area.getX(), mid, (float) width, 1.0f));
     }
 
     // Selection being dragged
@@ -272,13 +323,14 @@ void WaveformView::paintWaveform (juce::Graphics& g, juce::Rectangle<int> area)
         const auto range = selectionRange();
         const auto x1 = secondsToX (range.first);
         const auto x2 = secondsToX (range.second);
-        g.setColour (theme::text().withAlpha (0.2f));
-        g.fillRect (juce::Rectangle<float> (x1, (float) area.getY(), x2 - x1, (float) area.getHeight()));
+        g.setColour (theme::text().withAlpha (0.14f));
+        g.fillRoundedRectangle (juce::Rectangle<float> (x1, top + 2.0f, x2 - x1, height - 4.0f), 8.0f);
     }
 
-    // Playhead
-    g.setColour (theme::palette().playhead);
-    g.fillRect (juce::Rectangle<float> (secondsToX (player.getPositionSeconds()) - 1.0f, (float) area.getY(), 2.0f, (float) area.getHeight()));
+    // Playhead: a line with a dot on top.
+    g.setColour (pal.playhead);
+    g.fillRect (juce::Rectangle<float> (playX - 1.0f, top - 2.0f, 2.0f, height - 2.0f));
+    g.fillEllipse (juce::Rectangle<float> (10.0f, 10.0f).withCentre ({ playX, top - 2.0f }));
 }
 
 double WaveformView::snap (double seconds) const
@@ -361,11 +413,8 @@ void WaveformView::paintChordLane (juce::Graphics& g, juce::Rectangle<int> area)
         }
     }
 
-    g.setColour (theme::shade (0.3f));
-    g.fillRect (lane);
-
     const auto position = player.getPositionSeconds();
-    g.setFont (juce::FontOptions (13.0f).withStyle ("Bold"));
+    g.setFont (theme::textFont (12.5f, "SemiBold"));
 
     for (const auto& chord : chords->chords)
     {
@@ -375,22 +424,22 @@ void WaveformView::paintChordLane (juce::Graphics& g, juce::Rectangle<int> area)
         const auto x1 = secondsToX (chord.start), x2 = secondsToX (chord.end);
         const auto isCurrent = position >= chord.start && position < chord.end;
 
-        if (isCurrent)
+        // A pill per chord: amber for the one playing now.
+        const auto pill = juce::Rectangle<float> (x1 + 1.5f, lane.getY() + 2.0f, x2 - x1 - 3.0f, lane.getHeight() - 4.0f);
+
+        if (pill.getWidth() >= 4.0f && chord.root >= 0)
         {
-            g.setColour (theme::highlight().withAlpha (0.18f));
-            g.fillRect (juce::Rectangle<float> (x1, lane.getY(), x2 - x1, lane.getHeight()));
+            g.setColour (isCurrent ? theme::accent() : theme::raised());
+            g.fillRoundedRectangle (pill, pill.getHeight() * 0.5f);
         }
 
-        g.setColour (theme::text().withAlpha (0.3f));
-        g.fillRect (juce::Rectangle<float> (x1, lane.getY(), 1.0f, lane.getHeight()));
-
         // Keep the name visible while its chord scrolls off the left edge.
-        const auto textX = juce::jmax (x1, lane.getX()) + 4.0f;
+        const auto textX = juce::jmax (x1, lane.getX()) + 9.0f;
 
         if (x2 - textX < 16.0f || chord.root < 0)
             continue;
 
-        g.setColour (isCurrent ? theme::highlight() : theme::text().withAlpha (0.8f));
+        g.setColour (isCurrent ? theme::onAccent() : theme::muted());
         g.drawText (chords->chordName (chord, chordTranspose), juce::Rectangle<float> (textX, lane.getY(), x2 - textX - 2.0f, lane.getHeight()),
                     juce::Justification::centredLeft, true);
     }
@@ -398,9 +447,6 @@ void WaveformView::paintChordLane (juce::Graphics& g, juce::Rectangle<int> area)
 
 void WaveformView::paintTimeRuler (juce::Graphics& g, juce::Rectangle<int> area)
 {
-    g.setColour (theme::shade (0.25f));
-    g.fillRect (area);
-
     // Choose a tick spacing that leaves at least ~90 px between labels.
     static const double steps[] = { 0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0, 300.0 };
     auto step = steps[std::size (steps) - 1];
@@ -470,10 +516,10 @@ void WaveformView::paintOverview (juce::Graphics& g, juce::Rectangle<int> area)
         const auto x1 = toX (viewStart);
         const auto x2 = juce::jmax (x1 + 3.0f, toX (viewStart + viewLength));
         auto window = juce::Rectangle<float> (x1, (float) area.getY(), x2 - x1, (float) area.getHeight());
-        g.setColour (theme::text().withAlpha (0.15f));
-        g.fillRect (window);
-        g.setColour (theme::text().withAlpha (0.8f));
-        g.drawRect (window, 1.5f);
+        g.setColour (theme::palette().wavePlayed.withAlpha (0.12f));
+        g.fillRoundedRectangle (window, 6.0f);
+        g.setColour (theme::palette().wavePlayed);
+        g.drawRoundedRectangle (window.reduced (0.75f), 6.0f, 1.5f);
     }
 
     // Playhead

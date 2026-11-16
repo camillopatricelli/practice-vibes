@@ -290,7 +290,7 @@ void TunerPanel::paintNote (juce::Graphics& g, juce::Rectangle<float> area)
     const auto bigSize = juce::jmin (area.getHeight() * 0.8f, 130.0f);
 
     g.setColour (noteColour);
-    g.setFont (juce::FontOptions (bigSize).withStyle ("Bold"));
+    g.setFont (theme::displayFont (bigSize, "SemiBold"));
     g.drawText (hasNote ? note.name : "-", centre, juce::Justification::centred);
 
     if (! hasNote)
@@ -423,7 +423,7 @@ void TunerPanel::paintStrum (juce::Graphics& g, juce::Rectangle<float> area)
         // Number and words on top.
         auto top = cell.removeFromTop (juce::jmin (90.0f, cell.getHeight() * 0.35f));
         g.setColour (colour);
-        g.setFont (juce::FontOptions (juce::jmin (40.0f, top.getHeight() * 0.55f, cellWidth * 0.32f)).withStyle ("Bold"));
+        g.setFont (theme::displayFont (juce::jmin (40.0f, top.getHeight() * 0.55f, cellWidth * 0.32f), "SemiBold"));
         const auto cents = juce::roundToInt (reading.cents);
         g.drawText (! reading.heard ? "-" : cents > 0 ? "+" + juce::String (cents) : juce::String (cents),
                     top.removeFromTop (top.getHeight() * 0.65f), juce::Justification::centredBottom);
@@ -480,7 +480,7 @@ void TunerPanel::paintStrings (juce::Graphics& g, juce::Rectangle<float>)
 
         auto top = cell.removeFromTop (cell.getHeight() * 0.6f);
         g.setColour (lit ? theme::text() : theme::text().withAlpha (0.6f));
-        g.setFont (juce::FontOptions (juce::jmin (22.0f, top.getHeight() * 0.8f)).withStyle ("Bold"));
+        g.setFont (theme::displayFont (juce::jmin (22.0f, top.getHeight() * 0.8f), "SemiBold"));
         g.drawText (noteName (midi), top, juce::Justification::centredBottom);
 
         g.setColour (lit && std::abs (away) >= 50.0f ? offColour() : theme::text().withAlpha (0.4f));

@@ -1,5 +1,6 @@
 #include "WarmLookAndFeel.h"
 #include "FontData.h"
+#include "Icons.h"
 
 namespace pv
 {
@@ -207,6 +208,30 @@ void WarmLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& but
     auto bounds = button.getLocalBounds().toFloat().reduced (0.5f);
     const float corner = juce::jmin (bounds.getHeight() * 0.5f, 22.0f);
 
+    if (icons::isRound (button))
+    {
+        // The big primary button: an amber gradient circle with a soft glow under it.
+        const float d = juce::jmin (bounds.getWidth(), bounds.getHeight()) - 6.0f;
+        const auto circle = juce::Rectangle<float> (d, d).withCentre (bounds.getCentre().translated (0.0f, -2.0f));
+        const float alpha = button.isEnabled() ? 1.0f : 0.45f;
+
+        g.setColour (theme::accent().withAlpha (0.28f * alpha));
+        g.fillEllipse (circle.translated (0.0f, 4.0f).expanded (1.5f));
+
+        juce::ColourGradient fill (juce::Colour (0xffffc857).withMultipliedAlpha (alpha), circle.getTopLeft(),
+                                   juce::Colour (0xffff8a4c).withMultipliedAlpha (alpha), circle.getBottomRight(), false);
+        g.setGradientFill (fill);
+        g.fillEllipse (circle);
+
+        if (isDown || isHighlighted)
+        {
+            g.setColour (isDown ? juce::Colours::black.withAlpha (0.12f) : juce::Colours::white.withAlpha (0.12f));
+            g.fillEllipse (circle);
+        }
+
+        return;
+    }
+
     auto base = backgroundColour;
 
     if (! button.isEnabled())
@@ -238,7 +263,8 @@ void WarmLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& but
 void WarmLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& button, bool, bool)
 {
     const bool on = button.getToggleState();
-    const auto fill = button.findColour (on ? juce::TextButton::buttonOnColourId : juce::TextButton::buttonColourId);
+    const auto fill = icons::isRound (button) ? juce::Colour (0xffffb050)
+                                              : button.findColour (on ? juce::TextButton::buttonOnColourId : juce::TextButton::buttonColourId);
     auto colour = readableOn (fill, button.findColour (on ? juce::TextButton::textColourOnId : juce::TextButton::textColourOffId));
 
     if (! button.isEnabled())
@@ -247,6 +273,43 @@ void WarmLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& butto
     const auto font = getTextButtonFont (button, button.getHeight());
     g.setFont (font);
     g.setColour (colour);
+
+    auto icon = icons::getIcon (button);
+
+    // Play / pause follows the button's text ("Pause", "Pause take").
+    if (icon == icons::Icon::play && button.getButtonText().startsWithIgnoreCase ("Pause"))
+        icon = icons::Icon::pause;
+
+    if (icon != icons::Icon::none)
+    {
+        const auto area = button.getLocalBounds().toFloat();
+        const bool round = icons::isRound (button);
+        const float iconSize = round ? juce::jmin (26.0f, area.getHeight() * 0.42f)
+                                     : juce::jmin (18.0f, area.getHeight() * 0.48f);
+
+        if (round || icons::isIconOnly (button) || button.getButtonText().isEmpty())
+        {
+            // A play triangle looks centred when nudged right a little.
+            const float nudge = (icon == icons::Icon::play && round) ? iconSize * 0.06f : 0.0f;
+            icons::draw (g, icon, juce::Rectangle<float> (iconSize, iconSize)
+                                      .withCentre (area.getCentre().translated (nudge, round ? -2.0f : 0.0f)), colour);
+            return;
+        }
+
+        // Icon + text, centred together.
+        const float gap = 7.0f;
+        const float textWidth = juce::jmin (juce::GlyphArrangement::getStringWidth (font, button.getButtonText()),
+                                            area.getWidth() - iconSize - gap - 20.0f);
+        const float total = iconSize + gap + textWidth;
+        float x = area.getCentreX() - total * 0.5f;
+
+        icons::draw (g, icon, { x, area.getCentreY() - iconSize * 0.5f, iconSize, iconSize }, colour);
+        x += iconSize + gap;
+        g.setColour (colour);
+        g.drawFittedText (button.getButtonText(), juce::Rectangle<float> (x, 0.0f, textWidth + 2.0f, area.getHeight()).toNearestInt(),
+                          juce::Justification::centredLeft, 1, 0.85f);
+        return;
+    }
 
     const int yIndent = juce::jmin (4, button.proportionOfHeight (0.3f));
     const int pad = juce::jmin (16, juce::roundToInt ((float) button.getHeight() * 0.42f));
@@ -530,6 +593,48 @@ void WarmLookAndFeel::drawScrollbar (juce::Graphics& g, juce::ScrollBar& bar, in
 
     g.setColour (bar.findColour (juce::ScrollBar::thumbColourId).withAlpha (isMouseDown ? 0.75f : isMouseOver ? 0.6f : 0.4f));
     g.fillRoundedRectangle (r, corner);
+}
+
+//==============================================================================
+void WarmLookAndFeel::drawLabel (juce::Graphics& g, juce::Label& label)
+{
+    const bool section = (bool) label.getProperties()["pvSection"];
+    const bool sliderBox = dynamic_cast<juce::Slider*> (label.getParentComponent()) != nullptr;
+
+    if (! section && ! sliderBox)
+    {
+        LookAndFeel_V4::drawLabel (g, label);
+        return;
+    }
+
+    const auto bounds = label.getLocalBounds().toFloat();
+
+    if (sliderBox)
+    {
+        // Slider value box: a rounded field.
+        g.setColour (label.findColour (juce::Label::backgroundColourId));
+        g.fillRoundedRectangle (bounds.reduced (1.0f), juce::jmin (9.0f, bounds.getHeight() * 0.5f));
+    }
+
+    if (label.isBeingEdited())
+        return;
+
+    const float alpha = label.isEnabled() ? 1.0f : 0.5f;
+    const auto font = getLabelFont (label);
+    auto textArea = label.getBorderSize().subtractedFrom (label.getLocalBounds());
+
+    if (section)
+    {
+        const float dot = 8.0f;
+        g.setColour (theme::accent().withMultipliedAlpha (alpha));
+        g.fillEllipse ((float) textArea.getX() + 1.0f, bounds.getCentreY() - dot * 0.5f, dot, dot);
+        textArea.removeFromLeft (16);
+    }
+
+    g.setColour (label.findColour (juce::Label::textColourId).withMultipliedAlpha (alpha));
+    g.setFont (font);
+    g.drawFittedText (label.getText(), textArea, label.getJustificationType(),
+                      juce::jmax (1, (int) ((float) textArea.getHeight() / font.getHeight())), label.getMinimumHorizontalScale());
 }
 
 //==============================================================================
