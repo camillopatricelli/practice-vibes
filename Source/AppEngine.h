@@ -82,6 +82,12 @@ private:
     // and true again when they pick the current default.
     bool followSystemOutput = true;
     juce::String lastOutputName;
+
+    // Windows: the saved ASIO driver wasn't installed / its interface was unplugged at start, so the app
+    // opened the default Windows Audio device instead. Until the user picks something in the audio
+    // settings, saveState() keeps writing the ASIO choice so it comes back when the interface does.
+    std::unique_ptr<juce::XmlElement> unavailableAsioState;
+    juce::String fallbackStateAtStart;
     juce::String savedMetronomeSettings, savedDrumSettings;
 
     std::shared_ptr<bool> alive = std::make_shared<bool> (true);

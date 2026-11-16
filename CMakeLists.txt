@@ -173,6 +173,7 @@ if(WIN32)
         JUCE_PLUGINHOST_VST3=1
         JUCE_USE_WINRT_MIDI=1     # Bluetooth LE MIDI on Windows 10/11
         JUCE_WASAPI=1
+        JUCE_ASIO=1               # ASIO SDK headers are bundled with JUCE (Steinberg dual licence, used under GPLv3)
         JUCE_DIRECTSOUND=0)
 endif()
 

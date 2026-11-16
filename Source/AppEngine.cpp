@@ -8,6 +8,28 @@ namespace
 {
     // Our own attribute in the device-state XML; JUCE ignores unknown attributes.
     const juce::Identifier followAttribute { "pvFollowSystemOutput" };
+
+    // ASIO has no "system default output": each driver is one interface, chosen on purpose.
+    const juce::String asioTypeName { "ASIO" };
+
+    juce::AudioIODeviceType* findDeviceType (juce::AudioDeviceManager& manager, const juce::String& name)
+    {
+        for (auto* type : manager.getAvailableDeviceTypes())
+            if (type->getTypeName() == name)
+                return type;
+
+        return nullptr;
+    }
+
+    juce::String stateWithoutFollow (const juce::XmlElement* xml)
+    {
+        if (xml == nullptr)
+            return {};
+
+        juce::XmlElement copy (*xml);
+        copy.removeAttribute (followAttribute);
+        return copy.toString();
+    }
 }
 
 AppEngine::AppEngine()
@@ -105,28 +127,81 @@ void AppEngine::start()
             juce::Logger::writeToLog ("Audio input permission was NOT granted: the guitar input will be silent");
 
         auto savedState = juce::parseXML (getDeviceStateFile());
+        juce::String savedAsioDriver;     // set when the saved setup is an ASIO driver
 
         if (savedState != nullptr)
         {
             followSystemOutput = savedState->getBoolAttribute (followAttribute, false);
+            const auto savedType = savedState->getStringAttribute ("deviceType");
 
-            // The saved output name is stale when following: open today's default instead.
-            if (followSystemOutput)
-                for (auto* type : deviceManager.getAvailableDeviceTypes())
-                    if (type->getTypeName() == savedState->getStringAttribute ("deviceType"))
-                    {
-                        type->scanForDevices();
-                        const auto defaultName = type->getDeviceNames (false)[type->getDefaultDeviceIndex (false)];
+            if (savedType == asioTypeName)
+            {
+                // JUCE would fall back to another ASIO driver (or to no device at all) when the saved
+                // one is missing: open the default Windows Audio device instead, and remember the ASIO choice.
+                followSystemOutput = false;
+                savedAsioDriver = savedState->getStringAttribute ("audioOutputDeviceName");
 
-                        if (defaultName.isNotEmpty())
-                            savedState->setAttribute ("audioOutputDeviceName", defaultName);
-                    }
+                if (savedAsioDriver.isEmpty())
+                    savedAsioDriver = savedState->getStringAttribute ("audioDeviceName");
+
+                bool driverFound = false;
+
+                if (auto* asio = findDeviceType (deviceManager, asioTypeName))
+                {
+                    asio->scanForDevices();
+                    driverFound = savedAsioDriver.isNotEmpty() && asio->getDeviceNames (false).contains (savedAsioDriver);
+                }
+
+                if (! driverFound)
+                {
+                    juce::Logger::writeToLog ("ASIO driver \"" + savedAsioDriver + "\" not found: using Windows Audio for now");
+                    unavailableAsioState = std::move (savedState);
+                    followSystemOutput = true;
+                }
+            }
+            else if (followSystemOutput)
+            {
+                // The saved output name is stale when following: open today's default instead.
+                if (auto* type = findDeviceType (deviceManager, savedType))
+                {
+                    type->scanForDevices();
+                    const auto defaultName = type->getDeviceNames (false)[type->getDefaultDeviceIndex (false)];
+
+                    if (defaultName.isNotEmpty())
+                        savedState->setAttribute ("audioOutputDeviceName", defaultName);
+                }
+            }
         }
 
-        const auto error = deviceManager.initialise (granted ? 2 : 0, 2, savedState.get(), true);
+        auto error = deviceManager.initialise (granted ? 2 : 0, 2, savedState.get(), true);
 
         if (error.isNotEmpty())
             juce::Logger::writeToLog ("Audio device error: " + error);
+
+        if (unavailableAsioState != nullptr)
+        {
+            // Keep the MIDI inputs the user had enabled with the ASIO setup.
+            for (auto* midi : unavailableAsioState->getChildWithTagNameIterator ("MIDIINPUT"))
+                for (const auto& info : juce::MidiInput::getAvailableDevices())
+                    if (info.identifier == midi->getStringAttribute ("identifier"))
+                        deviceManager.setMidiInputDeviceEnabled (info.identifier, true);
+
+            const auto current = deviceManager.createStateXml();
+            fallbackStateAtStart = stateWithoutFollow (current.get());
+        }
+        else if (savedAsioDriver.isNotEmpty()
+                 && (deviceManager.getCurrentAudioDevice() == nullptr
+                     || deviceManager.getCurrentAudioDevice()->getName() != savedAsioDriver))
+        {
+            // The driver is installed but wouldn't open (another app holds it, or the interface was unplugged
+            // without the driver noticing), and JUCE fell back to another ASIO driver or to nothing.
+            // Not "chosen": the saved state keeps the ASIO setup for the next start.
+            juce::Logger::writeToLog ("Could not open the ASIO driver \"" + savedAsioDriver + "\": using Windows Audio for now");
+            followSystemOutput = true;
+
+            if (auto* first = deviceManager.getAvailableDeviceTypes().getFirst())
+                deviceManager.setCurrentAudioDeviceType (first->getTypeName(), false);
+        }
 
         lastOutputName = deviceManager.getAudioDeviceSetup().outputDeviceName;
         juce::Logger::writeToLog (followSystemOutput ? "Output follows the system default output"
@@ -167,9 +242,17 @@ void AppEngine::saveState()
 
     saveMetronomeIfChanged();
 
-    if (auto deviceXml = deviceManager.createStateXml())
+    auto deviceXml = deviceManager.createStateXml();
+
+    // Started on Windows Audio because the ASIO driver was missing, and the user hasn't changed anything since.
+    if (unavailableAsioState != nullptr && stateWithoutFollow (deviceXml.get()) == fallbackStateAtStart)
+        deviceXml = std::make_unique<juce::XmlElement> (*unavailableAsioState);
+
+    if (deviceXml != nullptr)
     {
-        deviceXml->setAttribute (followAttribute, followSystemOutput);
+        if (deviceXml->getStringAttribute ("deviceType") != asioTypeName)
+            deviceXml->setAttribute (followAttribute, followSystemOutput);
+
         deviceXml->writeTo (getDeviceStateFile());
     }
 
@@ -181,7 +264,8 @@ void AppEngine::saveState()
 juce::String AppEngine::getSystemDefaultOutputName() const
 {
     if (auto* type = deviceManager.getCurrentDeviceTypeObject())
-        return type->getDeviceNames (false)[type->getDefaultDeviceIndex (false)];
+        if (type->getTypeName() != asioTypeName)
+            return type->getDeviceNames (false)[type->getDefaultDeviceIndex (false)];
 
     return {};
 }
