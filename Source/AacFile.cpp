@@ -62,7 +62,8 @@ static juce::Result writeNative (const juce::File& file, const juce::AudioBuffer
         return juce::Result::fail ("can't create the file (error " + juce::String ((int) status) + ")");
 
     // The software encoder also works while the app is in the background.
-    UInt32 codec = kAppleSoftwareAudioCodecManufacturer;
+    // = kAppleSoftwareAudioCodecManufacturer ('appl'), spelled out: macOS's AudioToolbox.h doesn't declare it.
+    UInt32 codec = ((UInt32) 'a' << 24) | ((UInt32) 'p' << 16) | ((UInt32) 'p' << 8) | (UInt32) 'l';
     ExtAudioFileSetProperty (out, kExtAudioFileProperty_CodecManufacturer, sizeof (codec), &codec);
 
     AudioStreamBasicDescription client {};
