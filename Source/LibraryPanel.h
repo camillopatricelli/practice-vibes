@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Library.h"
 #include "SharePanel.h"
+#include "StudentGroups.h"
 
 namespace pv
 {
@@ -91,6 +92,8 @@ private:
     void addUrls (const juce::String& topicId, const juce::Array<juce::URL>&);
     void showTagMenu();
     void updateTagButton();
+    bool passesTagFilter (const Topic&) const;   // the tag, student or group filter
+    void editGroups();                         // teachers: overlay to add / rename / remove groups and their members
     void editResource (const juce::String& topicId, const juce::String& resourceId, bool isNewLink);
     void openResource (const Topic&, const Resource&);
     void openFile (const juce::File&, const juce::String& title);
@@ -102,6 +105,7 @@ private:
     juce::String signature;
     juce::String selectedId;                   // topic id, "inbox" or empty
     juce::String tagFilter;                    // show only topics with this tag (on the topic or a resource)
+    StudentGroups groups;                      // teachers' groups (re-read with the list)
     std::vector<juce::String> rowIds;
     bool dirty = false, rebuilding = false;
     juce::uint32 lastEdit = 0, lastPoll = 0, lastDownloadCheck = 0;

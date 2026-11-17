@@ -55,6 +55,7 @@ namespace TopicShare
         juce::StringArray includedFiles;    // file names inside the topic folder
         bool shrinkAudio = false;           // WAV / AIFF in the list go in as .m4a (AAC); needs AacFile::isAvailable()
         bool asNewTopic = false;            // a fresh copy (new id): e.g. the same lesson for another student
+        juce::String sendAsId;              // the id to put in the file (a send to a group); overrides the above
         juce::String senderName;            // "Your name" (optional): shown to the receiver
         PracticeSummary summary;            // students: their practice on this topic (opt-in; empty = not sent)
     };
@@ -109,6 +110,15 @@ namespace TopicShare
 
     enum class Mode { update, copy };   // update: same topic id -> that topic (or a new one if there's none)
 
+    /** Teachers: who the imported topic is for. A file sent to a group comes back from every member with the same id,
+        so for those (groupId set) the target is that member's own copy (Topic::group + student), made on first return
+        with the file's id as its Topic::sharedId. */
+    struct ImportAs
+    {
+        juce::String student;       // the Student box (empty = leave as it is)
+        juce::String groupId;       // set: a member of this group sent it back (student = the member)
+    };
+
     /** What importing would do. */
     struct Preview
     {
@@ -128,13 +138,12 @@ namespace TopicShare
         juce::String summary() const;           // one or two sentences for the import dialog
     };
 
-    Preview preview (const Library&, const Package&, Mode, const LocatedFiles&);
+    Preview preview (const Library&, const Package&, Mode, const LocatedFiles&, const ImportAs& = {});
 
     /** Imports into the library: copies the files in, connects left-out ones, saves topic.xml. On success topicId is
         the topic that was created or updated. Keeps the receiver's private notes, rotation switch and own resources.
         Rescan the library afterwards. */
-    juce::Result apply (Library&, const Package&, Mode, const LocatedFiles&, juce::String& topicId,
-                        const juce::String& student = {});    // teachers: the Student box (empty = leave as it is)
+    juce::Result apply (Library&, const Package&, Mode, const LocatedFiles&, juce::String& topicId, const ImportAs& = {});
 }
 
 } // namespace pv

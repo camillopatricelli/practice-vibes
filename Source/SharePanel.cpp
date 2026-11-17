@@ -22,7 +22,7 @@ SharePanel::SharePanel (const Topic& t, juce::File folder, juce::String shareBut
       context (std::move (ctx)), shareButton (shareButtonText)
 {
     getProperties().set ("overlayWidth", 680);
-    getProperties().set ("overlayHeight", 680);
+    getProperties().set ("overlayHeight", context.teacher ? 760 : 680);
 
     nameLabel.setText ("Your name", juce::dontSendNotification);
     nameLabel.setJustificationType (juce::Justification::centredRight);
@@ -37,6 +37,33 @@ SharePanel::SharePanel (const Topic& t, juce::File folder, juce::String shareBut
     newTopicToggle.setTooltip ("Gets a new topic id: importing it never updates the topic you sent to someone else");
     newTopicToggle.onClick = [this] { updateTotal(); };
     addChildComponent (newTopicToggle);
+    styleInfo (newTopicHint, 0.6f);
+    addChildComponent (newTopicHint);
+
+    // Teachers: one student, or a group (an ensemble) in one go.
+    toLabel.setText ("To", juce::dontSendNotification);
+    toLabel.setJustificationType (juce::Justification::centredRight);
+    addChildComponent (toLabel);
+    toBox.addItem (topic.student.isNotEmpty() ? topic.student + " (this topic's student)" : juce::String ("One person"), 1);
+
+    for (size_t i = 0; i < context.groups.groups.size(); ++i)
+    {
+        const auto& g = context.groups.groups[i];
+        toBox.addItem ("Group: " + g.name + " (" + juce::String (g.members.size()) + (g.members.size() == 1 ? " member)" : " members)"),
+                       100 + (int) i);
+    }
+
+    toBox.setSelectedId (1, juce::dontSendNotification);
+    toBox.setTooltip ("Groups: Topics > Tags > Edit groups...");
+    toBox.onChange = [this] { updateNewTopicDefault(); updateTotal(); resized(); };
+    addChildComponent (toBox);
+
+    groupModeBox.addItem ("One file for the whole group: send it once to the group chat or a mail to all", 1);
+    groupModeBox.addItem ("One file per member: each member gets their own file", 2);
+    groupModeBox.setSelectedId (1, juce::dontSendNotification);
+    groupModeBox.onChange = [this] { updateNewTopicDefault(); updateTotal(); };
+    addChildComponent (groupModeBox);
+    updateNewTopicDefault();
 
     if (! context.summary.isEmpty() && context.summary.sessions > 0)
         summaryToggle.setButtonText ("Include my practice on this topic: " + context.summary.describe());
@@ -115,6 +142,51 @@ SharePanel::SharePanel (const Topic& t, juce::File folder, juce::String shareBut
 
 SharePanel::~SharePanel() = default;
 
+const StudentGroup* SharePanel::chosenGroup() const
+{
+    const auto index = toBox.getSelectedId() - 100;
+
+    if (! context.teacher || isDocument() || ! juce::isPositiveAndBelow (index, (int) context.groups.groups.size()))
+        return nullptr;
+
+    return &context.groups.groups[(size_t) index];
+}
+
+const GroupSend* SharePanel::previousGroupSend() const
+{
+    const auto* group = chosenGroup();
+
+    if (group == nullptr)
+        return nullptr;
+
+    if (! onePerMember())
+        return context.groups.lastSend (topic.id, group->id);
+
+    for (auto& m : group->members)
+        if (const auto* send = context.groups.lastSend (topic.id, group->id, m))
+            return send;
+
+    return nullptr;
+}
+
+void SharePanel::updateNewTopicDefault()
+{
+    // Owner's smart default: a template (no student, never received) goes out as a new topic, so what students send
+    // back can't mix into it; a topic that belongs to a student goes out as an update of their copy.
+    // Groups: a first send is always a new topic; sending the same topic to the group again updates their copies.
+    if (chosenGroup() != nullptr)
+    {
+        const auto* previous = previousGroupSend();
+        newTopicToggle.setToggleState (previous == nullptr, juce::dontSendNotification);
+        newTopicToggle.setEnabled (previous != nullptr);
+    }
+    else
+    {
+        newTopicToggle.setToggleState (topic.student.isEmpty() && topic.lastReceived == juce::Time(), juce::dontSendNotification);
+        newTopicToggle.setEnabled (true);
+    }
+}
+
 void SharePanel::updateTotal()
 {
     juce::int64 total = 4096;   // topic.xml and the zip's own bookkeeping
@@ -129,6 +201,37 @@ void SharePanel::updateTotal()
     }
 
     newTopicToggle.setVisible (context.teacher && ! isDocument());
+    newTopicHint.setVisible (newTopicToggle.isVisible());
+    toLabel.setVisible (context.teacher && ! isDocument() && ! context.groups.groups.empty());
+    toBox.setVisible (toLabel.isVisible());
+
+    const auto* group = chosenGroup();
+    groupModeBox.setVisible (group != nullptr);
+    shareButton.setEnabled (! writing && (group == nullptr || ! group->members.isEmpty()));
+
+    if (group != nullptr)
+    {
+        newTopicToggle.setButtonText ("As a new topic for " + group->name);
+        const auto* previous = previousGroupSend();
+
+        if (group->members.isEmpty())
+            newTopicHint.setText ("This group has no members yet: add them in Topics > Tags > Edit groups...", juce::dontSendNotification);
+        else if (newTopicToggle.getToggleState() || previous == nullptr)
+            newTopicHint.setText (juce::String (onePerMember() ? "Each member gets their own new copy." : "Everyone in the group gets a new copy.")
+                                      + " What each member sends back becomes their own topic here.",
+                                  juce::dontSendNotification);
+        else
+            newTopicHint.setText ("Updates the copies the group got on " + previous->sent.formatted ("%d %b") + ".", juce::dontSendNotification);
+    }
+    else
+    {
+        newTopicToggle.setButtonText ("As a new topic: the same lesson for another student (their own copy)");
+        newTopicHint.setText (newTopicToggle.getToggleState() ? juce::String ("Your student gets their own copy: what they send back never mixes into this topic.")
+                              : topic.student.isNotEmpty() || topic.lastReceived != juce::Time() ? juce::String ("Updates their copy of this topic.")
+                              : juce::String ("Sends this topic itself: what comes back updates this topic."),
+                              juce::dontSendNotification);
+    }
+
     summaryToggle.setVisible (! context.teacher && ! isDocument() && ! context.summary.isEmpty() && context.summary.sessions > 0);
     nameLabel.setVisible (! isDocument());
     nameEditor.setVisible (! isDocument());
@@ -169,24 +272,73 @@ void SharePanel::share()
             options.includedFiles.add (items[i].fileName);
 
     outputFolder.createDirectory();
-    const auto target = TopicShare::fileNameFor (topic, outputFolder);
     const auto document = isDocument();
+
+    // What to write: one file, or (a group) one for the group / one per member, each with the id it carries.
+    struct Job { juce::File target; juce::String sendAsId, member; };
+    std::vector<Job> jobs;
+    std::vector<GroupSend> groupSends;
+
+    auto fileFor = [this] (const juce::String& suffix)
+    {
+        auto named = topic;
+        named.title << " (" << suffix << ")";
+        return TopicShare::fileNameFor (named, outputFolder);
+    };
+
+    if (const auto* group = chosenGroup(); group != nullptr && ! document)
+    {
+        const auto now = juce::Time::getCurrentTime();
+        auto idFor = [this, group] (const juce::String& member)
+        {
+            const auto* previous = context.groups.lastSend (topic.id, group->id, member);
+            return previous != nullptr && ! newTopicToggle.getToggleState() ? previous->sharedId : juce::Uuid().toDashedString();
+        };
+
+        if (onePerMember())
+            for (auto& m : group->members)
+                jobs.push_back ({ fileFor (m), idFor (m), m });
+        else
+            jobs.push_back ({ fileFor (group->name), idFor ({}), {} });
+
+        for (auto& j : jobs)
+            groupSends.push_back ({ j.sendAsId, group->id, topic.id, j.member, now });
+    }
+    else
+    {
+        jobs.push_back ({ TopicShare::fileNameFor (topic, outputFolder), {}, {} });
+    }
 
     writing = true;
     shareButton.setEnabled (false);
     shareButton.setButtonText ("Packing...");
 
-    juce::Thread::launch ([safeThis = juce::WeakReference<SharePanel> (this), topicCopy = topic, options, target, document,
+    juce::Thread::launch ([safeThis = juce::WeakReference<SharePanel> (this), topicCopy = topic, options, jobs, groupSends, document,
                            folder = outputFolder]
     {
         juce::Array<juce::File> written;
-        const auto result = document ? TopicShare::writeDocument (topicCopy, options, folder, written)
-                                     : TopicShare::write (topicCopy, options, target);
+        auto result = juce::Result::ok();
 
-        if (! document)
-            written.add (target);
+        if (document)
+        {
+            result = TopicShare::writeDocument (topicCopy, options, folder, written);
+        }
+        else
+        {
+            for (auto& job : jobs)
+            {
+                auto jobOptions = options;
+                jobOptions.sendAsId = job.sendAsId;
+                result = TopicShare::write (topicCopy, jobOptions, job.target);
 
-        juce::MessageManager::callAsync ([safeThis, result, written, document]
+                if (result.failed())
+                    break;
+
+                written.add (job.target);
+            }
+        }
+
+        juce::MessageManager::callAsync ([safeThis, result, written, document, groupSends]
         {
             const auto target = written.isEmpty() ? juce::File() : written.getFirst();
 
@@ -201,6 +353,7 @@ void SharePanel::share()
 
             safeThis->writing = false;
             safeThis->shareButton.setEnabled (true);
+            safeThis->updateTotal();
             safeThis->shareButton.setButtonText (safeThis->shareText);
 
             if (result.failed())
@@ -208,6 +361,9 @@ void SharePanel::share()
                 safeThis->totalLabel.setText ("Could not write the file: " + result.getErrorMessage(), juce::dontSendNotification);
                 return;
             }
+
+            if (! groupSends.empty() && safeThis->onGroupSent)
+                safeThis->onGroupSent (groupSends);
 
             if (safeThis->onWritten)
                 safeThis->onWritten (written, document);
@@ -238,8 +394,22 @@ void SharePanel::resized()
     if (summaryToggle.isVisible())
         summaryToggle.setBounds (area.removeFromBottom (32));
 
+    if (newTopicHint.isVisible())
+        newTopicHint.setBounds (area.removeFromBottom (24).withTrimmedLeft (30));
+
     if (newTopicToggle.isVisible())
         newTopicToggle.setBounds (area.removeFromBottom (32));
+
+    if (groupModeBox.isVisible())
+        groupModeBox.setBounds (area.removeFromBottom (38).reduced (0, 4).withTrimmedLeft (88));
+
+    if (toBox.isVisible())
+    {
+        auto row = area.removeFromBottom (38).reduced (0, 4);
+        toLabel.setBounds (row.removeFromLeft (80));
+        row.removeFromLeft (8);
+        toBox.setBounds (row);
+    }
 
     if (nameEditor.isVisible())
     {
@@ -283,7 +453,39 @@ ImportPanel::ImportPanel (std::function<Library*()> libraryFn, std::unique_ptr<T
     styleEditor (studentEditor);
     addChildComponent (studentEditor);
 
-    if (teacher && package != nullptr)
+    // A file sent to a group comes back from every member with the same id: whose copy is this?
+    if (auto* library = getLibrary ? getLibrary() : nullptr; library != nullptr && package != nullptr)
+    {
+        const auto groups = StudentGroups::load (library->getRoot());
+
+        if (const auto* send = groups.findSend (package->topic.id))
+        {
+            if (const auto* g = groups.find (send->groupId))
+            {
+                groupSend = *send;
+                group = *g;
+            }
+        }
+    }
+
+    if (groupSend.has_value())
+    {
+        memberLabel.setText ("Who sent this?", juce::dontSendNotification);
+        memberLabel.setJustificationType (juce::Justification::centredRight);
+        addAndMakeVisible (memberLabel);
+
+        for (int i = 0; i < group.members.size(); ++i)
+            memberBox.addItem (group.members[i], i + 1);
+
+        const auto member = groupSend->member.isNotEmpty() ? group.findMember (groupSend->member) : group.findMember (package->senderName);
+        memberBox.setSelectedId (group.members.indexOf (member) + 1, juce::dontSendNotification);
+        memberBox.setTextWhenNothingSelected ("Choose the member of " + group.name);
+        memberBox.setEnabled (groupSend->member.isEmpty());     // a file made for one member: it's theirs
+        memberBox.setTooltip ("Each member's copy becomes its own topic here (Student = the member, in the group " + group.name + ")");
+        memberBox.onChange = [this] { refresh(); };
+        addAndMakeVisible (memberBox);
+    }
+    else if (teacher && package != nullptr)
     {
         juce::String initial = package->senderName;
 
@@ -339,8 +541,21 @@ void ImportPanel::refresh()
     if (library == nullptr || package == nullptr)
         return;
 
-    current = TopicShare::preview (*library, *package, TopicShare::Mode::update, located);
-    summaryLabel.setText (current.summary(), juce::dontSendNotification);
+    const auto as = importAs();
+    current = TopicShare::preview (*library, *package, TopicShare::Mode::update, located, as);
+    auto summaryText = current.summary();
+
+    if (groupSend.has_value())
+    {
+        if (as.student.isEmpty())
+            summaryText = "Sent back by a member of " + group.name + ": choose who sent it.";
+        else if (! current.updatesExisting)
+            summaryText = as.student + "'s copy of the topic sent to " + group.name + ". " + summaryText;
+        else
+            summaryText = summaryText.replace ("Updates your topic", "Updates " + as.student + "'s copy");
+    }
+
+    summaryLabel.setText (summaryText, juce::dontSendNotification);
 
     juce::String text;
     auto listLine = [&text] (const juce::String& heading, const juce::StringArray& names)
@@ -369,7 +584,7 @@ void ImportPanel::refresh()
     details.setText (text.trim(), false);
 
     applyButton.setButtonText (current.updatesExisting ? "Apply update" : "Import");
-    applyButton.setEnabled (current.changesAnything());
+    applyButton.setEnabled (current.changesAnything() && ! (groupSend.has_value() && as.student.isEmpty()));
     copyButton.setVisible (current.updatesExisting);
     cancelButton.setButtonText (current.changesAnything() ? "Cancel" : "Close");
 
@@ -441,8 +656,7 @@ void ImportPanel::import (TopicShare::Mode mode)
         return;
 
     juce::String topicId;
-    const auto result = TopicShare::apply (*library, *package, mode, located, topicId,
-                                           teacher ? studentEditor.getText() : juce::String());
+    const auto result = TopicShare::apply (*library, *package, mode, located, topicId, importAs());
 
     if (result.failed())
     {
@@ -458,6 +672,23 @@ void ImportPanel::import (TopicShare::Mode mode)
         onImported (topicId);
 }
 
+TopicShare::ImportAs ImportPanel::importAs() const
+{
+    TopicShare::ImportAs as;
+
+    if (groupSend.has_value())
+    {
+        as.student = group.members[memberBox.getSelectedId() - 1];
+        as.groupId = group.id;
+    }
+    else if (teacher)
+    {
+        as.student = studentEditor.getText();
+    }
+
+    return as;
+}
+
 void ImportPanel::paint (juce::Graphics& g)
 {
     g.fillAll (theme::background());
@@ -466,6 +697,15 @@ void ImportPanel::paint (juce::Graphics& g)
 void ImportPanel::resized()
 {
     auto area = getLocalBounds().reduced (12);
+
+    if (groupSend.has_value())
+    {
+        auto row = area.removeFromTop (38).reduced (0, 4);
+        memberLabel.setBounds (row.removeFromLeft (120));
+        row.removeFromLeft (8);
+        memberBox.setBounds (row.removeFromLeft (juce::jmin (row.getWidth(), 320)));
+        area.removeFromTop (6);
+    }
 
     auto buttons = area.removeFromBottom (40);
     applyButton.setBounds (buttons.removeFromRight (160).reduced (2, 3));

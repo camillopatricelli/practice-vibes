@@ -167,6 +167,154 @@ private:
 };
 
 //==============================================================================
+/** Overlay: the teacher's groups (ensembles): a name and its members, one row per group. */
+class GroupEditor final : public juce::Component
+{
+public:
+    GroupEditor (const StudentGroups& g, const juce::StringArray& knownStudents,
+                 std::function<void (StudentGroups)> onSave, std::function<void()> onCancel)
+        : groups (g), saved (std::move (onSave)), cancelled (std::move (onCancel))
+    {
+        getProperties().set ("overlayWidth", 680);
+        getProperties().set ("overlayHeight", 560);
+
+        introLabel.setText ("A group gets one topic in one go (Share > To). Members are first names or nicknames, separated "
+                            "by commas, as in the Student boxes. Groups stay on your devices: never sent to anyone.",
+                            juce::dontSendNotification);
+        introLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.7f));
+        introLabel.setJustificationType (juce::Justification::topLeft);
+        addAndMakeVisible (introLabel);
+
+        studentsLabel.setText (knownStudents.isEmpty() ? juce::String()
+                                                       : "Your students: " + knownStudents.joinIntoString (", "),
+                               juce::dontSendNotification);
+        studentsLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.5f));
+        studentsLabel.setJustificationType (juce::Justification::topLeft);
+        studentsLabel.setMinimumHorizontalScale (0.7f);
+        addAndMakeVisible (studentsLabel);
+
+        viewport.setViewedComponent (&rowHolder, false);
+        viewport.setScrollBarsShown (true, false);
+        addAndMakeVisible (viewport);
+
+        addButton.onClick = [this] { readRows(); groups.add ({}); buildRows(); nameEditors.getLast()->grabKeyboardFocus(); };
+        saveButton.setColour (juce::TextButton::buttonColourId, theme::accent());
+        saveButton.onClick = [this]
+        {
+            readRows();
+            auto result = groups;
+            result.groups.erase (std::remove_if (result.groups.begin(), result.groups.end(),
+                                                 [] (const StudentGroup& sg) { return sg.name.isEmpty() && sg.members.isEmpty(); }),
+                                 result.groups.end());
+
+            for (auto& sg : result.groups)
+                if (sg.name.isEmpty())
+                    sg.name = "Group";
+
+            if (saved) saved (std::move (result));
+        };
+        cancelButton.onClick = [this] { if (cancelled) cancelled(); };
+
+        for (auto* b : { &addButton, &saveButton, &cancelButton })
+            addAndMakeVisible (*b);
+
+        if (groups.groups.empty())
+            groups.add ({});
+
+        buildRows();
+    }
+
+    void paint (juce::Graphics& g) override    { g.fillAll (theme::background()); }
+
+    void resized() override
+    {
+        auto area = getLocalBounds().reduced (14);
+        auto buttons = area.removeFromBottom (40);
+        saveButton.setBounds (buttons.removeFromRight (120).reduced (2, 3));
+        cancelButton.setBounds (buttons.removeFromRight (110).reduced (2, 3));
+        addButton.setBounds (buttons.removeFromLeft (140).reduced (2, 3));
+        area.removeFromBottom (8);
+        introLabel.setBounds (area.removeFromTop (48));
+        studentsLabel.setBounds (area.removeFromTop (studentsLabel.getText().isEmpty() ? 0 : 26));
+        area.removeFromTop (6);
+        viewport.setBounds (area);
+
+        constexpr int rowHeight = 40;
+        const auto width = juce::jmax (1, viewport.getMaximumVisibleWidth());
+        rowHolder.setSize (width, juce::jmax (1, nameEditors.size() * rowHeight));
+
+        for (int i = 0; i < nameEditors.size(); ++i)
+        {
+            auto row = juce::Rectangle<int> (0, i * rowHeight, width, rowHeight).reduced (0, 4);
+            removeButtons[i]->setBounds (row.removeFromRight (90).reduced (2, 0));
+            nameEditors[i]->setBounds (row.removeFromLeft (190));
+            row.removeFromLeft (8);
+            memberEditors[i]->setBounds (row.withTrimmedRight (6));
+        }
+    }
+
+private:
+    void readRows()
+    {
+        for (int i = 0; i < nameEditors.size() && i < (int) groups.groups.size(); ++i)
+        {
+            auto& sg = groups.groups[(size_t) i];
+            sg.name = nameEditors[i]->getText().trim().substring (0, 60);
+            sg.members.clear();
+
+            for (auto m : juce::StringArray::fromTokens (memberEditors[i]->getText(), ",", ""))
+                if (m = m.trim().substring (0, 60); m.isNotEmpty())
+                    sg.members.addIfNotAlreadyThere (m, true);
+        }
+    }
+
+    void buildRows()
+    {
+        nameEditors.clear();
+        memberEditors.clear();
+        removeButtons.clear();
+
+        for (size_t i = 0; i < groups.groups.size(); ++i)
+        {
+            const auto& sg = groups.groups[i];
+            auto* name = nameEditors.add (new juce::TextEditor());
+            name->setText (sg.name, false);
+            name->setTextToShowWhenEmpty ("Group name", theme::text().withAlpha (0.35f));
+            styleEditor (*name);
+            rowHolder.addAndMakeVisible (name);
+
+            auto* members = memberEditors.add (new juce::TextEditor());
+            members->setText (sg.members.joinIntoString (", "), false);
+            members->setTextToShowWhenEmpty ("Members, e.g. Anna, Marco, Luca", theme::text().withAlpha (0.35f));
+            styleEditor (*members);
+            rowHolder.addAndMakeVisible (members);
+
+            auto* remove = removeButtons.add (new juce::TextButton ("Remove"));
+            remove->setTooltip ("Removes the group (its members' topics stay)");
+            remove->onClick = [this, i]
+            {
+                readRows();
+                groups.groups.erase (groups.groups.begin() + (std::ptrdiff_t) i);
+                buildRows();
+            };
+            rowHolder.addAndMakeVisible (remove);
+        }
+
+        resized();
+    }
+
+    StudentGroups groups;
+    std::function<void (StudentGroups)> saved;
+    std::function<void()> cancelled;
+    juce::Label introLabel, studentsLabel;
+    juce::Component rowHolder;
+    juce::Viewport viewport;
+    juce::OwnedArray<juce::TextEditor> nameEditors, memberEditors;
+    juce::OwnedArray<juce::TextButton> removeButtons;
+    juce::TextButton addButton { "+ Add group" }, saveButton { "Save" }, cancelButton { "Cancel" };
+};
+
+//==============================================================================
 /** Title, created date, notes and the resource list of one topic. Files can be dropped onto it (desktop). */
 class LibraryPanel::TopicView final : public juce::Component,
                                       public juce::FileDragAndDropTarget
@@ -223,6 +371,11 @@ public:
         summaryLabel.setColour (juce::Label::textColourId, theme::good());
         summaryLabel.setMinimumHorizontalScale (0.6f);
         addChildComponent (summaryLabel);
+
+        groupLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.7f));
+        groupLabel.setMinimumHorizontalScale (0.6f);
+        groupLabel.setJustificationType (juce::Justification::centredLeft);
+        addChildComponent (groupLabel);
 
         deleteButton.onClick = [this] { owner.deleteTopic (topicId); };
         addAndMakeVisible (deleteButton);
@@ -338,6 +491,21 @@ public:
         assignmentLabel.setText (topic.assignment.isEmpty() ? juce::String ("No assignment yet")
                                                             : "Assignment: " + topic.assignment.describe(), juce::dontSendNotification);
         assignmentLabel.setTooltip (topic.assignment.describe());
+
+        // Groups: who got this topic and who sent something back; a member's copy names its group.
+        juce::String groupText = owner.groups.describeSends (*owner.library, topic.id);
+
+        if (const auto* g = owner.groups.find (topic.group); g != nullptr && topic.group.isNotEmpty())
+            groupText = ("In the group " + g->name + (groupText.isNotEmpty() ? "\n" : "")) + groupText;
+
+        groupLabel.setText (groupText, juce::dontSendNotification);
+        groupLabel.setTooltip (groupText.replace ("\n", "  "));
+
+        if (groupLabel.isVisible() != groupText.isNotEmpty())
+        {
+            groupLabel.setVisible (groupText.isNotEmpty());
+            resized();
+        }
 
         summaryLabel.setVisible (! topic.studentSummary.isEmpty());
         summaryLabel.setText ("Student's practice (sent " + formatDate (topic.studentSummary.made) + "): " + topic.studentSummary.describe(),
@@ -480,6 +648,9 @@ public:
         if (summaryLabel.isVisible())
             summaryLabel.setBounds (area.removeFromTop (26));
 
+        if (groupLabel.isVisible())
+            groupLabel.setBounds (area.removeFromTop (juce::jmin (3, juce::StringArray::fromLines (groupLabel.getText()).size()) * 20 + 6));
+
         if (conflictLabel.isVisible())
         {
             auto row = area.removeFromTop (28);
@@ -541,6 +712,7 @@ private:
 
     LibraryPanel& owner;
     juce::TextEditor titleEditor, tagsEditor, descriptionEditor, privateNotesEditor, studentEditor;
+    juce::Label groupLabel;
     juce::Label assignmentLabel, summaryLabel, createdLabel, notesLabel, privateNotesLabel, resourcesLabel, conflictLabel, noResourcesLabel;
     juce::TextButton deleteButton { "Delete topic" }, addFilesButton { "Add files..." }, addLinkButton { "Add link..." },
                      practiseButton { "Practise" }, shareButton { "Share..." }, assignmentButton { "Assignment..." }, historyButton { "History" }, conflictButton { "Choose version..." };
@@ -886,8 +1058,26 @@ void LibraryPanel::shareTopic (const juce::String& topicId)
     const juce::String buttonText = "Share...";
    #endif
 
-    auto panel = std::make_unique<SharePanel> (*t, folder, buttonText, getShareContext ? getShareContext (topicId) : ShareContext());
+    auto context = getShareContext ? getShareContext (topicId) : ShareContext();
+
+    if (context.teacher)
+        context.groups = StudentGroups::load (library->getRoot());
+
+    auto panel = std::make_unique<SharePanel> (*t, folder, buttonText, std::move (context));
     panel->onCancel = [this] { if (hideOverlay) hideOverlay(); };
+    panel->onGroupSent = [this] (const std::vector<GroupSend>& sends)
+    {
+        if (library == nullptr)
+            return;
+
+        auto current = StudentGroups::load (library->getRoot());   // fresh: another device may have changed it
+        current.sends.insert (current.sends.end(), sends.begin(), sends.end());
+
+        if (! current.save (library->getRoot()))
+            juce::Logger::writeToLog ("Could not save the group sends");
+
+        groups = std::move (current);
+    };
     panel->onWritten = [this, topicId] (const juce::Array<juce::File>& files, bool isDocument)
     {
         juce::ignoreUnused (isDocument);
@@ -1194,8 +1384,10 @@ void LibraryPanel::showTagMenu()
             students.add (t.student);
 
     students.sortNatural();
+    groups = StudentGroups::load (library->getRoot());
+    const bool teacher = isTeacher && isTeacher();
 
-    if (! students.isEmpty())
+    if (! students.isEmpty() || ! groups.groups.empty() || teacher)
     {
         menu.addSectionHeader ("Students");
 
@@ -1215,6 +1407,27 @@ void LibraryPanel::showTagMenu()
                 rebuildList (selectedId);
             });
         }
+
+        for (auto& g : groups.groups)
+        {
+            const auto filter = Topic::groupFilter (g.id);
+            int count = 0;
+
+            for (auto& t : library->getTopics())
+                if (t.matchesTag (filter) || std::any_of (groups.sends.begin(), groups.sends.end(),
+                                                          [&] (const GroupSend& s) { return s.topicId == t.id && s.groupId == g.id; }))
+                    ++count;
+
+            menu.addItem ("Group: " + g.name + "  (" + juce::String (count) + ")", true, filter == tagFilter, [this, filter]
+            {
+                tagFilter = filter;
+                updateTagButton();
+                rebuildList (selectedId);
+            });
+        }
+
+        if (teacher)
+            menu.addItem (groups.groups.empty() ? "New group (ensemble)..." : "Edit groups...", [this] { editGroups(); });
     }
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&tagsButton));
@@ -1222,11 +1435,68 @@ void LibraryPanel::showTagMenu()
 
 void LibraryPanel::updateTagButton()
 {
+    const auto* group = tagFilter.startsWith ("@group:") ? groups.find (tagFilter.fromFirstOccurrenceOf (":", false, false)) : nullptr;
     tagsButton.setButtonText (tagFilter.isEmpty() ? juce::String ("Tags")
                               : tagFilter.startsWith ("@student:") ? "Student: " + tagFilter.fromFirstOccurrenceOf (":", false, false) + "   (change / clear)"
+                              : tagFilter.startsWith ("@group:") ? "Group: " + (group != nullptr ? group->name : juce::String ("?")) + "   (change / clear)"
                               : "Tag: " + tagFilter + "   (change / clear)");
     tagsButton.setColour (juce::TextButton::buttonColourId,
                           tagFilter.isEmpty() ? getLookAndFeel().findColour (juce::TextButton::buttonColourId) : theme::accent());
+}
+
+bool LibraryPanel::passesTagFilter (const Topic& t) const
+{
+    if (t.matchesTag (tagFilter))
+        return true;
+
+    // A group: its members' copies (above) and the topics sent to it.
+    if (! tagFilter.startsWith ("@group:"))
+        return false;
+
+    const auto groupId = tagFilter.fromFirstOccurrenceOf (":", false, false);
+    return std::any_of (groups.sends.begin(), groups.sends.end(),
+                        [&] (const GroupSend& s) { return s.topicId == t.id && s.groupId == groupId; });
+}
+
+void LibraryPanel::editGroups()
+{
+    if (library == nullptr || ! showOverlay)
+        return;
+
+    flush();
+    juce::StringArray students;
+
+    for (auto& t : library->getTopics())
+        if (t.student.isNotEmpty())
+            students.addIfNotAlreadyThere (t.student, true);
+
+    students.sortNatural();
+
+    showOverlay ("Groups", std::make_unique<GroupEditor> (StudentGroups::load (library->getRoot()), students,
+        [this] (StudentGroups edited)
+        {
+            if (library != nullptr)
+            {
+                // Keep sends recorded meanwhile (another device), take the groups from the editor.
+                auto current = StudentGroups::load (library->getRoot());
+                current.groups = std::move (edited.groups);
+
+                if (! current.save (library->getRoot()))
+                    showError ("Could not save the groups.");
+
+                groups = std::move (current);
+
+                if (tagFilter.startsWith ("@group:") && groups.find (tagFilter.fromFirstOccurrenceOf (":", false, false)) == nullptr)
+                    tagFilter = {};
+
+                updateTagButton();
+                rebuildList (selectedId);
+            }
+
+            if (hideOverlay)
+                hideOverlay();
+        },
+        [this] { if (hideOverlay) hideOverlay(); }));
 }
 
 void LibraryPanel::rebuildList (const juce::String& idToSelect)
@@ -1242,8 +1512,10 @@ void LibraryPanel::rebuildList (const juce::String& idToSelect)
         if (! library->getInbox().isEmpty() && ! filtering)
             rowIds.push_back (inboxId);
 
+        groups = StudentGroups::load (library->getRoot());
+
         for (auto& t : library->getTopics())
-            if (t.matches (searchBox.getText()) && t.matchesTag (tagFilter))
+            if (t.matches (searchBox.getText()) && passesTagFilter (t))
                 rowIds.push_back (t.id);
     }
 
@@ -1316,7 +1588,7 @@ void LibraryPanel::selectTopic (const juce::String& topicId)
 
     flush();
 
-    if (auto* t = library->findTopic (topicId); ! t->matches (searchBox.getText()) || ! t->matchesTag (tagFilter))
+    if (auto* t = library->findTopic (topicId); ! t->matches (searchBox.getText()) || ! passesTagFilter (*t))
     {
         searchBox.clear();
         tagFilter = {};

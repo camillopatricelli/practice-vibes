@@ -142,6 +142,9 @@ struct Topic
 
     // Sharing. Never sent along: kept on this user's devices only.
     juce::String student;               // teachers: who the topic is for (a first name or nickname, typed by the teacher)
+    juce::String group;                 // teachers: the StudentGroup (id) a member's copy belongs to
+    juce::String sharedId;              // the id the other side knows this topic by, when it differs from `id`
+                                        // (a member's copy of a topic sent to a group): sent instead of `id`
     juce::Time lastSent, lastReceived;
     PracticeSummary studentSummary;     // the latest summary a student sent with this topic (read-only)
 
@@ -162,6 +165,8 @@ struct Topic
 
     /** The tag filter value that means "topics for this student" (Topics > Tags menu). */
     static juce::String studentFilter (const juce::String& student)     { return "@student:" + student; }
+    /** The tag filter value that means "topics of this group" (members' copies; the panel adds the topics sent to it). */
+    static juce::String groupFilter (const juce::String& groupId)       { return "@group:" + groupId; }
 
     /** True if the topic or any of its resources carries the tag (empty tag = always), or it's the student filter. */
     bool matchesTag (const juce::String& tag) const;

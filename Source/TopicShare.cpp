@@ -1,4 +1,5 @@
 #include "TopicShare.h"
+#include "StudentGroups.h"
 #include "AacFile.h"
 #include "PracticeLog.h"
 #include "Take.h"
@@ -238,12 +239,16 @@ juce::Result write (const Topic& topic, const ExportOptions& options, const juce
     Topic shared = topic;
     shared.privateNotes = {};
     shared.inRotation = false;
-    shared.student = {};
+    shared.student = shared.group = shared.sharedId = {};
     shared.lastSent = shared.lastReceived = {};
     shared.studentSummary = options.summary;     // only the sender's own summary, if they chose to send it
 
-    if (options.asNewTopic)
+    if (options.sendAsId.isNotEmpty())
+        shared.id = options.sendAsId;
+    else if (options.asNewTopic)
         shared.id = juce::Uuid().toDashedString();
+    else if (topic.sharedId.isNotEmpty())
+        shared.id = topic.sharedId;              // a member's copy: their topic has the id the group got
 
     juce::TemporaryFile tempZip (target);
     TempFolder shrinkFolderHolder;
@@ -634,7 +639,7 @@ std::unique_ptr<Package> open (const juce::File& pvtopic, juce::String& error)
 
     // Never taken from a shared file, even if someone put them in.
     package->topic.privateNotes = {};
-    package->topic.student = {};
+    package->topic.student = package->topic.group = package->topic.sharedId = {};
     package->topic.lastSent = package->topic.lastReceived = {};
     package->topic.studentSummary = {};
     package->topic.conflictFiles.clear();
@@ -667,13 +672,20 @@ juce::File findInLibrary (const Library& library, const juce::String& fileName, 
 //==============================================================================
 namespace
 {
-    const Topic* targetFor (const Library& library, const Package& package, Mode mode)
+    const Topic* targetFor (const Library& library, const Package& package, Mode mode, const ImportAs& as)
     {
         if (mode == Mode::copy || package.topic.id.isEmpty())
             return nullptr;
 
+        if (as.groupId.isNotEmpty())
+            return StudentGroups::findMemberCopy (library, package.topic.id, as.groupId, as.student.trim());
+
         for (auto& t : library.getTopics())
             if (t.id == package.topic.id)
+                return &t;
+
+        for (auto& t : library.getTopics())
+            if (t.sharedId == package.topic.id)
                 return &t;
 
         return nullptr;
@@ -747,11 +759,11 @@ juce::String Preview::summary() const
     return text;
 }
 
-Preview preview (const Library& library, const Package& package, Mode mode, const LocatedFiles& located)
+Preview preview (const Library& library, const Package& package, Mode mode, const LocatedFiles& located, const ImportAs& as)
 {
     Preview p;
     const auto& incoming = package.topic;
-    const auto* target = targetFor (library, package, mode);
+    const auto* target = targetFor (library, package, mode, as);
 
     p.updatesExisting = target != nullptr;
     p.title = incoming.title;
@@ -834,10 +846,11 @@ Preview preview (const Library& library, const Package& package, Mode mode, cons
 }
 
 juce::Result apply (Library& library, const Package& package, Mode mode, const LocatedFiles& located, juce::String& topicId,
-                    const juce::String& student)
+                    const ImportAs& as)
 {
     const auto& incoming = package.topic;
-    const auto* existing = targetFor (library, package, mode);
+    const auto* existing = targetFor (library, package, mode, as);
+    const bool memberCopy = mode == Mode::update && as.groupId.isNotEmpty() && incoming.id.isNotEmpty();
 
     // Sources first (a reconnect may come from a topic folder; nothing moves until all are known).
     std::map<juce::String, juce::File> sources;
@@ -847,7 +860,7 @@ juce::Result apply (Library& library, const Package& package, Mode mode, const L
             sources[r.fileName] = sourceFor (library, package, located, r.fileName, existing != nullptr ? existing->folder : juce::File());
 
     Topic* target = existing != nullptr ? library.findTopic (existing->id)
-                                        : library.createTopic (incoming.title, mode == Mode::copy ? juce::String() : incoming.id);
+                                        : library.createTopic (incoming.title, mode == Mode::copy || memberCopy ? juce::String() : incoming.id);
 
     if (target == nullptr)
         return juce::Result::fail ("Could not create the topic folder in the library.");
@@ -909,8 +922,14 @@ juce::Result apply (Library& library, const Package& package, Mode mode, const L
     if (! package.summary.isEmpty())
         target->studentSummary = package.summary;
 
-    if (student.trim().isNotEmpty())
-        target->student = student.trim().substring (0, 60);
+    if (as.student.trim().isNotEmpty())
+        target->student = as.student.trim().substring (0, 60);
+
+    if (memberCopy)
+    {
+        target->group = as.groupId;
+        target->sharedId = incoming.id;     // replies from this copy carry the id the member has
+    }
 
     target->lastReceived = juce::Time::getCurrentTime();
     target->title = incoming.title.isNotEmpty() ? incoming.title : target->title;

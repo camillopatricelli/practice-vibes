@@ -24,6 +24,7 @@
 #include "../Source/AacFile.h"
 #include "../Source/Take.h"
 #include "../Source/TopicShare.h"
+#include "../Source/StudentGroups.h"
 #include "../Source/Tuner.h"
 #include "../Source/GainMeterProcessor.h"
 
@@ -4479,6 +4480,116 @@ static void stemsDeveloperRun()
     out.write (stems.data(), stems.size() * sizeof (float));
 }
 
+static void testStudentGroups()
+{
+    std::cout << "Student groups (one topic to an ensemble)" << std::endl;
+
+    juce::TemporaryFile tempT, tempA, tempM, tempOut;
+    const auto rootT = tempT.getFile(), rootA = tempA.getFile(), rootM = tempM.getFile(), out = tempOut.getFile();
+    for (auto& f : { rootT, rootA, rootM, out })
+        f.createDirectory();
+
+    Library teacher (rootT), anna (rootA), marco (rootM);
+    auto* master = teacher.createTopic ("Quartet in G");
+    const auto masterId = master->id;
+    master->description = "Parts for Tuesday";
+    master->folder.getChildFile ("Score.pdf").replaceWithText ("score");
+    teacher.saveTopic (*master);
+    teacher.rescan();
+
+    // Groups: saved in the library, members matched loosely.
+    StudentGroups groups;
+    auto& g = groups.add ("Quartetto Tuesday");
+    g.members = { "Anna", "Marco" };
+    const auto groupId = g.id;
+    check (groups.save (rootT), "groups saved");
+    groups = StudentGroups::load (rootT);
+    check (groups.groups.size() == 1 && groups.groups[0].members.size() == 2 && groups.groups[0].name == "Quartetto Tuesday",
+           "groups load back");
+    check (groups.groups[0].findMember ("anna rossi") == "Anna" && groups.groups[0].findMember ("Marc").isEmpty(),
+           "member from the sender's name");
+
+    // One file for the whole group, with its own id.
+    const auto groupFile = out.getChildFile ("group.pvtopic");
+    TopicShare::ExportOptions options;
+    options.includedFiles = { "Score.pdf" };
+    options.sendAsId = juce::Uuid().toDashedString();
+    check (TopicShare::write (*teacher.findTopic (masterId), options, groupFile).wasOk(), "group file written");
+    groups.sends.push_back ({ options.sendAsId, groupId, masterId, {}, juce::Time::getCurrentTime() });
+    groups.save (rootT);
+    groups = StudentGroups::load (rootT);
+    check (groups.findSend (options.sendAsId) != nullptr && groups.lastSend (masterId, groupId) != nullptr
+               && groups.lastSend (masterId, groupId, "Anna") == nullptr, "send remembered");
+
+    // Both members import it and send it back with something of their own.
+    auto memberReturn = [&] (Library& lib, const juce::String& name, const juce::File& back)
+    {
+        juce::String error, id;
+        auto package = TopicShare::open (groupFile, error);
+        TopicShare::apply (lib, *package, TopicShare::Mode::update, {}, id);
+        lib.rescan();
+        auto* t = lib.findTopic (id);
+        check (t != nullptr && t->id == options.sendAsId, name + ": the group's id");
+        t->folder.getChildFile (name + " take.m4a").replaceWithText (name);
+        lib.rescan();
+        t = lib.findTopic (id);
+        TopicShare::ExportOptions o;
+        o.senderName = name + " Rossi";
+        o.includedFiles = { name + " take.m4a" };
+        TopicShare::write (*t, o, back);
+    };
+
+    const auto fromAnna = out.getChildFile ("anna.pvtopic"), fromMarco = out.getChildFile ("marco.pvtopic");
+    memberReturn (anna, "Anna", fromAnna);
+    memberReturn (marco, "Marco", fromMarco);
+
+    // Teacher: each return becomes that member's own copy; the master is left alone.
+    auto importReturn = [&] (const juce::File& file, bool expectExisting) -> juce::String
+    {
+        juce::String error, id;
+        auto package = TopicShare::open (file, error);
+        const auto* send = groups.findSend (package->topic.id);
+        const auto member = send != nullptr ? groups.find (send->groupId)->findMember (package->senderName) : juce::String();
+        const TopicShare::ImportAs as { member, groupId };
+        const auto p = TopicShare::preview (teacher, *package, TopicShare::Mode::update, {}, as);
+        check (send != nullptr && member.isNotEmpty() && p.updatesExisting == expectExisting,
+               "return from " + package->senderName + (expectExisting ? ": updates their copy" : ": new copy"));
+        TopicShare::apply (teacher, *package, TopicShare::Mode::update, {}, id, as);
+        teacher.rescan();
+        return id;
+    };
+
+    const auto annaCopy = importReturn (fromAnna, false);
+    const auto marcoCopy = importReturn (fromMarco, false);
+    const auto* a = teacher.findTopic (annaCopy);
+    check (a != nullptr && annaCopy != masterId && annaCopy != marcoCopy && a->student == "Anna" && a->group == groupId
+               && a->sharedId == options.sendAsId && a->folder.getChildFile ("Anna take.m4a").existsAsFile(),
+           "member copy: Student, group, the id the member has");
+    check (teacher.findTopic (masterId)->resources.size() == 1, "master untouched by the returns");
+    check (importReturn (fromAnna, true) == annaCopy, "second return from Anna updates her copy");
+    check (teacher.findTopic (marcoCopy)->matchesTag (Topic::groupFilter (groupId)), "group filter finds member copies");
+
+    const auto status = groups.describeSends (teacher, masterId);
+    check (status.contains ("Sent to Quartetto Tuesday") && status.contains ("Back from Anna") && status.contains ("Marco"),
+           "group status: " + status);
+
+    // A reply from Anna's copy carries her id; local fields never travel.
+    const auto reply = out.getChildFile ("reply.pvtopic");
+    TopicShare::write (*teacher.findTopic (annaCopy), {}, reply);
+    juce::String error;
+    auto package = TopicShare::open (reply, error);
+    check (package != nullptr && package->topic.id == options.sendAsId && package->topic.group.isEmpty()
+               && package->topic.sharedId.isEmpty(), "reply: Anna's id, no group or sharedId inside");
+    juce::ZipFile zip (reply);
+    std::unique_ptr<juce::InputStream> in (zip.createStreamForEntry (*zip.getEntry ("topic.xml")));
+    const auto xml = in != nullptr ? in->readEntireStreamAsString() : juce::String();
+    check (! xml.contains ("sharedId") && ! xml.contains (groupId) && ! xml.contains ("student="), "reply topic.xml has no local fields");
+
+    juce::String importedId;
+    TopicShare::apply (anna, *package, TopicShare::Mode::update, {}, importedId);
+    check (importedId == options.sendAsId, "Anna's copy updates on her side");
+}
+
 static void testTopicShare()
 {
     std::cout << "Topic sharing (.pvtopic)" << std::endl;
@@ -4734,7 +4845,7 @@ static void testTopicShare()
 
         check (! package->summary.isEmpty() && package->summary.sessions == 12 && package->summary.weeklySeconds.size() == 4,
                "summary travels to the teacher");
-        TopicShare::apply (teacher, *package, TopicShare::Mode::update, {}, importedId, "Anna B.");
+        TopicShare::apply (teacher, *package, TopicShare::Mode::update, {}, importedId, { "Anna B." });
         teacher.rescan();
         t = teacher.findTopic (topicId);
         check (t->studentSummary.sessions == 12 && t->student == "Anna B.", "teacher keeps the summary and the Student box");
@@ -4855,6 +4966,7 @@ int main()
     testTunings();
     testLibrary();
     testTopicShare();
+    testStudentGroups();
     testLinks();
     testPracticeLog();
     testLogCorrections();

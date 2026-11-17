@@ -178,6 +178,7 @@ target_sources(PracticeVibes PRIVATE
     Source/Take.cpp
     Source/TodayPanel.cpp
     Source/TopicShare.cpp
+    Source/StudentGroups.cpp
     Source/SharePanel.cpp
     Source/Theme.cpp
     Source/Tuner.cpp
@@ -315,6 +316,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         Source/Take.cpp
         Source/Theme.cpp
         Source/TopicShare.cpp
+        Source/StudentGroups.cpp
         Source/Tuner.cpp)
 
     pv_use_onnxruntime(PracticeVibesTests)

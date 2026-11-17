@@ -278,6 +278,9 @@ bool Topic::matchesTag (const juce::String& tag) const
     if (tag.startsWith ("@student:"))
         return student.equalsIgnoreCase (tag.fromFirstOccurrenceOf (":", false, false));
 
+    if (tag.startsWith ("@group:"))
+        return group.isNotEmpty() && group == tag.fromFirstOccurrenceOf (":", false, false);
+
     if (tag.isEmpty() || hasTag (tags, tag))
         return true;
 
@@ -567,6 +570,8 @@ bool Library::loadTopic (const juce::File& folder, Topic& topic)
             topic.privateNotes = d->getAllSubText();
 
         topic.student = xml->getStringAttribute ("student");
+        topic.group = xml->getStringAttribute ("group");
+        topic.sharedId = xml->getStringAttribute ("sharedId");
         topic.lastSent = juce::Time::fromISO8601 (xml->getStringAttribute ("lastSent"));
         topic.lastReceived = juce::Time::fromISO8601 (xml->getStringAttribute ("lastReceived"));
 
@@ -842,6 +847,8 @@ std::unique_ptr<juce::XmlElement> Library::topicToXml (const Topic& t)
         xml.createNewChildElement ("PRIVATE_NOTES")->addTextElement (t.privateNotes);
 
     if (t.student.isNotEmpty())                 xml.setAttribute ("student", t.student);
+    if (t.group.isNotEmpty())                   xml.setAttribute ("group", t.group);
+    if (t.sharedId.isNotEmpty())                xml.setAttribute ("sharedId", t.sharedId);
     if (t.lastSent != juce::Time())             xml.setAttribute ("lastSent", t.lastSent.toISO8601 (true));
     if (t.lastReceived != juce::Time())         xml.setAttribute ("lastReceived", t.lastReceived.toISO8601 (true));
     if (! t.studentSummary.isEmpty())           t.studentSummary.toXml (xml);
