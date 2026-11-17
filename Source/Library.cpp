@@ -306,6 +306,137 @@ juce::String Topic::describeMatch (const juce::String& searchText, const juce::S
 }
 
 //==============================================================================
+juce::String formatMarkTime (double seconds)
+{
+    const auto total = juce::roundToInt (juce::jmax (0.0, seconds));
+    const auto h = total / 3600, m = (total / 60) % 60, s = total % 60;
+    return h > 0 ? juce::String::formatted ("%d:%02d:%02d", h, m, s) : juce::String::formatted ("%d:%02d", m, s);
+}
+
+juce::String SongMark::describe() const
+{
+    juce::String head;
+
+    if (isLoop())
+    {
+        head << "Loop " << formatMarkTime (start) << "-" << formatMarkTime (end);
+
+        if (speed > 0.0 && std::abs (speed - 1.0) > 0.001)
+            head << " at " << juce::roundToInt (speed * 100.0) << " %";
+
+        if (std::abs (semitones) > 0.05)
+            head << (semitones > 0 ? " +" : " ") << juce::String (semitones, 1) << " st";
+    }
+    else
+    {
+        head << formatMarkTime (start);
+    }
+
+    return text.isNotEmpty() ? head + "  " + text : head;
+}
+
+juce::String PracticeSummary::describe() const
+{
+    if (isEmpty())
+        return {};
+
+    auto duration = [] (double seconds)
+    {
+        const auto minutes = juce::roundToInt (seconds / 60.0);
+        return minutes >= 60 ? juce::String (minutes / 60) + " h " + juce::String (minutes % 60) + " min"
+                             : juce::String (minutes) + " min";
+    };
+
+    juce::String text;
+    text << duration (totalSeconds) << " in " << (int) weeklySeconds.size() << " weeks ("
+         << sessions << (sessions == 1 ? " session)" : " sessions)");
+
+    if (firstBpm > 0.0 && lastBpm > 0.0)
+        text << " \u00b7 tempo " << juce::roundToInt (firstBpm) << (std::abs (firstBpm - lastBpm) >= 1.0 ? " -> " + juce::String (juce::roundToInt (lastBpm)) : juce::String()) << " bpm";
+
+    if (firstSpeed > 0.0 && lastSpeed > 0.0)
+        text << " \u00b7 song speed " << juce::roundToInt (firstSpeed * 100.0)
+             << (std::abs (firstSpeed - lastSpeed) >= 0.01 ? " -> " + juce::String (juce::roundToInt (lastSpeed * 100.0)) : juce::String()) << " %";
+
+    if (streakDays > 1)
+        text << " \u00b7 " << streakDays << " days in a row";
+
+    return text;
+}
+
+void PracticeSummary::toXml (juce::XmlElement& parent) const
+{
+    auto* e = parent.createNewChildElement ("PRACTICE_SUMMARY");
+    e->setAttribute ("made", made.toISO8601 (true));
+    e->setAttribute ("total", juce::String (totalSeconds, 0));
+    e->setAttribute ("sessions", sessions);
+    e->setAttribute ("streak", streakDays);
+    e->setAttribute ("firstBpm", juce::String (firstBpm, 1));
+    e->setAttribute ("lastBpm", juce::String (lastBpm, 1));
+    e->setAttribute ("firstSpeed", juce::String (firstSpeed, 3));
+    e->setAttribute ("lastSpeed", juce::String (lastSpeed, 3));
+
+    juce::StringArray weeks;
+
+    for (auto w : weeklySeconds)
+        weeks.add (juce::String (w, 0));
+
+    e->setAttribute ("weeks", weeks.joinIntoString (","));
+}
+
+PracticeSummary PracticeSummary::fromXml (const juce::XmlElement& e)
+{
+    PracticeSummary s;
+    s.made = juce::Time::fromISO8601 (e.getStringAttribute ("made"));
+    s.totalSeconds = juce::jmax (0.0, e.getDoubleAttribute ("total"));
+    s.sessions = juce::jmax (0, e.getIntAttribute ("sessions"));
+    s.streakDays = juce::jlimit (0, 10000, e.getIntAttribute ("streak"));
+    s.firstBpm = e.getDoubleAttribute ("firstBpm");
+    s.lastBpm = e.getDoubleAttribute ("lastBpm");
+    s.firstSpeed = e.getDoubleAttribute ("firstSpeed");
+    s.lastSpeed = e.getDoubleAttribute ("lastSpeed");
+
+    for (auto& w : juce::StringArray::fromTokens (e.getStringAttribute ("weeks"), ",", {}))
+        if (s.weeklySeconds.size() < 104)
+            s.weeklySeconds.push_back (juce::jmax (0.0, w.getDoubleValue()));
+
+    return s;
+}
+
+std::vector<SongMark> Topic::marksFor (const juce::String& fileName) const
+{
+    std::vector<SongMark> result;
+
+    for (auto& m : marks)
+        if (m.fileName == fileName)
+            result.push_back (m);
+
+    std::stable_sort (result.begin(), result.end(), [] (const SongMark& a, const SongMark& b) { return a.start < b.start; });
+    return result;
+}
+
+void Topic::setMark (const SongMark& mark)
+{
+    for (auto& m : marks)
+    {
+        if (m.id == mark.id)
+        {
+            m = mark;
+            return;
+        }
+    }
+
+    marks.push_back (mark);
+}
+
+bool Topic::removeMark (const juce::String& markId)
+{
+    const auto before = marks.size();
+    marks.erase (std::remove_if (marks.begin(), marks.end(), [&] (const SongMark& m) { return m.id == markId; }), marks.end());
+    return marks.size() != before;
+}
+
+//==============================================================================
 Library::Library (const juce::File& rootFolder) : root (rootFolder)
 {
     root.createDirectory();
@@ -391,6 +522,13 @@ bool Library::loadTopic (const juce::File& folder, Topic& topic)
         if (auto* d = xml->getChildByName ("PRIVATE_NOTES"))
             topic.privateNotes = d->getAllSubText();
 
+        topic.student = xml->getStringAttribute ("student");
+        topic.lastSent = juce::Time::fromISO8601 (xml->getStringAttribute ("lastSent"));
+        topic.lastReceived = juce::Time::fromISO8601 (xml->getStringAttribute ("lastReceived"));
+
+        if (auto* summary = xml->getChildByName ("PRACTICE_SUMMARY"))
+            topic.studentSummary = PracticeSummary::fromXml (*summary);
+
         for (auto* e : xml->getChildWithTagNameIterator ("RESOURCE"))
         {
             Resource r;
@@ -411,6 +549,24 @@ bool Library::loadTopic (const juce::File& folder, Topic& topic)
                 continue;   // never let topic.xml point outside its folder
 
             topic.resources.push_back (std::move (r));
+        }
+
+        for (auto* e : xml->getChildWithTagNameIterator ("MARK"))
+        {
+            SongMark m;
+            m.id = e->getStringAttribute ("id");
+            m.fileName = e->getStringAttribute ("file");
+            m.start = e->getDoubleAttribute ("start");
+            m.end = e->getDoubleAttribute ("end");
+            m.speed = e->getDoubleAttribute ("speed");
+            m.semitones = e->getDoubleAttribute ("semitones");
+            m.added = juce::Time::fromISO8601 (e->getStringAttribute ("added"));
+            m.text = e->getAllSubText().trim();
+
+            if (m.id.isEmpty() || m.fileName.isEmpty() || m.fileName.containsAnyOf ("/\\") || m.start < 0.0)
+                continue;
+
+            topic.setMark (m);
         }
     }
 
@@ -638,6 +794,11 @@ std::unique_ptr<juce::XmlElement> Library::topicToXml (const Topic& t)
     if (t.privateNotes.isNotEmpty())
         xml.createNewChildElement ("PRIVATE_NOTES")->addTextElement (t.privateNotes);
 
+    if (t.student.isNotEmpty())                 xml.setAttribute ("student", t.student);
+    if (t.lastSent != juce::Time())             xml.setAttribute ("lastSent", t.lastSent.toISO8601 (true));
+    if (t.lastReceived != juce::Time())         xml.setAttribute ("lastReceived", t.lastReceived.toISO8601 (true));
+    if (! t.studentSummary.isEmpty())           t.studentSummary.toXml (xml);
+
     for (auto& r : t.resources)
     {
         auto* e = xml.createNewChildElement ("RESOURCE");
@@ -660,6 +821,31 @@ std::unique_ptr<juce::XmlElement> Library::topicToXml (const Topic& t)
 
         if (r.description.isNotEmpty())
             e->createNewChildElement ("DESCRIPTION")->addTextElement (r.description);
+    }
+
+    for (auto& m : t.marks)
+    {
+        auto* e = xml.createNewChildElement ("MARK");
+        e->setAttribute ("id", m.id);
+        e->setAttribute ("file", m.fileName);
+        e->setAttribute ("start", juce::String (m.start, 3));
+
+        if (m.isLoop())
+        {
+            e->setAttribute ("end", juce::String (m.end, 3));
+
+            if (m.speed > 0.0)
+                e->setAttribute ("speed", juce::String (m.speed, 3));
+
+            if (std::abs (m.semitones) > 0.001)
+                e->setAttribute ("semitones", juce::String (m.semitones, 2));
+        }
+
+        if (m.added != juce::Time())
+            e->setAttribute ("added", m.added.toISO8601 (true));
+
+        if (m.text.isNotEmpty())
+            e->addTextElement (m.text);
     }
 
     return xmlPtr;

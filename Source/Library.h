@@ -57,6 +57,47 @@ bool resourceMatches (const Resource&, const juce::String& searchText);
 /** Trims a typed URL and adds "https://" when it has no scheme ("www.x.com" -> "https://www.x.com"). */
 juce::String normaliseUrl (const juce::String& url);
 
+/** A point or a loop on a song (or a take) in a topic, with a short comment: "bar 17: watch the fingering".
+    Loops keep the speed and pitch to practise them at. Saved in topic.xml, so they travel when the topic is shared. */
+struct SongMark
+{
+    juce::String id;            // UUID
+    juce::String fileName;      // the song or take, inside the topic folder
+    double start = 0.0, end = 0.0;          // seconds; end > start: a loop
+    double speed = 0.0, semitones = 0.0;    // loops: speed 0 = leave the player's speed as it is
+    juce::String text;
+    juce::Time added;
+
+    bool isLoop() const noexcept    { return end > start + 0.01; }
+
+    /** "0:42  bar 17: watch the fingering" / "Loop 0:42-0:58 at 80 %  ..." */
+    juce::String describe() const;
+};
+
+/** "1:05" / "1:02:05" */
+juce::String formatMarkTime (double seconds);
+
+/** A student's practice on one topic, sent to the teacher with the topic if the student ticks it.
+    Totals only: no times of day, no device names. */
+struct PracticeSummary
+{
+    juce::Time made;                        // when the student shared it
+    double totalSeconds = 0.0;              // over the last `weeklySeconds.size()` weeks
+    int sessions = 0;
+    std::vector<double> weeklySeconds;      // oldest first, the last one is the week it was made
+    double firstBpm = 0.0, lastBpm = 0.0;   // metronome tempo at the start / end of those weeks (0 = not used)
+    double firstSpeed = 0.0, lastSpeed = 0.0;
+    int streakDays = 0;                     // days in a row with practice on this topic, up to the day it was made
+
+    bool isEmpty() const noexcept           { return made == juce::Time(); }
+
+    /** "3 h 10 min in 8 weeks (12 sessions) · tempo 80 -> 96 bpm · 4 days in a row" */
+    juce::String describe() const;
+
+    void toXml (juce::XmlElement& parent) const;
+    static PracticeSummary fromXml (const juce::XmlElement&);
+};
+
 /** A practice topic: a folder in the library holding topic.xml and the topic's files. */
 struct Topic
 {
@@ -69,6 +110,12 @@ struct Topic
     bool inRotation = false;    // offered on the Today tab ("haven't practised since...")
     bool noGuitar = false;      // ear training, theory...: practice time runs on the clock, not the guitar input
     std::vector<Resource> resources;
+    std::vector<SongMark> marks;   // markers and saved loops on the topic's songs and takes
+
+    // Sharing. Never sent along: kept on this user's devices only.
+    juce::String student;               // teachers: who the topic is for (a first name or nickname, typed by the teacher)
+    juce::Time lastSent, lastReceived;
+    PracticeSummary studentSummary;     // the latest summary a student sent with this topic (read-only)
 
     juce::File folder;
     juce::StringArray conflictFiles;   // copies of topic.xml left by a cloud sync conflict
@@ -76,6 +123,12 @@ struct Topic
     juce::File getFile (const Resource& r) const    { return r.isLink() ? juce::File() : folder.getChildFile (r.fileName); }
     bool isMissing (const Resource& r) const        { return ! r.isLink() && ! getFile (r).existsAsFile(); }
     Resource* findResource (const juce::String& resourceId);
+
+    /** The marks on one file, by time. */
+    std::vector<SongMark> marksFor (const juce::String& fileName) const;
+    /** Adds the mark, or replaces the one with the same id. */
+    void setMark (const SongMark&);
+    bool removeMark (const juce::String& markId);
     /** Search: every word must start a word in the title, tags, notes, or a resource's name, tags or notes. */
     bool matches (const juce::String& searchText) const;
 

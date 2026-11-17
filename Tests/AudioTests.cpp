@@ -4663,6 +4663,95 @@ static void testTopicShare()
         check (student.findTopic (topicId)->folder.getChildFile ("Rare song.mp3").getSize() == 7000, "located file copied in");
     }
 
+    // Marks, sender name, fresh copies, practice summary; the teacher's private fields never travel.
+    {
+        auto* t = teacher.findTopic (topicId);
+        SongMark loop;
+        loop.id = "mark-1"; loop.fileName = "Autumn Leaves.mp3"; loop.start = 42.0; loop.end = 58.5; loop.speed = 0.8;
+        loop.text = "bar 17: watch the fingering";
+        t->setMark (loop);
+        SongMark point;
+        point.id = "mark-2"; point.fileName = "Autumn Leaves.mp3"; point.start = 90.0; point.text = "solo starts";
+        t->setMark (point);
+        t->student = "Anna";
+        t->lastSent = juce::Time::getCurrentTime();
+        teacher.saveTopic (*t);
+        teacher.rescan();
+        t = teacher.findTopic (topicId);
+        check (t->marks.size() == 2 && t->marksFor ("Autumn Leaves.mp3").front().id == "mark-1" && t->student == "Anna",
+               "marks and student saved in topic.xml");
+        check (loop.describe() == "Loop 0:42-0:59 at 80 %  bar 17: watch the fingering" || loop.describe().startsWith ("Loop 0:42-0:58"),
+               "mark description: " + loop.describe());
+
+        TopicShare::ExportOptions options;
+        options.includedFiles = { "Lead sheet.pdf" };
+        options.senderName = "Mr Rossi";
+        check (TopicShare::write (*t, options, pvtopic).wasOk(), "write with marks");
+
+        {
+            juce::ZipFile zip (pvtopic);
+            std::unique_ptr<juce::InputStream> in (zip.createStreamForEntry (*zip.getEntry ("topic.xml")));
+            const auto text = in->readEntireStreamAsString();
+            check (! text.contains ("Anna") && ! text.contains ("lastSent") && text.contains ("Mr Rossi"),
+                   "student name and dates never sent; sender name is");
+        }
+
+        juce::String error;
+        auto package = TopicShare::open (pvtopic, error);
+
+        if (package == nullptr)
+            return;
+
+        check (package->senderName == "Mr Rossi" && package->topic.marks.size() == 2, "package: sender and marks");
+        const auto p = TopicShare::preview (student, *package, TopicShare::Mode::update, {});
+        check (p.newMarks == 2 && p.summary().contains ("2 new markers or loops"), "preview counts new marks");
+
+        juce::String importedId;
+        TopicShare::apply (student, *package, TopicShare::Mode::update, {}, importedId);
+        student.rescan();
+        auto* s = student.findTopic (topicId);
+        check (s != nullptr && s->marksFor ("Autumn Leaves.mp3").size() == 2 && s->lastReceived != juce::Time() && s->student.isEmpty(),
+               "marks imported, received date set, no student name on the student's side");
+
+        // The student sends back a practice summary.
+        PracticeSummary summary;
+        summary.made = juce::Time::getCurrentTime();
+        summary.totalSeconds = 3 * 3600 + 600;
+        summary.sessions = 12;
+        summary.weeklySeconds = { 1200, 2400, 3600, 4200 };
+        summary.firstBpm = 80; summary.lastBpm = 96; summary.streakDays = 4;
+        check (summary.describe().contains ("3 h 10 min in 4 weeks (12 sessions)") && summary.describe().contains ("80 -> 96 bpm"),
+               "summary text: " + summary.describe());
+
+        TopicShare::ExportOptions back;
+        back.summary = summary;
+        back.senderName = "Anna";
+        TopicShare::write (*s, back, pvtopic);
+        package = TopicShare::open (pvtopic, error);
+
+        if (package == nullptr)
+            return;
+
+        check (! package->summary.isEmpty() && package->summary.sessions == 12 && package->summary.weeklySeconds.size() == 4,
+               "summary travels to the teacher");
+        TopicShare::apply (teacher, *package, TopicShare::Mode::update, {}, importedId, "Anna B.");
+        teacher.rescan();
+        t = teacher.findTopic (topicId);
+        check (t->studentSummary.sessions == 12 && t->student == "Anna B.", "teacher keeps the summary and the Student box");
+
+        // Re-sharing from the teacher never sends the student's summary on.
+        TopicShare::ExportOptions again;
+        TopicShare::write (*t, again, pvtopic);
+        package = TopicShare::open (pvtopic, error);
+        check (package != nullptr && package->summary.isEmpty(), "summary is not passed on");
+
+        // A fresh copy for another student: new id.
+        again.asNewTopic = true;
+        TopicShare::write (*t, again, pvtopic);
+        package = TopicShare::open (pvtopic, error);
+        check (package != nullptr && package->topic.id != topicId && package->topic.marks.size() == 2, "fresh copy: new id, marks kept");
+    }
+
     // Document for people without the app: a web page + the chosen files.
     {
         auto* t = teacher.findTopic (topicId);

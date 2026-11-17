@@ -1,8 +1,10 @@
 #include "TopicShare.h"
 #include "AacFile.h"
+#include "PracticeLog.h"
 #include "Take.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
+#include <set>
 
 namespace pv::TopicShare
 {
@@ -181,11 +183,67 @@ juce::File fileNameFor (const Topic& topic, const juce::File& folder)
     return folder.getChildFile (name + extension);
 }
 
+PracticeSummary makeSummary (const PracticeLog& log, const juce::String& topicId, juce::Time now, int weeks)
+{
+    PracticeSummary s;
+    s.made = now;
+    s.weeklySeconds = log.weeklySeconds (topicId, now, weeks);
+
+    for (auto w : s.weeklySeconds)
+        s.totalSeconds += w;
+
+    const auto from = PracticeLog::startOfWeek (now) - juce::RelativeTime::weeks (weeks - 1);
+    std::set<juce::int64> days;   // local calendar days with practice on the topic
+
+    for (auto* e : log.historyFor (topicId))
+    {
+        days.insert (juce::Time (e->start.getYear(), e->start.getMonth(), e->start.getDayOfMonth(), 0, 0).toMilliseconds());
+
+        if (e->start < from || e->start > now)
+            continue;
+
+        ++s.sessions;
+
+        if (e->maxBpm > 0.0)
+        {
+            if (s.firstBpm <= 0.0) s.firstBpm = e->maxBpm;
+            s.lastBpm = e->maxBpm;
+        }
+
+        if (e->maxSpeed > 0.0)
+        {
+            if (s.firstSpeed <= 0.0) s.firstSpeed = e->maxSpeed;
+            s.lastSpeed = e->maxSpeed;
+        }
+    }
+
+    // Days in a row up to today (or up to yesterday, if today hasn't been practised yet).
+    auto day = juce::Time (now.getYear(), now.getMonth(), now.getDayOfMonth(), 0, 0);
+
+    if (days.count (day.toMilliseconds()) == 0)
+        day = day - juce::RelativeTime::days (1);
+
+    for (int guard = 0; guard < 3660 && days.count (day.toMilliseconds()) > 0; ++guard)
+    {
+        ++s.streakDays;
+        const auto previous = day - juce::RelativeTime::hours (12);   // DST-safe step back to the previous day
+        day = juce::Time (previous.getYear(), previous.getMonth(), previous.getDayOfMonth(), 0, 0);
+    }
+
+    return s;
+}
+
 juce::Result write (const Topic& topic, const ExportOptions& options, const juce::File& target)
 {
     Topic shared = topic;
     shared.privateNotes = {};
     shared.inRotation = false;
+    shared.student = {};
+    shared.lastSent = shared.lastReceived = {};
+    shared.studentSummary = options.summary;     // only the sender's own summary, if they chose to send it
+
+    if (options.asNewTopic)
+        shared.id = juce::Uuid().toDashedString();
 
     juce::TemporaryFile tempZip (target);
     TempFolder shrinkFolderHolder;
@@ -249,12 +307,19 @@ juce::Result write (const Topic& topic, const ExportOptions& options, const juce
             }
         }
 
+        for (auto& m : shared.marks)
+            if (m.fileName == r.fileName)
+                m.fileName = nameInZip;
+
         r.id = r.fileName = nameInZip;
     }
 
     auto xml = Library::topicToXml (shared);
     xml->setAttribute ("shared", juce::Time::getCurrentTime().toISO8601 (true));
     xml->setAttribute ("format", formatVersion);
+
+    if (options.senderName.trim().isNotEmpty())
+        xml->setAttribute ("from", options.senderName.trim().substring (0, 60));
 
     for (auto* e : xml->getChildWithTagNameIterator ("RESOURCE"))
     {
@@ -364,10 +429,15 @@ juce::String documentHtml (const Topic& topic, const juce::StringArray& attached
         else
         {
             const auto attached = attachedFiles.contains (r.fileName);
+            juce::String marks;
+
+            for (auto& m : topic.marksFor (r.fileName))
+                marks << "<div class=\"mark\">" << escapeHtml (m.describe()) << "</div>";
+
             files << "<li>" << (attached ? "<a href=\"" + relativeHref (r.fileName) + "\">" + title + "</a>" : title)
                   << "<span class=\"meta\">" << kindName (r) << " &middot; " << escapeHtml (r.fileName)
                   << (attached ? juce::String() : juce::String (" &middot; not included: use your own copy")) << "</span>"
-                  << description << "</li>\n";
+                  << description << marks << "</li>\n";
         }
     }
 
@@ -394,6 +464,7 @@ juce::String documentHtml (const Topic& topic, const juce::StringArray& attached
          << "a { color: var(--accent); font-weight: 600; text-decoration: none; } a:hover { text-decoration: underline; }\n"
          << ".meta { display: block; color: var(--muted); font-size: 13px; }\n"
          << ".desc { margin-top: 4px; white-space: pre-wrap; }\n"
+         << ".mark { margin-top: 4px; font-size: 14px; padding-left: 10px; border-left: 3px solid var(--accent); }\n"
          << "footer { margin-top: 40px; color: var(--muted); font-size: 12px; }\n"
          << "@media print { body { background: #fff; color: #000; } li, .notes { break-inside: avoid; } "
          << "li > a[href^='http']::after { content: ' (' attr(href) ')'; font-weight: 400; color: #555; font-size: 12px; } }\n"
@@ -459,6 +530,10 @@ juce::Result writeDocument (const Topic& topic, const ExportOptions& options, co
         {
             return juce::Result::fail ("Could not copy " + r.fileName);
         }
+
+        for (auto& m : shown.marks)
+            if (m.fileName == r.fileName)
+                m.fileName = dest.getFileName();
 
         r.fileName = r.id = dest.getFileName();
         attached.add (dest.getFileName());
@@ -545,13 +620,20 @@ std::unique_ptr<Package> open (const juce::File& pvtopic, juce::String& error)
         juce::Logger::writeToLog ("Shared topic made by a newer version of the app: importing what this version knows");
 
     package->sharedAt = juce::Time::fromISO8601 (xml->getStringAttribute ("shared"));
+    package->senderName = xml->getStringAttribute ("from").trim().substring (0, 60);
 
     for (auto* e : xml->getChildWithTagNameIterator ("RESOURCE"))
         if (const auto file = e->getStringAttribute ("file"); file.isNotEmpty())
             package->sizes[file] = e->getStringAttribute ("size", "-1").getLargeIntValue();
 
     Library::loadTopic (package->stage, package->topic);
-    package->topic.privateNotes = {};     // never taken from a shared file, even if someone put them in
+    package->summary = package->topic.studentSummary;
+
+    // Never taken from a shared file, even if someone put them in.
+    package->topic.privateNotes = {};
+    package->topic.student = {};
+    package->topic.lastSent = package->topic.lastReceived = {};
+    package->topic.studentSummary = {};
     package->topic.conflictFiles.clear();
 
     if (package->topic.id.startsWith ("dir:"))
@@ -610,7 +692,7 @@ namespace
 
 bool Preview::changesAnything() const
 {
-    return ! updatesExisting || titleChanged || notesChanged || tagsChanged || detailsChanged
+    return ! updatesExisting || titleChanged || notesChanged || tagsChanged || detailsChanged || newMarks > 0 || hasSummary
         || ! newResources.isEmpty() || ! updatedFiles.isEmpty() || ! reconnected.isEmpty();
 }
 
@@ -646,6 +728,8 @@ juce::String Preview::summary() const
         if (notesChanged)                 changes.add ("notes changed");
         if (tagsChanged)                  changes.add ("new tags");
         if (detailsChanged)               changes.add ("resource details changed");
+        if (newMarks > 0)                 changes.add (plural (newMarks, "new marker or loop", "new markers or loops"));
+        if (hasSummary)                   changes.add ("a practice summary");
         if (! reconnected.isEmpty())      changes.add (plural (reconnected.size(), "file connected", "files connected"));
 
         text << "Updates your topic “" << existingTitle << "”: " << changes.joinIntoString (", ") << ".";
@@ -676,6 +760,22 @@ Preview preview (const Library& library, const Package& package, Mode mode, cons
 
         for (auto& tag : incoming.tags)
             p.tagsChanged = p.tagsChanged || ! hasTag (target->tags, tag);
+    }
+
+    p.hasSummary = ! package.summary.isEmpty();
+
+    for (auto& m : incoming.marks)
+    {
+        bool same = false;
+
+        if (target != nullptr)
+            for (auto& tm : target->marks)
+                same = same || (tm.id == m.id && tm.text == m.text && std::abs (tm.start - m.start) < 0.01
+                                && std::abs (tm.end - m.end) < 0.01 && std::abs (tm.speed - m.speed) < 0.001
+                                && std::abs (tm.semitones - m.semitones) < 0.01);
+
+        if (! same)
+            ++p.newMarks;
     }
 
     for (auto& r : incoming.resources)
@@ -727,7 +827,8 @@ Preview preview (const Library& library, const Package& package, Mode mode, cons
     return p;
 }
 
-juce::Result apply (Library& library, const Package& package, Mode mode, const LocatedFiles& located, juce::String& topicId)
+juce::Result apply (Library& library, const Package& package, Mode mode, const LocatedFiles& located, juce::String& topicId,
+                    const juce::String& student)
 {
     const auto& incoming = package.topic;
     const auto* existing = targetFor (library, package, mode);
@@ -791,6 +892,16 @@ juce::Result apply (Library& library, const Package& package, Mode mode, const L
         }
     }
 
+    for (auto& m : incoming.marks)
+        target->setMark (m);
+
+    if (! package.summary.isEmpty())
+        target->studentSummary = package.summary;
+
+    if (student.trim().isNotEmpty())
+        target->student = student.trim().substring (0, 60);
+
+    target->lastReceived = juce::Time::getCurrentTime();
     target->title = incoming.title.isNotEmpty() ? incoming.title : target->title;
     target->description = incoming.description;
     target->noGuitar = incoming.noGuitar;

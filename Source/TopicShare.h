@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Library.h"
+
+namespace pv { class PracticeLog; }
 #include <map>
 #include <memory>
 
@@ -52,7 +54,13 @@ namespace TopicShare
     {
         juce::StringArray includedFiles;    // file names inside the topic folder
         bool shrinkAudio = false;           // WAV / AIFF in the list go in as .m4a (AAC); needs AacFile::isAvailable()
+        bool asNewTopic = false;            // a fresh copy (new id): e.g. the same lesson for another student
+        juce::String senderName;            // "Your name" (optional): shown to the receiver
+        PracticeSummary summary;            // students: their practice on this topic (opt-in; empty = not sent)
     };
+
+    /** The summary a student can send with a topic: the last `weeks` weeks of the log, totals only. */
+    PracticeSummary makeSummary (const PracticeLog&, const juce::String& topicId, juce::Time now, int weeks = 8);
 
     /** Writes the .pvtopic (any thread: reads only the given Topic copy and the file system). */
     juce::Result write (const Topic&, const ExportOptions&, const juce::File& target);
@@ -81,6 +89,8 @@ namespace TopicShare
         Topic topic;                                    // as the sender has it (folder = stage)
         std::map<juce::String, juce::int64> sizes;      // file name -> size on the sender's device (files left out too)
         juce::Time sharedAt;
+        juce::String senderName;                        // as the sender typed it (may be empty)
+        PracticeSummary summary;                        // sent by a student (may be empty)
 
         bool isIncluded (const juce::String& fileName) const;
 
@@ -109,6 +119,8 @@ namespace TopicShare
         juce::StringArray reconnected;          // left-out files found on this device (library or chosen)
         juce::StringArray missing;              // left-out files with no copy here: listed as missing until located
         bool titleChanged = false, notesChanged = false, tagsChanged = false, detailsChanged = false;
+        int newMarks = 0;                       // markers / loops added or changed
+        bool hasSummary = false;                // a practice summary came with it
         int resourceCount = 0, includedFiles = 0;
 
         bool changesAnything() const;
@@ -120,7 +132,8 @@ namespace TopicShare
     /** Imports into the library: copies the files in, connects left-out ones, saves topic.xml. On success topicId is
         the topic that was created or updated. Keeps the receiver's private notes, rotation switch and own resources.
         Rescan the library afterwards. */
-    juce::Result apply (Library&, const Package&, Mode, const LocatedFiles&, juce::String& topicId);
+    juce::Result apply (Library&, const Package&, Mode, const LocatedFiles&, juce::String& topicId,
+                        const juce::String& student = {});    // teachers: the Student box (empty = leave as it is)
 }
 
 } // namespace pv
