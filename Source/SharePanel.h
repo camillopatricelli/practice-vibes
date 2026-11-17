@@ -17,11 +17,13 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
-    std::function<void (const juce::File&)> onWritten;
+    /** The .pvtopic, or (document) the page followed by the files that go with it. */
+    std::function<void (const juce::Array<juce::File>&, bool isDocument)> onWritten;
     std::function<void()> onCancel;
 
 private:
     void updateTotal();
+    bool isDocument() const    { return formatBox.getSelectedId() == 2; }
     void share();
 
     Topic topic;
@@ -29,7 +31,8 @@ private:
     std::vector<TopicShare::FileItem> items;
     juce::String shareText;
 
-    juce::Label introLabel, totalLabel, leftOutLabel, noFilesLabel;
+    juce::ComboBox formatBox;
+    juce::Label formatLabel, introLabel, totalLabel, leftOutLabel, noFilesLabel;
     juce::OwnedArray<juce::ToggleButton> toggles;
     juce::OwnedArray<juce::Label> sizeLabels;
     juce::Component rowHolder;

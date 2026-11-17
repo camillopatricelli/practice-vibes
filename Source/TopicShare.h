@@ -57,6 +57,14 @@ namespace TopicShare
     /** Writes the .pvtopic (any thread: reads only the given Topic copy and the file system). */
     juce::Result write (const Topic&, const ExportOptions&, const juce::File& target);
 
+    /** For people without the app: a web page (opens in any browser, prints to PDF) with the title, tags, notes,
+        the links under their titles and the list of files, plus the chosen files next to it.
+        Written into a fresh "<title>" folder inside `folder`; `written` gets the page first, then the files. */
+    juce::Result writeDocument (const Topic&, const ExportOptions&, const juce::File& folder, juce::Array<juce::File>& written);
+
+    /** The page itself (attachedFiles: names of the files that go along, linked from the page). */
+    juce::String documentHtml (const Topic&, const juce::StringArray& attachedFiles, juce::Time sharedAt);
+
     /** "<title>.pvtopic" in the folder (a name a file system can hold). */
     juce::File fileNameFor (const Topic&, const juce::File& folder);
 

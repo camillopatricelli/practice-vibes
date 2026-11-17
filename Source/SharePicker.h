@@ -8,7 +8,7 @@ namespace pv
 #if JUCE_MAC
 /** macOS: the system share menu (AirDrop, Mail, Messages, WhatsApp if installed...) for a file, shown over the
     component. Falls back to showing the file in Finder. */
-void showSystemSharePicker (const juce::File&, juce::Component& anchor);
+void showSystemSharePicker (const juce::Array<juce::File>&, juce::Component& anchor);
 #endif
 
 #if JUCE_IOS

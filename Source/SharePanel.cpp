@@ -21,10 +21,19 @@ SharePanel::SharePanel (const Topic& t, juce::File folder, juce::String shareBut
     : topic (t), outputFolder (std::move (folder)), items (TopicShare::listFiles (t)), shareText (shareButtonText), shareButton (shareButtonText)
 {
     getProperties().set ("overlayWidth", 640);
-    getProperties().set ("overlayHeight", 560);
+    getProperties().set ("overlayHeight", 600);
 
-    introLabel.setText ("Choose which files go in. The notes, links and resource details always travel; "
-                        "your private notes and practice log never do.", juce::dontSendNotification);
+    formatLabel.setText ("Send as", juce::dontSendNotification);
+    formatLabel.setJustificationType (juce::Justification::centredRight);
+    addAndMakeVisible (formatLabel);
+    formatBox.addItem ("Practice Vibes topic (.pvtopic): opens in the app, updates the topic", 1);
+    formatBox.addItem ("Document for anyone: a web page + the files (no app needed)", 2);
+    formatBox.setSelectedId (1, juce::dontSendNotification);
+    formatBox.setTooltip ("Not everyone has the app: the document opens in any browser or phone (and prints to PDF), "
+                          "with the notes, the links under their titles and the list of files");
+    formatBox.onChange = [this] { updateTotal(); resized(); };
+    addAndMakeVisible (formatBox);
+
     styleInfo (introLabel);
     addAndMakeVisible (introLabel);
 
@@ -98,12 +107,18 @@ void SharePanel::updateTotal()
             ++leftOut;
     }
 
+    introLabel.setText (isDocument() ? "Choose which files go along with the page. The notes and links are on the page; "
+                                       "your private notes and practice log are never included."
+                                     : "Choose which files go in. The notes, links and resource details always travel; "
+                                       "your private notes and practice log never do.",
+                        juce::dontSendNotification);
     totalLabel.setText ("Total: " + TopicShare::sizeHint (total), juce::dontSendNotification);
     totalLabel.setColour (juce::Label::textColourId, total <= TopicShare::emailLimitBytes ? theme::text().withAlpha (0.9f) : theme::highlight());
 
     leftOutLabel.setText (leftOut == 0 ? juce::String()
                                        : (leftOut == 1 ? juce::String ("The file left out stays") : juce::String (leftOut) + " files left out stay")
-                                             + " listed: the receiver connects their own copy (found by file name), or locates it once.",
+                                             + (isDocument() ? juce::String (" listed on the page as not included.")
+                                                             : juce::String (" listed: the receiver connects their own copy (found by file name), or locates it once.")),
                           juce::dontSendNotification);
 }
 
@@ -121,17 +136,26 @@ void SharePanel::share()
 
     outputFolder.createDirectory();
     const auto target = TopicShare::fileNameFor (topic, outputFolder);
+    const auto document = isDocument();
 
     writing = true;
     shareButton.setEnabled (false);
     shareButton.setButtonText ("Packing...");
 
-    juce::Thread::launch ([safeThis = juce::WeakReference<SharePanel> (this), topicCopy = topic, options, target]
+    juce::Thread::launch ([safeThis = juce::WeakReference<SharePanel> (this), topicCopy = topic, options, target, document,
+                           folder = outputFolder]
     {
-        const auto result = TopicShare::write (topicCopy, options, target);
+        juce::Array<juce::File> written;
+        const auto result = document ? TopicShare::writeDocument (topicCopy, options, folder, written)
+                                     : TopicShare::write (topicCopy, options, target);
 
-        juce::MessageManager::callAsync ([safeThis, result, target]
+        if (! document)
+            written.add (target);
+
+        juce::MessageManager::callAsync ([safeThis, result, written, document]
         {
+            const auto target = written.isEmpty() ? juce::File() : written.getFirst();
+
             if (result.failed())
                 juce::Logger::writeToLog ("Could not share the topic: " + result.getErrorMessage());
             else
@@ -152,7 +176,7 @@ void SharePanel::share()
             }
 
             if (safeThis->onWritten)
-                safeThis->onWritten (target);
+                safeThis->onWritten (written, document);
         });
     });
 }
@@ -177,6 +201,11 @@ void SharePanel::resized()
     if (shrinkToggle.isVisible())
         shrinkToggle.setBounds (area.removeFromBottom (32));
 
+    auto formatRow = area.removeFromTop (38).reduced (0, 3);
+    formatLabel.setBounds (formatRow.removeFromLeft (70));
+    formatRow.removeFromLeft (8);
+    formatBox.setBounds (formatRow);
+    area.removeFromTop (8);
     introLabel.setBounds (area.removeFromTop (48));
     area.removeFromTop (4);
     viewport.setBounds (area);

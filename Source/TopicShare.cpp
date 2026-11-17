@@ -306,6 +306,176 @@ juce::Result write (const Topic& topic, const ExportOptions& options, const juce
 }
 
 //==============================================================================
+namespace
+{
+    juce::String escapeHtml (const juce::String& text)
+    {
+        return text.replace ("&", "&amp;").replace ("<", "&lt;").replace (">", "&gt;").replace ("\"", "&quot;");
+    }
+
+    /** A file name as a relative link (spaces and other characters percent-encoded). */
+    juce::String relativeHref (const juce::String& fileName)
+    {
+        return escapeHtml (juce::URL::addEscapeChars (fileName, false).replace ("+", "%20"));
+    }
+
+    juce::String kindName (const Resource& r)
+    {
+        switch (kindOf (r))
+        {
+            case ResourceKind::youtube:      return "YouTube video";
+            case ResourceKind::googleDoc:    return "Google document";
+            case ResourceKind::pdf:          return "PDF";
+            case ResourceKind::image:        return "Image";
+            case ResourceKind::audio:        return r.isTake ? "Recording" : "Audio";
+            case ResourceKind::video:        return "Video";
+            case ResourceKind::text:         return "Text";
+            case ResourceKind::document:     return "Document";
+            case ResourceKind::spreadsheet:  return "Spreadsheet";
+            case ResourceKind::presentation: return "Presentation";
+            case ResourceKind::web:          return "Web page";
+            case ResourceKind::other:        break;
+        }
+
+        return "File";
+    }
+}
+
+juce::String documentHtml (const Topic& topic, const juce::StringArray& attachedFiles, juce::Time sharedAt)
+{
+    juce::String links, files;
+
+    for (auto& r : topic.resources)
+    {
+        const auto title = escapeHtml (r.title.isNotEmpty() ? r.title : (r.isLink() ? Library::titleFromUrl (r.url) : r.fileName));
+        const auto description = r.description.trim().isNotEmpty() ? "<div class=\"desc\">" + escapeHtml (r.description.trim()) + "</div>" : juce::String();
+
+        if (r.isLink())
+        {
+            auto host = juce::URL (r.url).getDomain();
+
+            if (host.startsWithIgnoreCase ("www."))
+                host = host.substring (4);
+
+            links << "<li><a href=\"" << escapeHtml (r.url) << "\">" << title << "</a>"
+                  << "<span class=\"meta\">" << kindName (r) << (host.isNotEmpty() ? " &middot; " + escapeHtml (host) : juce::String()) << "</span>"
+                  << description << "</li>\n";
+        }
+        else
+        {
+            const auto attached = attachedFiles.contains (r.fileName);
+            files << "<li>" << (attached ? "<a href=\"" + relativeHref (r.fileName) + "\">" + title + "</a>" : title)
+                  << "<span class=\"meta\">" << kindName (r) << " &middot; " << escapeHtml (r.fileName)
+                  << (attached ? juce::String() : juce::String (" &middot; not included: use your own copy")) << "</span>"
+                  << description << "</li>\n";
+        }
+    }
+
+    juce::String tags;
+
+    for (auto& tag : topic.tags)
+        tags << "<span class=\"tag\">" << escapeHtml (tag) << "</span>";
+
+    juce::String html;
+    html << "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\n"
+         << "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+         << "<title>" << escapeHtml (topic.title) << "</title>\n<style>\n"
+         << ":root { --bg: #fbf8f3; --card: #ffffff; --text: #2b2420; --muted: #7a6e66; --accent: #b0640f; --line: #e8e0d6; }\n"
+         << "@media (prefers-color-scheme: dark) { :root { --bg: #1b1714; --card: #26201c; --text: #f1e9e1; --muted: #a89a8f; --accent: #f0a640; --line: #3a322c; } }\n"
+         << "body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }\n"
+         << "main { max-width: 760px; margin: 0 auto; padding: 32px 16px 48px; }\n"
+         << "h1 { font-size: 28px; line-height: 1.2; margin: 0 0 8px; }\n"
+         << "h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 32px 0 10px; }\n"
+         << ".tag { display: inline-block; font-size: 13px; padding: 2px 10px; margin: 0 6px 6px 0; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }\n"
+         << ".date { color: var(--muted); font-size: 14px; margin: 4px 0 0; }\n"
+         << ".notes { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; white-space: pre-wrap; overflow-wrap: anywhere; }\n"
+         << "ul { list-style: none; padding: 0; margin: 0; }\n"
+         << "li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin-bottom: 8px; overflow-wrap: anywhere; }\n"
+         << "a { color: var(--accent); font-weight: 600; text-decoration: none; } a:hover { text-decoration: underline; }\n"
+         << ".meta { display: block; color: var(--muted); font-size: 13px; }\n"
+         << ".desc { margin-top: 4px; white-space: pre-wrap; }\n"
+         << "footer { margin-top: 40px; color: var(--muted); font-size: 12px; }\n"
+         << "@media print { body { background: #fff; color: #000; } li, .notes { break-inside: avoid; } "
+         << "li > a[href^='http']::after { content: ' (' attr(href) ')'; font-weight: 400; color: #555; font-size: 12px; } }\n"
+         << "</style></head><body><main>\n"
+         << "<h1>" << escapeHtml (topic.title) << "</h1>\n";
+
+    if (tags.isNotEmpty())
+        html << "<div>" << tags << "</div>\n";
+
+    if (sharedAt != juce::Time())
+        html << "<p class=\"date\">Shared on " << sharedAt.formatted ("%d %B %Y") << "</p>\n";
+
+    if (topic.description.trim().isNotEmpty())
+        html << "<h2>Notes</h2>\n<div class=\"notes\">" << escapeHtml (topic.description.trim()) << "</div>\n";
+
+    if (links.isNotEmpty())
+        html << "<h2>Links</h2>\n<ul>\n" << links << "</ul>\n";
+
+    if (files.isNotEmpty())
+        html << "<h2>Files</h2>\n<ul>\n" << files << "</ul>\n";
+
+    html << "<footer>Made with Practice Vibes</footer>\n</main></body></html>\n";
+    return html;
+}
+
+juce::Result writeDocument (const Topic& topic, const ExportOptions& options, const juce::File& folder, juce::Array<juce::File>& written)
+{
+    written.clear();
+    const auto name = fileNameFor (topic, folder).getFileNameWithoutExtension();
+    const auto target = folder.getChildFile (name);
+
+    // A fresh folder each time: attachments left out this time mustn't go along.
+    if (target.isDirectory() && ! target.deleteRecursively())
+        return juce::Result::fail ("Can't replace " + target.getFullPathName() + " (is a file in it open?)");
+
+    if (! target.createDirectory())
+        return juce::Result::fail ("Can't create " + target.getFullPathName());
+
+    Topic shown = topic;
+    juce::StringArray attached;
+    juce::Array<juce::File> files;
+
+    for (auto& r : shown.resources)
+    {
+        if (r.isLink() || ! options.includedFiles.contains (r.fileName))
+            continue;
+
+        const auto source = topic.getFile (r);
+
+        if (! source.existsAsFile())
+            continue;
+
+        auto dest = target.getChildFile (r.fileName);
+
+        if (options.shrinkAudio && isUncompressedAudio (r.fileName) && AacFile::isAvailable())
+        {
+            dest = target.getChildFile (uniqueName (source.getFileNameWithoutExtension(), ".m4a", attached));
+
+            if (const auto result = shrinkToAac (source, dest); result.failed())
+                return juce::Result::fail ("Could not make " + r.fileName + " smaller: " + result.getErrorMessage());
+        }
+        else if (! source.copyFileTo (dest))
+        {
+            return juce::Result::fail ("Could not copy " + r.fileName);
+        }
+
+        r.fileName = r.id = dest.getFileName();
+        attached.add (dest.getFileName());
+        files.add (dest);
+    }
+
+    const auto page = target.getChildFile (name + ".html");
+
+    if (! page.replaceWithText (documentHtml (shown, attached, juce::Time::getCurrentTime()), false, false, "\n"))
+        return juce::Result::fail ("Can't write " + page.getFullPathName());
+
+    written.add (page);
+    written.addArray (files);
+    return juce::Result::ok();
+}
+
+//==============================================================================
 Package::~Package()
 {
     if (stage.isDirectory())

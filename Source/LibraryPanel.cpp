@@ -696,17 +696,28 @@ void LibraryPanel::shareTopic (const juce::String& topicId)
 
     auto panel = std::make_unique<SharePanel> (*t, folder, buttonText);
     panel->onCancel = [this] { if (hideOverlay) hideOverlay(); };
-    panel->onWritten = [this] (const juce::File& file)
+    panel->onWritten = [this] (const juce::Array<juce::File>& files, bool isDocument)
     {
+        juce::ignoreUnused (isDocument);
+
         if (hideOverlay)
             hideOverlay();
 
+        if (files.isEmpty())
+            return;
+
        #if JUCE_IOS
-        shareBox = juce::ContentSharer::shareFilesScoped ({ juce::URL (file) }, [] (bool, const juce::String&) {}, this);
+        juce::Array<juce::URL> urls;
+
+        for (auto& f : files)
+            urls.add (juce::URL (f));
+
+        shareBox = juce::ContentSharer::shareFilesScoped (urls, [] (bool, const juce::String&) {}, this);
        #elif JUCE_MAC
-        showSystemSharePicker (file, *this);
+        showSystemSharePicker (files, *this);
        #else
-        file.revealToUser();     // Explorer with the file selected: drag it into a mail or WhatsApp
+        // Explorer with the file selected (a document: in its folder, with its files): drag them into a mail or WhatsApp.
+        files.getFirst().revealToUser();
        #endif
     };
     showOverlay ("Share “" + t->title + "”", std::move (panel));

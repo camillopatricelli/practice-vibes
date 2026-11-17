@@ -4663,6 +4663,26 @@ static void testTopicShare()
         check (student.findTopic (topicId)->folder.getChildFile ("Rare song.mp3").getSize() == 7000, "located file copied in");
     }
 
+    // Document for people without the app: a web page + the chosen files.
+    {
+        auto* t = teacher.findTopic (topicId);
+        t->description = "Watch bar 17 <slowly> & relax";
+        teacher.saveTopic (*t);
+
+        TopicShare::ExportOptions options;
+        options.includedFiles = { "Lead sheet.pdf" };
+        juce::Array<juce::File> written;
+        check (TopicShare::writeDocument (*t, options, out, written).wasOk() && written.size() == 2
+                   && written[0].hasFileExtension ("html") && written[1].getFileName() == "Lead sheet.pdf",
+               "document: page first, then the chosen file");
+
+        const auto html = written[0].loadFileAsString();
+        check (html.contains ("<a href=\"https://www.youtube.com/watch?v=abc\">Chet Baker</a>")
+                   && html.contains ("&lt;slowly&gt; &amp; relax") && html.contains ("href=\"Lead%20sheet.pdf\"")
+                   && html.contains ("not included") && ! html.contains ("bridge"),
+               "document: titled links, escaped notes, attached file linked, left-out files marked, no private notes");
+    }
+
     // Hostile zip: names that climb out of the folder are never extracted.
     {
         const auto evil = out.getChildFile ("evil.pvtopic");

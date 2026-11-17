@@ -5,14 +5,16 @@
 namespace pv
 {
 
-void showSystemSharePicker (const juce::File& file, juce::Component& anchor)
+void showSystemSharePicker (const juce::Array<juce::File>& files, juce::Component& anchor)
 {
     auto* peer = anchor.getPeer();
     auto* view = peer != nullptr ? (NSView*) peer->getNativeHandle() : nil;
 
-    if (view == nil)
+    if (view == nil || files.isEmpty())
     {
-        file.revealToUser();
+        if (! files.isEmpty())
+            files.getFirst().revealToUser();
+
         return;
     }
 
@@ -23,8 +25,12 @@ void showSystemSharePicker (const juce::File& file, juce::Component& anchor)
         if (picker != nil)
             [picker release];
 
-        NSURL* url = [NSURL fileURLWithPath: [NSString stringWithUTF8String: file.getFullPathName().toRawUTF8()]];
-        picker = [[NSSharingServicePicker alloc] initWithItems: @[ url ]];
+        NSMutableArray* items = [NSMutableArray array];
+
+        for (auto& file : files)
+            [items addObject: [NSURL fileURLWithPath: [NSString stringWithUTF8String: file.getFullPathName().toRawUTF8()]]];
+
+        picker = [[NSSharingServicePicker alloc] initWithItems: items];
 
         // JUCE's views are flipped (y down), like component coordinates.
         const auto area = peer->getComponent().getLocalArea (&anchor, anchor.getLocalBounds().withSizeKeepingCentre (2, 2));
