@@ -171,7 +171,7 @@ private:
 class GroupEditor final : public juce::Component
 {
 public:
-    GroupEditor (const StudentGroups& g, const juce::StringArray& knownStudents,
+    GroupEditor (const StudentGroups& g, const juce::StringArray& knownStudents, bool addNew,
                  std::function<void (StudentGroups)> onSave, std::function<void()> onCancel)
         : groups (g), saved (std::move (onSave)), cancelled (std::move (onCancel))
     {
@@ -218,10 +218,18 @@ public:
         for (auto* b : { &addButton, &saveButton, &cancelButton })
             addAndMakeVisible (*b);
 
-        if (groups.groups.empty())
+        if (groups.groups.empty() || addNew)
             groups.add ({});
 
         buildRows();
+
+        // The new (empty) row is ready to type in.
+        juce::MessageManager::callAsync ([safeThis = juce::Component::SafePointer<GroupEditor> (this)]
+        {
+            if (safeThis != nullptr && safeThis->isShowing() && ! safeThis->nameEditors.isEmpty()
+                && safeThis->nameEditors.getLast()->isEmpty())
+                safeThis->nameEditors.getLast()->grabKeyboardFocus();
+        });
     }
 
     void paint (juce::Graphics& g) override    { g.fillAll (theme::background()); }
@@ -312,6 +320,83 @@ private:
     juce::OwnedArray<juce::TextEditor> nameEditors, memberEditors;
     juce::OwnedArray<juce::TextButton> removeButtons;
     juce::TextButton addButton { "+ Add group" }, saveButton { "Save" }, cancelButton { "Cancel" };
+};
+
+//==============================================================================
+/** Overlay after "one file per member" (iPad / Mac): one row per member with its own Share... button, so each file
+    goes to the right chat (a share sheet doesn't say whose file it is). */
+class MemberSharePanel final : public juce::Component
+{
+public:
+    using ShareFn = std::function<void (const juce::File&, juce::Component& anchor, std::function<void (bool shared)> done)>;
+
+    MemberSharePanel (const juce::StringArray& members, const juce::Array<juce::File>& filesToShare, ShareFn shareFn,
+                      std::function<void()> onDone)
+        : files (filesToShare), share (std::move (shareFn)), finished (std::move (onDone))
+    {
+        getProperties().set ("overlayWidth", 560);
+        getProperties().set ("overlayHeight", juce::jlimit (260, 640, 170 + files.size() * 44));
+
+        introLabel.setText ("Each member has their own file. Tap Share... on a row and send it to that member "
+                            "(their chat, mail or AirDrop), then the next one.", juce::dontSendNotification);
+        introLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.7f));
+        introLabel.setJustificationType (juce::Justification::topLeft);
+        addAndMakeVisible (introLabel);
+
+        for (int i = 0; i < files.size(); ++i)
+        {
+            auto* label = names.add (new juce::Label ({}, i < members.size() ? members[i] : files[i].getFileNameWithoutExtension()));
+            label->setFont (theme::textFont (16.0f));
+            addAndMakeVisible (label);
+
+            auto* button = buttons.add (new juce::TextButton ("Share..."));
+            button->setColour (juce::TextButton::buttonColourId, theme::accent());
+            button->onClick = [this, i] { shareRow (i); };
+            addAndMakeVisible (button);
+        }
+
+        doneButton.onClick = [this] { if (finished) finished(); };
+        addAndMakeVisible (doneButton);
+    }
+
+    void paint (juce::Graphics& g) override    { g.fillAll (theme::background()); }
+
+    void resized() override
+    {
+        auto area = getLocalBounds().reduced (14);
+        doneButton.setBounds (area.removeFromBottom (40).removeFromRight (120).reduced (2, 3));
+        area.removeFromBottom (8);
+        introLabel.setBounds (area.removeFromTop (48));
+        area.removeFromTop (6);
+
+        for (int i = 0; i < names.size(); ++i)
+        {
+            auto row = area.removeFromTop (44).reduced (0, 4);
+            buttons[i]->setBounds (row.removeFromRight (150));
+            names[i]->setBounds (row);
+        }
+    }
+
+private:
+    void shareRow (int i)
+    {
+        if (! share)
+            return;
+
+        // Marked as soon as the sheet opens: the Mac menu doesn't report back, and the iPad's "done" can't tell a send
+        // from a cancel for every app. The button stays, to send it again.
+        buttons[i]->setButtonText ("Shared - again?");
+        buttons[i]->setColour (juce::TextButton::buttonColourId, getLookAndFeel().findColour (juce::TextButton::buttonColourId));
+        share (files[i], *buttons[i], [] (bool) {});
+    }
+
+    juce::Array<juce::File> files;
+    ShareFn share;
+    std::function<void()> finished;
+    juce::Label introLabel;
+    juce::OwnedArray<juce::Label> names;
+    juce::OwnedArray<juce::TextButton> buttons;
+    juce::TextButton doneButton { "Done" };
 };
 
 //==============================================================================
@@ -1077,10 +1162,16 @@ void LibraryPanel::shareTopic (const juce::String& topicId)
             juce::Logger::writeToLog ("Could not save the group sends");
 
         groups = std::move (current);
+        lastSentMembers.clear();
+
+        for (auto& s : sends)
+            if (s.member.isNotEmpty())
+                lastSentMembers.add (s.member);
     };
+    lastSentMembers.clear();
     panel->onWritten = [this, topicId] (const juce::Array<juce::File>& files, bool isDocument)
     {
-        juce::ignoreUnused (isDocument);
+        juce::ignoreUnused (isDocument);   // used on iPad / Mac only
 
         if (hideOverlay)
             hideOverlay();
@@ -1095,6 +1186,15 @@ void LibraryPanel::shareTopic (const juce::String& topicId)
             signature = library->computeSignature();
             showSelection();
         }
+
+       #if JUCE_IOS || JUCE_MAC
+        // One file per member: a share sheet each, from a list that says whose file it is.
+        if (! isDocument && files.size() > 1 && lastSentMembers.size() == files.size())
+        {
+            shareOnePerMember (files);
+            return;
+        }
+       #endif
 
        #if JUCE_IOS
         juce::Array<juce::URL> urls;
@@ -1427,7 +1527,12 @@ void LibraryPanel::showTagMenu()
         }
 
         if (teacher)
-            menu.addItem (groups.groups.empty() ? "New group (ensemble)..." : "Edit groups...", [this] { editGroups(); });
+        {
+            menu.addItem ("New group (ensemble)...", [this] { editGroups (true); });
+
+            if (! groups.groups.empty())
+                menu.addItem ("Edit groups...", [this] { editGroups (false); });
+        }
     }
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&tagsButton));
@@ -1458,7 +1563,32 @@ bool LibraryPanel::passesTagFilter (const Topic& t) const
                         [&] (const GroupSend& s) { return s.topicId == t.id && s.groupId == groupId; });
 }
 
-void LibraryPanel::editGroups()
+void LibraryPanel::shareOnePerMember (const juce::Array<juce::File>& files)
+{
+    if (! showOverlay)
+        return;
+
+    auto shareOne = [this] (const juce::File& file, juce::Component& anchor, std::function<void (bool)> done)
+    {
+       #if JUCE_IOS
+        juce::ignoreUnused (anchor);
+        shareBox = juce::ContentSharer::shareFilesScoped ({ juce::URL (file) },
+                                                         [done] (bool ok, const juce::String&) { if (done) done (ok); }, this);
+       #elif JUCE_MAC
+        showSystemSharePicker ({ file }, anchor);
+        if (done) done (true);
+       #else
+        juce::ignoreUnused (anchor);
+        file.revealToUser();
+        if (done) done (true);
+       #endif
+    };
+
+    showOverlay ("Send to each member", std::make_unique<MemberSharePanel> (lastSentMembers, files, shareOne,
+                                                                           [this] { if (hideOverlay) hideOverlay(); }));
+}
+
+void LibraryPanel::editGroups (bool addNew)
 {
     if (library == nullptr || ! showOverlay)
         return;
@@ -1472,7 +1602,7 @@ void LibraryPanel::editGroups()
 
     students.sortNatural();
 
-    showOverlay ("Groups", std::make_unique<GroupEditor> (StudentGroups::load (library->getRoot()), students,
+    showOverlay ("Groups", std::make_unique<GroupEditor> (StudentGroups::load (library->getRoot()), students, addNew,
         [this] (StudentGroups edited)
         {
             if (library != nullptr)
