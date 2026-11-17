@@ -231,18 +231,18 @@ namespace
 
         for (auto& r : t.resources)
             if (hasWordStartingWith (resourceName (r), word))
-                return juce::String (juce::CharPointer_UTF8 ("in resource â")) + resourceName (r) + juce::String (juce::CharPointer_UTF8 ("â"));
+                return juce::String (juce::CharPointer_UTF8 ("in resource “")) + resourceName (r) + juce::String (juce::CharPointer_UTF8 ("”"));
 
         for (auto& r : t.resources)
             if (anyStartsWith (r.tags, word))
-                return juce::String (juce::CharPointer_UTF8 ("tag on â")) + resourceName (r) + juce::String (juce::CharPointer_UTF8 ("â"));
+                return juce::String (juce::CharPointer_UTF8 ("tag on “")) + resourceName (r) + juce::String (juce::CharPointer_UTF8 ("”"));
 
         if (hasWordStartingWith (t.description, word))
             return juce::String ("in notes");
 
         for (auto& r : t.resources)
             if (hasWordStartingWith (r.description, word))
-                return juce::String (juce::CharPointer_UTF8 ("in notes of â")) + resourceName (r) + juce::String (juce::CharPointer_UTF8 ("â"));
+                return juce::String (juce::CharPointer_UTF8 ("in notes of “")) + resourceName (r) + juce::String (juce::CharPointer_UTF8 ("”"));
 
         return std::nullopt;
     }
@@ -293,8 +293,8 @@ juce::String Topic::describeMatch (const juce::String& searchText, const juce::S
         for (auto& r : resources)
             if (hasTag (r.tags, tag))
             {
-                places.add ("#" + tag + juce::String (juce::CharPointer_UTF8 (" on â")) + resourceName (r)
-                            + juce::String (juce::CharPointer_UTF8 ("â")));
+                places.add ("#" + tag + juce::String (juce::CharPointer_UTF8 (" on “")) + resourceName (r)
+                            + juce::String (juce::CharPointer_UTF8 ("”")));
                 break;
             }
 
