@@ -1874,19 +1874,23 @@ namespace
 
         check (FootswitchAction::fromString (FootswitchAction { FootswitchAction::Kind::tuner, 0 }.toString()).kind
                    == FootswitchAction::Kind::tuner, "footswitch tuner action round trip");
-        check (FootswitchAction::fromString (FootswitchAction { FootswitchAction::Kind::guitarStem, 0 }.toString()).kind
-                   == FootswitchAction::Kind::guitarStem, "footswitch guitar stem action round trip");
+        check (FootswitchAction::fromString (FootswitchAction { FootswitchAction::Kind::stem, Stems::bass }.toString())
+                   == FootswitchAction { FootswitchAction::Kind::stem, Stems::bass }, "footswitch stem action round trip (bass)");
+        check (FootswitchAction::fromString ("guitarStem") == FootswitchAction { FootswitchAction::Kind::stem, Stems::guitar },
+               "old guitar-stem footswitch setting reads as the guitar stem");
+        check (! (FootswitchAction { FootswitchAction::Kind::stem, Stems::bass } == FootswitchAction { FootswitchAction::Kind::stem, Stems::piano }),
+               "stem actions for different stems differ");
     }
 
-    /** Six plucked strings, string i starting 15 ms after string i-1, after `silence` seconds. */
-    std::vector<float> makeStrum (double rate, const std::array<float, 6>& frequencies, const std::array<float, 6>& gains,
+    /** Plucked strings, string i starting 15 ms after string i-1, after `silence` seconds. */
+    std::vector<float> makeStrum (double rate, const std::vector<float>& frequencies, const std::vector<float>& gains,
                                   double silence, double seconds)
     {
         std::vector<float> out ((size_t) (rate * (silence + seconds)), 0.0f);
         const float harmonics[] = { 1.0f, 0.6f, 0.4f, 0.25f, 0.15f, 0.1f };
         juce::Random random (3);
 
-        for (size_t s = 0; s < 6; ++s)
+        for (size_t s = 0; s < frequencies.size(); ++s)
         {
             const auto start = (size_t) ((silence + 0.015 * (double) s) * rate);
 
@@ -1955,6 +1959,29 @@ namespace
             check (tuningName ({ 38, 45, 50, 55, 59, 64 }) == "Drop D" && tuningName ({ 40, 45, 50, 55, 59, 65 }) == "Custom",
                    "tuning names are found, others are custom");
 
+            juce::StringArray bassNames;
+
+            for (auto& t : tuningPresets (TunerInstrument::bass))
+            {
+                bassNames.addIfNotAlreadyThere (t.name);
+                bool inRange = t.strings.size() >= 4 && t.strings.size() <= 6;
+
+                for (auto n : t.strings)
+                    inRange = inRange && n >= Tuner::minStringNote (TunerInstrument::bass) && n <= Tuner::maxStringNote (TunerInstrument::bass);
+
+                check (inRange, juce::String ("bass preset ") + t.name + " has 4-6 strings in range");
+            }
+
+            check (bassNames.size() == (int) tuningPresets (TunerInstrument::bass).size()
+                     && tuningName ({ 28, 33, 38, 43 }, TunerInstrument::bass) == "Standard (4 strings)"
+                     && tuningName ({ 23, 28, 33, 38, 43 }, TunerInstrument::bass) == "Standard (5 strings)",
+                   "bass presets: unique names, 4- and 5-string standard found");
+            check (tuningPresets (TunerInstrument::other).empty(), "other instrument: no tunings (chromatic only)");
+
+            float lowB = 0.0f;
+            check (nearestString ({ 23, 28, 33, 38, 43 }, 30.87f, 440.0f, lowB) == 0 && std::abs (lowB) < 1.0f,
+                   "low B (31 Hz) on a 5-string bass: lowest string");
+
             float away = 0.0f;
             const StringNotes dropD { 38, 45, 50, 55, 59, 64 };
             const auto s = nearestString (dropD, 82.41f, 440.0f, away);
@@ -1965,35 +1992,65 @@ namespace
 
         {
             Tuner tuner;
-            tuner.strings = { 36, 43, 48, 55, 60, 64 };
+            tuner.guitarStrings = { 36, 43, 48, 55, 60, 64 };
+            tuner.bassStrings = { 23, 28, 33, 38, 43 };
+            tuner.instrument = TunerInstrument::bass;
             tuner.strobe = true;
             tuner.strumMode = true;
             Tuner copy;
             copy.fromXml (*tuner.toXml());
-            check (copy.strings == tuner.strings && copy.strobe && copy.strumMode, "tuning and view settings round trip");
+            check (copy.guitarStrings == tuner.guitarStrings && copy.bassStrings == tuner.bassStrings
+                     && copy.instrument == TunerInstrument::bass && copy.strings() == tuner.bassStrings
+                     && copy.strobe && copy.strumMode, "instrument, tunings and view settings round trip");
+
+            juce::XmlElement old ("TUNER");                 // saved before the instrument setting existed
+            old.setAttribute ("strings", "38 45 50 55 59 64");
+            copy.fromXml (old);
+            check (copy.instrument == TunerInstrument::guitar && copy.strings() == StringNotes { 38, 45, 50, 55, 59, 64 }
+                     && copy.bassStrings == tuningPresets (TunerInstrument::bass).front().strings,
+                   "old tuner settings: guitar with its tuning, standard bass");
+
+            Tuner other;
+            other.instrument = TunerInstrument::other;
+            other.strumMode = true;
+            check (other.strings().empty() && ! other.isStrumMode(), "other instrument: no strings, no strum mode");
 
             juce::XmlElement bad ("TUNER");
             bad.setAttribute ("strings", "40 45 50 55 59");
+            bad.setAttribute ("bassStrings", "28 33 38");
             copy.fromXml (bad);
-            check (copy.strings == tuningPresets().front().strings && ! copy.strobe, "bad string list falls back to standard");
+            check (copy.strings() == tuningPresets().front().strings && ! copy.strobe
+                     && copy.bassStrings == tuningPresets (TunerInstrument::bass).front().strings,
+                   "bad string lists fall back to standard");
             bad.setAttribute ("strings", "40 45 50 55 59 120");
+            bad.setAttribute ("bassStrings", "20 28 33 38");
             copy.fromXml (bad);
-            check (copy.strings == tuningPresets().front().strings, "out-of-range string note falls back to standard");
+            check (copy.strings() == tuningPresets().front().strings
+                     && copy.bassStrings == tuningPresets (TunerInstrument::bass).front().strings,
+                   "out-of-range string note falls back to standard");
         }
 
-        const std::array<float, 6> detune { -12.0f, 6.0f, 0.0f, -4.0f, 9.0f, -7.0f };
+        const std::vector<float> detune { -12.0f, 6.0f, 0.0f, -4.0f, 9.0f, -7.0f };
 
-        for (auto [rate, tuningIndex] : { std::pair { 48000.0, 0 }, std::pair { 44100.0, 3 }, std::pair { 96000.0, 6 } })
+        struct StrumCase { double rate; TunerInstrument instrument; int tuningIndex; };
+
+        for (auto [rate, instrument, tuningIndex] : { StrumCase { 48000.0, TunerInstrument::guitar, 0 },
+                                                      StrumCase { 44100.0, TunerInstrument::guitar, 3 },
+                                                      StrumCase { 96000.0, TunerInstrument::guitar, 6 },
+                                                      StrumCase { 48000.0, TunerInstrument::bass, 0 },
+                                                      StrumCase { 44100.0, TunerInstrument::bass, 4 } })
         {
-            const auto& tuning = tuningPresets()[(size_t) tuningIndex];
-            std::array<float, 6> freqs {};
+            const auto& tuning = tuningPresets (instrument)[(size_t) tuningIndex];
+            const auto count = tuning.strings.size();
+            std::vector<float> freqs (count);
 
-            for (size_t i = 0; i < 6; ++i)
+            for (size_t i = 0; i < count; ++i)
                 freqs[i] = noteFrequency (tuning.strings[i], 440.0f) * std::pow (2.0f, detune[i] / 1200.0f);
 
-            const auto strum = makeStrum (rate, freqs, { 1, 1, 1, 1, 1, 1 }, 0.4, 1.5);
+            const auto strum = makeStrum (rate, freqs, std::vector<float> (count, 1.0f), 0.4, 1.5);
             Tuner tuner;
-            tuner.strings = tuning.strings;
+            tuner.instrument = instrument;
+            tuner.strings() = tuning.strings;
             tuner.active = true;
 
             std::optional<StrumResult> result;
@@ -2013,10 +2070,10 @@ namespace
             }
 
             float worst = 0.0f;
-            bool allHeard = result.has_value();
+            bool allHeard = result.has_value() && result->size() == count;
 
-            if (result)
-                for (size_t i = 0; i < 6; ++i)
+            if (allHeard)
+                for (size_t i = 0; i < count; ++i)
                 {
                     allHeard = allHeard && (*result)[i].heard;
                     worst = juce::jmax (worst, std::abs ((*result)[i].cents - detune[i]));
@@ -2025,13 +2082,14 @@ namespace
             const auto delay = resultAt / rate - 0.4;
             juce::String perString;
 
-            if (result && ! (allHeard && worst < 1.5f))
-                for (size_t i = 0; i < 6; ++i)
+            if (result && result->size() == count && ! (allHeard && worst < 1.5f))
+                for (size_t i = 0; i < count; ++i)
                     perString << (i == 0 ? " [" : ", ") << ((*result)[i].heard ? juce::String ((*result)[i].cents - detune[i], 2) : "-")
-                              << (i == 5 ? "]" : "");
+                              << (i == count - 1 ? "]" : "");
 
-            check (allHeard && worst < 1.5f, juce::String (tuning.name) + " strum at " + juce::String (rate, 0)
-                                             + " Hz: six strings within 1.5 cents (worst " + juce::String (worst, 2) + ")" + perString);
+            check (allHeard && worst < 1.5f, juce::String (instrument == TunerInstrument::bass ? "Bass " : "") + tuning.name
+                                             + " strum at " + juce::String (rate, 0) + " Hz: " + juce::String ((int) count)
+                                             + " strings within 1.5 cents (worst " + juce::String (worst, 2) + ")" + perString);
             check (result && delay > 0.5 && delay < 0.8, "strum result arrives "
                                                           + juce::String (delay, 2) + " s after the strum");
         }
@@ -2039,7 +2097,7 @@ namespace
         {
             // One string muted, one detuned by more than the search range, then a second strum.
             const auto& standard = tuningPresets().front().strings;
-            std::array<float, 6> freqs {};
+            std::vector<float> freqs (6);
 
             for (size_t i = 0; i < 6; ++i)
                 freqs[i] = noteFrequency (standard[i], 440.0f);

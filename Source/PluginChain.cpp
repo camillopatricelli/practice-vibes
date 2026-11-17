@@ -43,7 +43,7 @@ PluginChain::PluginChain (juce::AudioDeviceManager& dm, juce::AudioPluginFormatM
     audioInNode     = graph.addNode (std::make_unique<IOProcessor> (IOProcessor::audioInputNode));
     audioOutNode    = graph.addNode (std::make_unique<IOProcessor> (IOProcessor::audioOutputNode));
     inputStageNode  = graph.addNode (std::make_unique<GainMeterProcessor> ("Input stage", 1));
-    outputStageNode = graph.addNode (std::make_unique<GainMeterProcessor> ("Guitar output", 2));
+    outputStageNode = graph.addNode (std::make_unique<GainMeterProcessor> ("Instrument output", 2));
     masterNode      = graph.addNode (std::make_unique<GainMeterProcessor> ("Master", 2));
 
     // Start muted: on an iPad the built-in mic + speaker would otherwise howl.

@@ -210,9 +210,9 @@ float PitchSmoother::add (const PitchReading& reading, double now)
 }
 
 //==============================================================================
-const std::vector<Tuning>& tuningPresets()
+const std::vector<Tuning>& tuningPresets (TunerInstrument instrument)
 {
-    static const std::vector<Tuning> presets {
+    static const std::vector<Tuning> guitar {
         { "Standard",         { 40, 45, 50, 55, 59, 64 } },     // E A D G B E
         { "Half step down",   { 39, 44, 49, 54, 58, 63 } },     // Eb Ab Db Gb Bb Eb
         { "Full step down",   { 38, 43, 48, 53, 57, 62 } },     // D G C F A D
@@ -224,12 +224,23 @@ const std::vector<Tuning>& tuningPresets()
         { "Open E",           { 40, 47, 52, 56, 59, 64 } },     // E B E G# B E
         { "Open C",           { 36, 43, 48, 55, 60, 64 } },     // C G C G C E
     };
-    return presets;
+    static const std::vector<Tuning> bass {
+        { "Standard (4 strings)",       { 28, 33, 38, 43 } },               // E A D G
+        { "Half step down (4 strings)", { 27, 32, 37, 42 } },               // Eb Ab Db Gb
+        { "Full step down (4 strings)", { 26, 31, 36, 41 } },               // D G C F
+        { "Drop D (4 strings)",         { 26, 33, 38, 43 } },               // D A D G
+        { "Standard (5 strings)",       { 23, 28, 33, 38, 43 } },           // B E A D G
+        { "High C (5 strings)",         { 28, 33, 38, 43, 48 } },           // E A D G C
+        { "Standard (6 strings)",       { 23, 28, 33, 38, 43, 48 } },       // B E A D G C
+    };
+    static const std::vector<Tuning> none;
+
+    return instrument == TunerInstrument::guitar ? guitar : instrument == TunerInstrument::bass ? bass : none;
 }
 
-juce::String tuningName (const StringNotes& strings)
+juce::String tuningName (const StringNotes& strings, TunerInstrument instrument)
 {
-    for (auto& t : tuningPresets())
+    for (auto& t : tuningPresets (instrument))
         if (t.strings == strings)
             return t.name;
 
@@ -284,7 +295,7 @@ int StrumAnalyser::samplesNeeded (double sampleRate) noexcept
     return (int) std::round (windowSeconds * sampleRate / factor) * factor;
 }
 
-StrumAnalyser::Peak StrumAnalyser::findPeak (float target, double binHz) const
+StrumAnalyser::Peak StrumAnalyser::findPeak (float target, double binHz, const std::vector<float>& partials) const
 {
     Peak peak;
     const auto spread = std::pow (2.0f, searchCents / 1200.0f);
@@ -306,10 +317,27 @@ StrumAnalyser::Peak StrumAnalyser::findPeak (float target, double binHz) const
 
     // A string stands far above the noise floor; the biggest noise bump only ~3x its median.
     // The floor is taken over +-4 semitones, so the peak's own main lobe hardly moves the median.
+    // The main lobes of the other strings' partials are left out: low bass strings are only a few
+    // Hz apart, and their lobes would otherwise fill the band and lift the "floor" to a peak's height.
     const auto floorSpread = std::pow (2.0f, 4.0f / 12.0f);
     const auto floorLo = juce::jmax (1, juce::jmin (lo, best - 60, (int) std::floor (target / floorSpread / binHz)));
     const auto floorHi = juce::jmin ((int) magnitude.size() - 1, juce::jmax (hi, best + 60, (int) std::ceil (target * floorSpread / binHz)));
-    std::vector<float> band (magnitude.begin() + floorLo, magnitude.begin() + floorHi + 1);
+    const auto lobeBins = 2.0 / windowSeconds / binHz + 2.0;     // Hann main lobe half-width, plus a little
+    std::vector<float> band;
+
+    for (int k = floorLo; k <= floorHi; ++k)
+    {
+        const bool inOtherLobe = (k < lo || k > hi)
+                                   && std::any_of (partials.begin(), partials.end(), [&] (float f)
+                                                   { return std::abs (k - f / binHz) < lobeBins
+                                                              && (f / binHz < lo || f / binHz > hi); });
+        if (! inOtherLobe)
+            band.push_back (magnitude[(size_t) k]);
+    }
+
+    if (band.size() < 24)
+        band.assign (magnitude.begin() + floorLo, magnitude.begin() + floorHi + 1);
+
     std::nth_element (band.begin(), band.begin() + (long) band.size() / 2, band.end());
 
     if (magnitude[(size_t) best] < minProminence * band[band.size() / 2])
@@ -471,7 +499,7 @@ StrumAnalyser::Peak StrumAnalyser::fitPartial (int n, double rate, float target,
 StrumResult StrumAnalyser::analyse (const float* samples, int numSamples, double sampleRate,
                                     const StringNotes& strings, float referenceA4)
 {
-    StrumResult result;
+    StrumResult result (strings.size());
     const auto factor = PitchDetector::decimationFor (sampleRate);
     const auto needed = samplesNeeded (sampleRate);
 
@@ -519,9 +547,17 @@ StrumResult StrumAnalyser::analyse (const float* samples, int numSamples, double
         magnitude[k] = std::hypot (spectrum[2 * k], spectrum[2 * k + 1]);
 
     const auto binHz = rate / strumFftSize;
-    std::array<Peak, 6> chosen;
-    std::array<int, 6> harmonicUsed {};
+    result.resize (strings.size());
+    std::vector<Peak> chosen (strings.size());
+    std::vector<int> harmonicUsed (strings.size(), 0);
     float loudest = 0.0f;
+
+    // Every string's expected partials, kept out of the noise floor estimate (see findPeak).
+    std::vector<float> partials;
+
+    for (auto note : strings)
+        for (int h = 1; h <= 8; ++h)
+            partials.push_back ((float) h * noteFrequency (note, referenceA4));
 
     for (size_t i = 0; i < strings.size(); ++i)
     {
@@ -535,8 +571,8 @@ StrumResult StrumAnalyser::analyse (const float* samples, int numSamples, double
                 if (j != i && std::abs (1200.0f * std::log2 ((float) h * noteFrequency (strings[j], referenceA4) / (2.0f * target))) < 25.0f)
                     shared = true;
 
-        const auto first = findPeak (target, binHz);
-        const auto second = shared ? Peak {} : findPeak (2.0f * target, binHz);
+        const auto first = findPeak (target, binHz, partials);
+        const auto second = shared ? Peak {} : findPeak (2.0f * target, binHz, partials);
 
         if (first.magnitude > 0.0f && (second.magnitude <= 0.0f || first.magnitude >= 0.25f * second.magnitude))
         {
@@ -553,7 +589,7 @@ StrumResult StrumAnalyser::analyse (const float* samples, int numSamples, double
     }
 
     const auto floorLevel = loudest * juce::Decibels::decibelsToGain (relativeFloorDb);
-    std::array<bool, 6> heard {};
+    std::vector<bool> heard (strings.size(), false);
 
     for (size_t i = 0; i < strings.size(); ++i)
         heard[i] = chosen[i].magnitude > 0.0f && chosen[i].magnitude >= floorLevel;
@@ -593,7 +629,7 @@ StrumResult StrumAnalyser::analyse (const float* samples, int numSamples, double
     }
 
     // Fewer than three strings: not a strum (a knock, a single note, noise).
-    if (std::count (heard.begin(), heard.end(), true) < 3)
+    if (strings.size() < 3 || std::count (heard.begin(), heard.end(), true) < 3)
         return result;
 
     for (size_t i = 0; i < strings.size(); ++i)
@@ -655,7 +691,7 @@ std::optional<StrumResult> Tuner::readStrum()
     const auto sampleRate = rate.load (std::memory_order_relaxed);
     const auto end = written.load (std::memory_order_acquire);
 
-    if (sampleRate <= 0.0)
+    if (sampleRate <= 0.0 || strings().size() < 3)
         return {};
 
     const auto needed = StrumAnalyser::samplesNeeded (sampleRate);
@@ -663,6 +699,18 @@ std::optional<StrumResult> Tuner::readStrum()
     const auto chunk = 256 * PitchDetector::decimationFor (sampleRate);
     const auto retrigger = (juce::int64) (0.3 * sampleRate);   // a strum's own rise is not a new strum
     constexpr float gate = 0.01f;                                // about -40 dBFS: a strum, not a hum
+
+    // The level is measured over ~1.75 periods of the lowest string, so it doesn't swing with the
+    // waveform: 4 chunks (~21 ms) for a guitar's low E, 8 for a bass's E, 11 for a low B.
+    const auto lowestPeriod = 1.0 / noteFrequency (*std::min_element (strings().begin(), strings().end()), referenceA4);
+    const auto energyWindow = juce::jlimit (4, (int) chunkEnergies.size(),
+                                            (int) std::ceil (1.75 * lowestPeriod * sampleRate / chunk - 0.05));
+
+    if (energyWindow != energyChunks)
+    {
+        energyChunks = energyWindow;
+        energyCount = energyNext = 0;
+    }
 
     // Don't scan audio that the ring has already overwritten.
     strumScanned = juce::jmax (strumScanned, clearedAt, end - ringSize / 2);
@@ -677,11 +725,9 @@ std::optional<StrumResult> Tuner::readStrum()
             sum += (double) v * v;
         }
 
-        // Level over the last 4 chunks (~21 ms): longer than a low E period, so it doesn't
-        // swing with the waveform.
         chunkEnergies[(size_t) energyNext] = (float) (sum / chunk);
-        energyNext = (energyNext + 1) % (int) chunkEnergies.size();
-        energyCount = juce::jmin (energyCount + 1, (int) chunkEnergies.size());
+        energyNext = (energyNext + 1) % energyChunks;
+        energyCount = juce::jmin (energyCount + 1, energyChunks);
         float energy = 0.0f;
 
         for (int i = 0; i < energyCount; ++i)
@@ -696,7 +742,11 @@ std::optional<StrumResult> Tuner::readStrum()
         for (int i = 1; i < chunkCount; ++i)
             before = juce::jmin (before, chunkLevels[(size_t) i]);
 
-        if (level > gate && level > 1.6f * before && (strumOnset < 0 || strumScanned - strumOnset > retrigger))
+        // While a strum is being measured, a new one must stand out more: the ringing strings'
+        // close partials beat, and on a bass that alone swings the level by ~1.6x.
+        const auto rise = strumOnset < 0 ? 1.6f : 2.5f;
+
+        if (level > gate && level > rise * before && (strumOnset < 0 || strumScanned - strumOnset > retrigger))
             strumOnset = strumScanned;
 
         // Recent chunk levels, in no particular order (only their minimum is used).
@@ -717,7 +767,7 @@ std::optional<StrumResult> Tuner::readStrum()
     for (int i = 0; i < needed; ++i)
         scratch[(size_t) i] = ring[(size_t) ((start + i) & (ringSize - 1))];
 
-    auto result = strumAnalyser.analyse (scratch.data(), needed, sampleRate, strings, referenceA4);
+    auto result = strumAnalyser.analyse (scratch.data(), needed, sampleRate, strings(), referenceA4);
 
     if (std::none_of (result.begin(), result.end(), [] (const StringReading& r) { return r.heard; }))
         return {};      // not a strum: keep waiting
@@ -735,18 +785,54 @@ void Tuner::clear()
     chunkCount = chunkNext = energyCount = energyNext = 0;
 }
 
+namespace
+{
+    juce::String instrumentToString (TunerInstrument i)
+    {
+        return i == TunerInstrument::bass ? "bass" : i == TunerInstrument::other ? "other" : "guitar";
+    }
+
+    juce::String notesToString (const StringNotes& notes)
+    {
+        juce::StringArray list;
+
+        for (auto n : notes)
+            list.add (juce::String (n));
+
+        return list.joinIntoString (" ");
+    }
+
+    /** The saved notes if they make sense for this instrument (guitar: six strings, bass: four to
+        six, each in range); otherwise the instrument's standard tuning. */
+    StringNotes parseStrings (const juce::String& text, TunerInstrument instrument)
+    {
+        const auto notes = juce::StringArray::fromTokens (text, " ", {});
+        const auto count = notes.size();
+        const bool countOk = instrument == TunerInstrument::guitar ? count == 6 : count >= 4 && count <= 6;
+        StringNotes parsed;
+
+        for (auto& n : notes)
+        {
+            const auto value = n.getIntValue();
+
+            if (! n.containsOnly ("0123456789") || value < Tuner::minStringNote (instrument) || value > Tuner::maxStringNote (instrument))
+                break;
+
+            parsed.push_back (value);
+        }
+
+        return countOk && (int) parsed.size() == count ? parsed : tuningPresets (instrument).front().strings;
+    }
+}
+
 std::unique_ptr<juce::XmlElement> Tuner::toXml() const
 {
     auto xml = std::make_unique<juce::XmlElement> ("TUNER");
     xml->setAttribute ("referenceA4", (double) referenceA4);
     xml->setAttribute ("muteWhileTuning", muteWhileTuning);
-
-    juce::StringArray notes;
-
-    for (auto n : strings)
-        notes.add (juce::String (n));
-
-    xml->setAttribute ("strings", notes.joinIntoString (" "));
+    xml->setAttribute ("instrument", instrumentToString (instrument));
+    xml->setAttribute ("strings", notesToString (guitarStrings));      // the guitar's (name kept from before bass)
+    xml->setAttribute ("bassStrings", notesToString (bassStrings));
     xml->setAttribute ("strobe", strobe);
     xml->setAttribute ("strumMode", strumMode);
     return xml;
@@ -759,25 +845,10 @@ void Tuner::fromXml (const juce::XmlElement& xml)
     strobe = xml.getBoolAttribute ("strobe", false);
     strumMode = xml.getBoolAttribute ("strumMode", false);
 
-    // Six notes, each in a sensible range for a guitar string; anything else -> standard.
-    strings = tuningPresets().front().strings;
-    const auto notes = juce::StringArray::fromTokens (xml.getStringAttribute ("strings"), " ", {});
-
-    if (notes.size() == (int) strings.size())
-    {
-        StringNotes parsed {};
-        bool ok = true;
-
-        for (int i = 0; i < notes.size(); ++i)
-        {
-            parsed[(size_t) i] = notes[i].getIntValue();
-            ok = ok && notes[i].containsOnly ("0123456789")
-                    && parsed[(size_t) i] >= minStringNote && parsed[(size_t) i] <= maxStringNote;
-        }
-
-        if (ok)
-            strings = parsed;
-    }
+    const auto name = xml.getStringAttribute ("instrument");
+    instrument = name == "bass" ? TunerInstrument::bass : name == "other" ? TunerInstrument::other : TunerInstrument::guitar;
+    guitarStrings = parseStrings (xml.getStringAttribute ("strings"), TunerInstrument::guitar);
+    bassStrings = parseStrings (xml.getStringAttribute ("bassStrings"), TunerInstrument::bass);
 }
 
 } // namespace pv

@@ -109,7 +109,7 @@ private:
 struct TakeRow
 {
     juce::Time when;
-    juce::String title;         // what it was played along to ("guitar only" if nothing)
+    juce::String title;         // what it was played along to ("no backing" if nothing)
     double seconds = 0.0;
     juce::File file;
 };

@@ -76,8 +76,11 @@ private:
     float shown = 0.0f;
 };
 
-/** Six guitar strings, low to high, as MIDI notes. */
-using StringNotes = std::array<int, 6>;
+/** What the tuner is set up for. "Other" is a plain chromatic tuner (no strings shown). */
+enum class TunerInstrument { guitar, bass, other };
+
+/** Open strings, low to high, as MIDI notes (6 for guitar, 4-6 for bass, none for "other"). */
+using StringNotes = std::vector<int>;
 
 struct Tuning
 {
@@ -85,11 +88,11 @@ struct Tuning
     StringNotes strings;
 };
 
-/** The built-in tunings; the first one is standard. */
-const std::vector<Tuning>& tuningPresets();
+/** The built-in tunings of an instrument; the first one is standard. Empty for "other". */
+const std::vector<Tuning>& tuningPresets (TunerInstrument = TunerInstrument::guitar);
 
 /** Preset name for these strings, or "Custom". */
-juce::String tuningName (const StringNotes&);
+juce::String tuningName (const StringNotes&, TunerInstrument = TunerInstrument::guitar);
 
 /** Frequency of a MIDI note for this A4 reference. */
 float noteFrequency (int midiNote, float referenceA4) noexcept;
@@ -106,9 +109,9 @@ struct StringReading
     float cents = 0.0f;         // from the string's target note (+ = sharp)
 };
 
-using StrumResult = std::array<StringReading, 6>;
+using StrumResult = std::vector<StringReading>;      // one per string
 
-/** Polyphonic check of all six open strings at once: we know which notes to expect, so a long
+/** Polyphonic check of all open strings at once: we know which notes to expect, so a long
     FFT is searched for a peak near each string's target (its 2nd harmonic if the fundamental is
     weak and the harmonic is not shared with another string). Not thread-safe.
 */
@@ -125,13 +128,15 @@ public:
     static int samplesNeeded (double sampleRate) noexcept;
 
     /** Analyses the last samplesNeeded() samples of `samples`. Nothing is heard unless at
-        least three strings are. */
+        least three strings are. The result has one reading per string. */
     StrumResult analyse (const float* samples, int numSamples, double sampleRate,
                          const StringNotes&, float referenceA4);
 
 private:
     struct Peak { float frequency = 0.0f, magnitude = 0.0f; };
-    Peak findPeak (float target, double binHz) const;
+    /** Strongest peak within searchCents of `target`, if it stands out from the noise floor. `partials`
+        = every string's expected partials (Hz), left out of the floor estimate. */
+    Peak findPeak (float target, double binHz, const std::vector<float>& partials) const;
 
     /** Best frequency for a partial near `start` in the band around `target`, given the other
         strings' partials (Hz) in that band. Uses the complex spectrum left by analyse(). */
@@ -141,7 +146,7 @@ private:
     std::vector<float> window, spectrum, magnitude;
 };
 
-/** Chromatic tuner: the guitar input stage pushes the dry signal into a ring buffer while the
+/** Chromatic tuner: the instrument input stage pushes the dry signal into a ring buffer while the
     tuner is active; the UI calls read() on the message thread a few dozen times per second.
 */
 class Tuner final : public AudioTap
@@ -154,13 +159,27 @@ public:
 
     // Settings (message thread), saved in tuner.xml.
     float referenceA4 = 440.0f;             // 430..450
-    bool muteWhileTuning = true;            // silence the guitar output while the tuner is open
-    StringNotes strings = tuningPresets().front().strings;
+    bool muteWhileTuning = true;            // silence the instrument output while the tuner is open
+    TunerInstrument instrument = TunerInstrument::guitar;
+    StringNotes guitarStrings = tuningPresets (TunerInstrument::guitar).front().strings;
+    StringNotes bassStrings = tuningPresets (TunerInstrument::bass).front().strings;
     bool strobe = false;                    // strobe band instead of the needle
-    bool strumMode = false;                 // check all six strings at once
+    bool strumMode = false;                 // check all strings at once
+
+    /** The open strings of the chosen instrument (empty for "other"). */
+    StringNotes& strings() noexcept                 { return instrument == TunerInstrument::bass ? bassStrings
+                                                           : instrument == TunerInstrument::guitar ? guitarStrings : noStrings; }
+    const StringNotes& strings() const noexcept     { return const_cast<Tuner*> (this)->strings(); }
+
+    /** Strum mode is chosen and the instrument has strings to check. */
+    bool isStrumMode() const noexcept               { return strumMode && ! strings().empty(); }
 
     static constexpr float minReference = 430.0f, maxReference = 450.0f;
-    static constexpr int minStringNote = 28, maxStringNote = 76;    // E1 .. E5 (baritone to high strings)
+
+    /** Range a string of this instrument may be tuned to: guitar E1..E5 (baritone to high strings),
+        bass B0..G3 (5-string low B to a piccolo bass's top). */
+    static int minStringNote (TunerInstrument i) noexcept   { return i == TunerInstrument::bass ? 23 : 28; }
+    static int maxStringNote (TunerInstrument i) noexcept   { return i == TunerInstrument::bass ? 55 : 76; }
 
     void push (const float* samples, int numSamples, double sampleRate) noexcept override;
 
@@ -196,9 +215,10 @@ private:
     juce::int64 strumScanned = 0, strumOnset = -1;
     std::array<float, 32> chunkLevels {};     // ~170 ms of 256-sample chunks at 48 kHz
     int chunkCount = 0, chunkNext = 0;
-    std::array<float, 4> chunkEnergies {};
-    int energyCount = 0, energyNext = 0;
+    std::array<float, 16> chunkEnergies {};   // ring of the last energyChunks chunk energies
+    int energyCount = 0, energyNext = 0, energyChunks = 4;
     StrumAnalyser strumAnalyser;
+    StringNotes noStrings;          // "other": always empty
 
     std::vector<float> scratch;
     PitchDetector detector;

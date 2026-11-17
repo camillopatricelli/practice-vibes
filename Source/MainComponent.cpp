@@ -230,13 +230,13 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     tunerButton.setTooltip ("Chromatic tuner (a footswitch can open and close it too)");
     engine.onToggleTuner = [this] { toggleTuner(); };
     recordButton.onClick = [this] { toggleRecording(); };
-    recordButton.setTooltip ("Record yourself (the guitar after the rig) into the topic you're practising. "
+    recordButton.setTooltip ("Record yourself (your instrument after the rig) into the topic you're practising. "
                              "Open the take later to hear it over the song, in step. A footswitch can do this too.");
     engine.onToggleRecording = [this] { toggleRecording(); };
-    engine.onToggleGuitarStem = [this]
+    engine.onToggleStem = [this] (int stem)
     {
         if (practicePanel != nullptr)
-            juce::Logger::writeToLog ("Footswitch: " + practicePanel->toggleGuitarStem());
+            juce::Logger::writeToLog ("Footswitch: " + practicePanel->toggleStem (stem));
     };
     engine.onSaveState = [this]
     {
@@ -361,7 +361,7 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     tabs.addTab ("Topics", theme::background(), libraryPanel.get(), false);
     tabs.addTab ("Links", theme::background(), linksPanel.get(), false);
     tabs.addTab ("Looper", theme::background(), looperPanel.get(), false);
-    tabs.addTab ("Guitar rig", theme::background(), rigPanel.get(), false);
+    tabs.addTab ("Rig", theme::background(), rigPanel.get(), false);
     addAndMakeVisible (tabs);
 
     // TabbedComponent brings the new panel to front *with* keyboard focus. A panel that doesn't take the focus
@@ -447,7 +447,7 @@ MainComponent::~MainComponent()
         stopRecording (true);   // keep what was recorded
 
     engine.onToggleRecording = nullptr;
-    engine.onToggleGuitarStem = nullptr;
+    engine.onToggleStem = nullptr;
     tracker.finish();
     tracker.onSaved = nullptr;
     tracker.captureSetup = nullptr;
@@ -996,7 +996,7 @@ void MainComponent::showTopicHistory (const juce::String& topicId)
         TakeRow row;
         row.file = topic->getFile (r);
         row.when = row.file.getCreationTime();
-        row.title = "guitar only";
+        row.title = "no backing";
 
         if (const auto info = TakeInfo::load (row.file))
         {

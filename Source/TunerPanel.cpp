@@ -58,26 +58,50 @@ TunerPanel::TunerPanel (AppEngine& e)
     tuningLabel.setText ("Tuning", juce::dontSendNotification);
     addAndMakeVisible (tuningLabel);
 
-    const auto& presets = tuningPresets();
-
-    for (int i = 0; i < (int) presets.size(); ++i)
-        tuningCombo.addItem (presets[(size_t) i].name, i + 1);
-
-    tuningCombo.addItem ("Custom", (int) presets.size() + 1);
-    tuningCombo.setItemEnabled ((int) presets.size() + 1, false);
     tuningCombo.setTooltip ("Click a string below to change its note (makes a custom tuning).");
     tuningCombo.onChange = [this]
     {
+        const auto& presets = tuningPresets (tuner.instrument);
         const auto index = tuningCombo.getSelectedId() - 1;
 
-        if (juce::isPositiveAndBelow (index, (int) tuningPresets().size()))
+        if (juce::isPositiveAndBelow (index, (int) presets.size()))
         {
-            tuner.strings = tuningPresets()[(size_t) index].strings;
+            tuner.strings() = presets[(size_t) index].strings;
             tuningChanged();
         }
     };
     addAndMakeVisible (tuningCombo);
-    updateTuningCombo();
+    fillTuningCombo();
+
+    instrumentLabel.setText ("Instrument", juce::dontSendNotification);
+    addAndMakeVisible (instrumentLabel);
+    guitarButton.setTooltip ("Six-string guitar tunings");
+    bassButton.setTooltip ("Bass tunings, 4, 5 or 6 strings");
+    otherButton.setTooltip ("Any other instrument or voice: a plain chromatic tuner, no strings");
+
+    const std::pair<juce::TextButton*, TunerInstrument> instrumentButtons[] {
+        { &guitarButton, TunerInstrument::guitar }, { &bassButton, TunerInstrument::bass }, { &otherButton, TunerInstrument::other } };
+
+    for (auto& [button, instrument] : instrumentButtons)
+    {
+        button->setClickingTogglesState (true);
+        button->setRadioGroupId (3);
+        button->setColour (juce::TextButton::buttonOnColourId, theme::accent());
+        button->setToggleState (tuner.instrument == instrument, juce::dontSendNotification);
+        button->onClick = [this, b = button, i = instrument]
+        {
+            if (b->getToggleState() && tuner.instrument != i)
+            {
+                tuner.instrument = i;
+                instrumentChanged();
+            }
+        };
+        addAndMakeVisible (*button);
+    }
+
+    guitarButton.setConnectedEdges (juce::Button::ConnectedOnRight);
+    bassButton.setConnectedEdges (juce::Button::ConnectedOnLeft | juce::Button::ConnectedOnRight);
+    otherButton.setConnectedEdges (juce::Button::ConnectedOnLeft);
 
     auto setUpPair = [this] (juce::TextButton& left, juce::TextButton& right, int group, bool rightOn)
     {
@@ -97,7 +121,7 @@ TunerPanel::TunerPanel (AppEngine& e)
     setUpPair (singleButton, strumButton, 1, tuner.strumMode);
     setUpPair (needleButton, strobeButton, 2, tuner.strobe);
     singleButton.setTooltip ("Tune one string at a time");
-    strumButton.setTooltip ("Strum all six open strings once and see every string at the same time");
+    strumButton.setTooltip ("Strum all open strings once and see every string at the same time");
     strobeButton.setTooltip ("A band that drifts while out of tune and stands still when in tune: finest for the last cent");
 
     for (auto* b : { &singleButton, &strumButton, &needleButton, &strobeButton })
@@ -137,8 +161,13 @@ void TunerPanel::applyMute()
 
 void TunerPanel::applyMode()
 {
-    needleButton.setVisible (! tuner.strumMode);
-    strobeButton.setVisible (! tuner.strumMode);
+    const bool hasStrings = ! tuner.strings().empty();
+    needleButton.setVisible (! tuner.isStrumMode());
+    strobeButton.setVisible (! tuner.isStrumMode());
+    singleButton.setVisible (hasStrings);
+    strumButton.setVisible (hasStrings);
+    tuningLabel.setVisible (hasStrings);
+    tuningCombo.setVisible (hasStrings);
 
     tuner.clear();
     smoother.reset();
@@ -148,20 +177,41 @@ void TunerPanel::applyMode()
     lastTick = juce::Time::getMillisecondCounterHiRes() / 1000.0;
 
     // The strobe needs smooth motion; the needle and the strum view don't.
-    startTimerHz (tuner.strobe && ! tuner.strumMode ? 60 : 30);
+    startTimerHz (tuner.strobe && ! tuner.isStrumMode() ? 60 : 30);
+    resized();
     repaint();
+}
+
+void TunerPanel::fillTuningCombo()
+{
+    const auto& presets = tuningPresets (tuner.instrument);
+    tuningCombo.clear (juce::dontSendNotification);
+
+    for (int i = 0; i < (int) presets.size(); ++i)
+        tuningCombo.addItem (presets[(size_t) i].name, i + 1);
+
+    tuningCombo.addItem ("Custom", (int) presets.size() + 1);
+    tuningCombo.setItemEnabled ((int) presets.size() + 1, false);
+    updateTuningCombo();
 }
 
 void TunerPanel::updateTuningCombo()
 {
-    const auto& presets = tuningPresets();
+    const auto& presets = tuningPresets (tuner.instrument);
     int id = (int) presets.size() + 1;
 
     for (int i = 0; i < (int) presets.size(); ++i)
-        if (presets[(size_t) i].strings == tuner.strings)
+        if (presets[(size_t) i].strings == tuner.strings())
             id = i + 1;
 
     tuningCombo.setSelectedId (id, juce::dontSendNotification);
+}
+
+void TunerPanel::instrumentChanged()
+{
+    engine.saveTunerSettings();
+    fillTuningCombo();
+    applyMode();
 }
 
 void TunerPanel::tuningChanged()
@@ -174,12 +224,17 @@ void TunerPanel::tuningChanged()
 
 void TunerPanel::showStringMenu (int index)
 {
-    const auto current = tuner.strings[(size_t) index];
+    const auto& strings = tuner.strings();
+
+    if (! juce::isPositiveAndBelow (index, (int) strings.size()))
+        return;
+
+    const auto current = strings[(size_t) index];
     juce::PopupMenu menu;
-    menu.addSectionHeader ("String " + juce::String (6 - index));
+    menu.addSectionHeader ("String " + juce::String ((int) strings.size() - index));
 
     for (int n = current + 7; n >= current - 7; --n)
-        if (n >= Tuner::minStringNote && n <= Tuner::maxStringNote)
+        if (n >= Tuner::minStringNote (tuner.instrument) && n <= Tuner::maxStringNote (tuner.instrument))
             menu.addItem (n + 1, noteName (n) + (n == current ? "" : "   (" + juce::String (n > current ? "+" : "")
                                                                             + juce::String (n - current) + ")"),
                           true, n == current);
@@ -188,17 +243,17 @@ void TunerPanel::showStringMenu (int index)
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea (localAreaToGlobal (stringCell (index).toNearestInt())),
                         [safe, index] (int result)
                         {
-                            if (safe == nullptr || result <= 0)
+                            if (safe == nullptr || result <= 0 || ! juce::isPositiveAndBelow (index, (int) safe->tuner.strings().size()))
                                 return;
 
-                            safe->tuner.strings[(size_t) index] = result - 1;
+                            safe->tuner.strings()[(size_t) index] = result - 1;
                             safe->tuningChanged();
                         });
 }
 
 void TunerPanel::mouseUp (const juce::MouseEvent& e)
 {
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < (int) tuner.strings().size(); ++i)
         if (stringCell (i).contains (e.position))
             showStringMenu (i);
 }
@@ -210,20 +265,20 @@ void TunerPanel::timerCallback()
     const auto dt = (float) juce::jlimit (0.0, 0.1, now - lastTick);
     lastTick = now;
 
-    if (tuner.strumMode)
+    if (tuner.isStrumMode())
     {
         if (auto result = tuner.readStrum())
         {
             strum = result;
-            strumStrings = tuner.strings;
+            strumStrings = tuner.strings();
         }
 
-        if (strum && strumStrings != tuner.strings)
+        if (strum && strumStrings != tuner.strings())
             strum.reset();
 
         hintLabel.setText (tuner.isStrumPending() ? "Listening..."
                            : strum ? "Strum again to check again"
-                                   : "Strum all six open strings once and let them ring",
+                                   : "Strum all open strings once and let them ring",
                            juce::dontSendNotification);
         repaint (noteArea.getUnion (meterArea).getUnion (stringsArea));
         return;
@@ -251,8 +306,9 @@ void TunerPanel::timerCallback()
     }
     else
     {
-        hintLabel.setText (inputLevel < PitchDetector::minLevel ? "Play a single string (no input signal)"
-                                                                : "Play a single string and let it ring",
+        const juce::String what = tuner.strings().empty() ? "Play a single note" : "Play a single string";
+        hintLabel.setText (inputLevel < PitchDetector::minLevel ? what + " (no input signal)"
+                                                                : what + " and let it ring",
                            juce::dontSendNotification);
     }
 
@@ -265,7 +321,7 @@ void TunerPanel::paint (juce::Graphics& g)
     g.setColour (theme::panel());
     g.fillRoundedRectangle (getLocalBounds().toFloat(), 8.0f);
 
-    if (tuner.strumMode)
+    if (tuner.isStrumMode())
     {
         paintStrum (g, noteArea.getUnion (meterArea).toFloat());
     }
@@ -411,12 +467,13 @@ void TunerPanel::paintStrobe (juce::Graphics& g, juce::Rectangle<float> area)
 
 void TunerPanel::paintStrum (juce::Graphics& g, juce::Rectangle<float> area)
 {
-    const auto cellWidth = area.getWidth() / 6.0f;
+    const auto count = (int) tuner.strings().size();
+    const auto cellWidth = area.getWidth() / (float) juce::jmax (1, count);
 
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < count; ++i)
     {
         auto cell = juce::Rectangle<float> (area.getX() + cellWidth * (float) i, area.getY(), cellWidth, area.getHeight()).reduced (6.0f, 4.0f);
-        const auto reading = strum ? (*strum)[(size_t) i] : StringReading {};
+        const auto reading = strum && i < (int) strum->size() ? (*strum)[(size_t) i] : StringReading {};
         const bool inTune = reading.heard && std::abs (reading.cents) <= strumInTuneCents;
         const auto colour = ! reading.heard ? theme::text().withAlpha (0.25f) : inTune ? inTuneColour() : offColour();
 
@@ -455,7 +512,7 @@ void TunerPanel::paintStrum (juce::Graphics& g, juce::Rectangle<float> area)
 juce::Rectangle<float> TunerPanel::stringCell (int index) const
 {
     const auto area = stringsArea.toFloat();
-    const auto cellWidth = area.getWidth() / 6.0f;
+    const auto cellWidth = area.getWidth() / (float) juce::jmax (1, (int) tuner.strings().size());
     return juce::Rectangle<float> (area.getX() + cellWidth * (float) index, area.getY(), cellWidth, area.getHeight()).reduced (4.0f);
 }
 
@@ -464,12 +521,13 @@ void TunerPanel::paintStrings (juce::Graphics& g, juce::Rectangle<float>)
     // Single mode: the string nearest to the note played lights up; when it's more than half a
     // semitone away (retuning to drop D, say), the cell says how far.
     float away = 0.0f;
-    const auto nearest = tuner.strumMode ? -1 : nearestString (tuner.strings, shownFrequency, tuner.referenceA4, away, retuneHintCents);
+    const auto& strings = tuner.strings();
+    const auto nearest = tuner.isStrumMode() ? -1 : nearestString (strings, shownFrequency, tuner.referenceA4, away, retuneHintCents);
 
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < (int) strings.size(); ++i)
     {
         auto cell = stringCell (i);
-        const auto midi = tuner.strings[(size_t) i];
+        const auto midi = strings[(size_t) i];
         const bool lit = i == nearest;
         const bool tuned = lit && std::abs (away) <= inTuneCents;
 
@@ -486,7 +544,7 @@ void TunerPanel::paintStrings (juce::Graphics& g, juce::Rectangle<float>)
         g.setColour (lit && std::abs (away) >= 50.0f ? offColour() : theme::text().withAlpha (0.4f));
         g.setFont (juce::FontOptions (12.0f));
         g.drawText (lit && std::abs (away) >= 50.0f ? semitonesText (away, cell.getWidth() > 150.0f)
-                                                    : "string " + juce::String (6 - i),
+                                                    : "string " + juce::String ((int) strings.size() - i),
                     cell, juce::Justification::centred);
     }
 }
@@ -495,6 +553,14 @@ void TunerPanel::paintStrings (juce::Graphics& g, juce::Rectangle<float>)
 void TunerPanel::resized()
 {
     auto area = getLocalBounds().reduced (16);
+
+    auto instrumentRow = area.removeFromTop (32);
+    instrumentLabel.setBounds (instrumentRow.removeFromLeft (90));
+
+    for (auto* b : { &guitarButton, &bassButton, &otherButton })
+        b->setBounds (instrumentRow.removeFromLeft (90).reduced (0, 2));
+
+    area.removeFromTop (8);
 
     auto topRow = area.removeFromTop (32);
     tuningLabel.setBounds (topRow.removeFromLeft (60));
@@ -514,8 +580,16 @@ void TunerPanel::resized()
     referenceSlider.setBounds (bottom.reduced (4, 0));
     area.removeFromBottom (12);
 
-    stringsArea = area.removeFromBottom (juce::jlimit (48, 70, area.getHeight() / 6));
-    area.removeFromBottom (12);
+    if (tuner.strings().empty())
+    {
+        stringsArea = {};
+    }
+    else
+    {
+        stringsArea = area.removeFromBottom (juce::jlimit (48, 70, area.getHeight() / 6));
+        area.removeFromBottom (12);
+    }
+
     hintLabel.setBounds (area.removeFromBottom (24));
     meterArea = area.removeFromBottom (juce::jlimit (60, 90, area.getHeight() / 3));
     noteArea = area;

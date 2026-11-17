@@ -1108,7 +1108,7 @@ public:
             if (e.maxBpm > 0.0)    detail.add (juce::String (juce::roundToInt (e.maxBpm)) + " bpm");
             if (e.maxSpeed > 0.0)  detail.add (juce::String (juce::roundToInt (e.maxSpeed * 100.0)) + " %");
             if (e.looper)          detail.add ("looper");
-            if (e.noGuitar)        detail.add ("no guitar");
+            if (e.noGuitar)        detail.add ("clock time");
             if (e.manual)          detail.add ("added by hand");
 
             const juce::Font rowFont (juce::FontOptions (14.0f));

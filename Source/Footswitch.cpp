@@ -1,4 +1,5 @@
 #include "Footswitch.h"
+#include "Stems.h"
 
 namespace pv
 {
@@ -74,10 +75,10 @@ juce::String FootswitchAction::describe() const
         case Kind::muteAll:    return "Mute / unmute all tracks";
         case Kind::clearAll:   return "Clear all tracks";
         case Kind::metronome:  return "Start / stop metronome";
-        case Kind::bypass:     return "Guitar rig: bypass selected plugin";
+        case Kind::bypass:     return "Rig: bypass selected plugin";
         case Kind::tuner:      return "Tuner on / off";
         case Kind::record:     return "Record a take (start / stop)";
-        case Kind::guitarStem: return "Mute / unmute the song's guitar stem";
+        case Kind::stem:       return "Mute / unmute the song's " + Stems::fileStem (track) + " stem";
         case Kind::none:       break;
     }
 
@@ -98,7 +99,7 @@ juce::String FootswitchAction::toString() const
         case Kind::bypass:     return "bypass";
         case Kind::tuner:      return "tuner";
         case Kind::record:     return "record";
-        case Kind::guitarStem: return "guitarStem";
+        case Kind::stem:       return "stem:" + Stems::fileStem (track);
         case Kind::none:       break;
     }
 
@@ -120,7 +121,13 @@ FootswitchAction FootswitchAction::fromString (const juce::String& text)
     if (name == "bypass")    return { Kind::bypass, 0 };
     if (name == "tuner")     return { Kind::tuner, 0 };
     if (name == "record")    return { Kind::record, 0 };
-    if (name == "guitarStem") return { Kind::guitarStem, 0 };
+    if (name == "guitarStem") return { Kind::stem, Stems::guitar };     // before the stem could be chosen
+
+    if (name == "stem")
+        for (int s = 0; s < Stems::count; ++s)
+            if (Stems::fileStem (s) == text.fromFirstOccurrenceOf (":", false, false))
+                return { Kind::stem, s };
+
     return {};
 }
 
@@ -132,8 +139,11 @@ std::vector<FootswitchAction> FootswitchAction::all (int numTracks)
         for (int t = 0; t < numTracks; ++t)
             list.push_back ({ kind, t });
 
-    for (auto kind : { Kind::undo, Kind::muteAll, Kind::clearAll, Kind::metronome, Kind::bypass, Kind::tuner, Kind::record, Kind::guitarStem })
+    for (auto kind : { Kind::undo, Kind::muteAll, Kind::clearAll, Kind::metronome, Kind::bypass, Kind::tuner, Kind::record })
         list.push_back ({ kind, 0 });
+
+    for (auto s : Stems::displayOrder)
+        list.push_back ({ Kind::stem, s });
 
     return list;
 }

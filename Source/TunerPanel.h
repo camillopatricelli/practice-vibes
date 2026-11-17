@@ -6,10 +6,11 @@
 namespace pv
 {
 
-/** Tuner shown in the overlay. Single-string mode: note name, a cents needle or a strobe band,
-    and the strings of the chosen tuning (the nearest one says how far to retune). Strum mode:
-    all six open strings checked from one strum. Click a string to change its note (Custom
-    tuning). The tuner listens only while this panel exists.
+/** Tuner shown in the overlay. Instrument: guitar, bass (4-6 strings) or other (chromatic only,
+    no strings). Single-string mode: note name, a cents needle or a strobe band, and the strings
+    of the chosen tuning (the nearest one says how far to retune). Strum mode: all open strings
+    checked from one strum. Click a string to change its note (Custom tuning). The tuner listens
+    only while this panel exists.
 */
 class TunerPanel final : public juce::Component,
                          private juce::Timer
@@ -27,6 +28,8 @@ private:
     void applyMute();
     void applyMode();
     void updateTuningCombo();
+    void fillTuningCombo();
+    void instrumentChanged();
     void showStringMenu (int stringIndex);
     void tuningChanged();
 
@@ -56,9 +59,11 @@ private:
     juce::Label referenceLabel, hintLabel, tuningLabel;
     juce::Slider referenceSlider;
     juce::ComboBox tuningCombo;
-    juce::TextButton singleButton { "Single string" }, strumButton { "Strum all six" },
+    juce::Label instrumentLabel;
+    juce::TextButton guitarButton { "Guitar" }, bassButton { "Bass" }, otherButton { "Other" };
+    juce::TextButton singleButton { "Single string" }, strumButton { "Strum all strings" },
                      needleButton { "Needle" }, strobeButton { "Strobe" };
-    juce::ToggleButton muteToggle { "Mute the guitar while tuning" };
+    juce::ToggleButton muteToggle { "Mute your instrument while tuning" };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TunerPanel)
 };

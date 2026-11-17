@@ -21,7 +21,7 @@ class RigPanel;
 class TodayPanel;
 class YouTubePlayer;
 
-/** Top-level UI: title bar, tabs (Today / Practice / Topics / Links / Looper / Guitar rig, plus an optional Log) and a full-window
+/** Top-level UI: title bar, tabs (Today / Practice / Topics / Links / Looper / Rig, plus an optional Log) and a full-window
     overlay used for plugin UIs and the audio settings.
 */
 class MainComponent final : public juce::Component,

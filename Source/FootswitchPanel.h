@@ -7,7 +7,7 @@ namespace pv
 {
 
 /** Footswitch setup (shown in the overlay): learn each switch of a MIDI pedal board and
-    choose what a tap and a hold do. Opened from the Looper and Guitar rig tabs.
+    choose what a tap and a hold do. Opened from the Looper and Rig tabs.
 */
 class FootswitchPanel final : public juce::Component,
                               private juce::Timer

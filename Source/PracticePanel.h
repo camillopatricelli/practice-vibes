@@ -45,8 +45,8 @@ public:
     /** Speed, pitch, loop (for the song or video showing now) and metronome settings of a saved setup. */
     void applySetup (const PracticeSetup&);
 
-    /** Footswitch action: mutes / unmutes the guitar stem (returns a short message for the log). */
-    juce::String toggleGuitarStem();
+    /** Footswitch action: mutes / unmutes one stem (Stems::Index) (returns a short message for the log). */
+    juce::String toggleStem (int stem);
 
     /** Shows a short note in place of the hint line for a few seconds (e.g. "Metronome set to 84 bpm..."). */
     void showNote (const juce::String&);

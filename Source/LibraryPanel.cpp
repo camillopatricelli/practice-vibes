@@ -93,7 +93,7 @@ public:
         addAndMakeVisible (rotationToggle);
 
         noGuitarToggle.setTooltip ("For ear training, theory...: while you practise this topic the time is counted on the clock "
-                                   "(with Pause on the Today tab) instead of from the guitar input");
+                                   "(with Pause on the Today tab) instead of from your instrument input");
         noGuitarToggle.onClick = [this] { owner.setNoGuitar (topicId, noGuitarToggle.getToggleState()); };
         addAndMakeVisible (noGuitarToggle);
 
@@ -304,7 +304,7 @@ private:
     juce::Label createdLabel, notesLabel, resourcesLabel, conflictLabel, noResourcesLabel;
     juce::TextButton deleteButton { "Delete topic" }, addFilesButton { "Add files..." }, addLinkButton { "Add link..." },
                      practiseButton { "Practise" }, historyButton { "History" }, conflictButton { "Choose version..." };
-    juce::ToggleButton rotationToggle { "In practice rotation" }, noGuitarToggle { "Timed without the guitar" };
+    juce::ToggleButton rotationToggle { "In practice rotation" }, noGuitarToggle { "Timed without playing" };
     juce::Viewport viewport;
     juce::Component rowHolder;
     std::vector<std::unique_ptr<ResourceRow>> rows;

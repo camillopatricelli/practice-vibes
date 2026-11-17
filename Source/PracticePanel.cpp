@@ -424,7 +424,7 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
             player.gain = gain;
     };
 
-    styleLabel (guitarVolumeLabel, "Guitar");
+    styleLabel (guitarVolumeLabel, "Take");
     styleHorizontal (guitarVolumeSlider, -40.0, 6.0, 0.5, 0.0, " dB");
     guitarVolumeSlider.setTooltip ("Volume of the recorded take");
     guitarVolumeSlider.onValueChange = [this] { player.takeGain = juce::Decibels::decibelsToGain ((float) guitarVolumeSlider.getValue(), -40.0f); };
@@ -799,14 +799,17 @@ void PracticePanel::applyStemGains()
         player.stemGains[(size_t) s] = stemControls.gainFor (s);
 }
 
-juce::String PracticePanel::toggleGuitarStem()
+juce::String PracticePanel::toggleStem (int stem)
 {
-    auto& muted = stemControls.mute[(size_t) Stems::guitar];
+    if (! juce::isPositiveAndBelow (stem, Stems::count))
+        return {};
+
+    auto& muted = stemControls.mute[(size_t) stem];
     muted = ! muted;
-    stemControls.solo[(size_t) Stems::guitar] = false;
+    stemControls.solo[(size_t) stem] = false;
     applyStemGains();
 
-    auto text = juce::String ("Guitar stem ") + (muted ? "muted" : "unmuted")
+    auto text = Stems::displayName (stem) + " stem " + (muted ? "muted" : "unmuted")
                   + (player.hasStems() ? juce::String() : juce::String (" (this song has no stems yet)"));
     showNote (text);
     return text;

@@ -161,7 +161,7 @@ public:
             if (it->maxBpm > 0.0)    detail.add (juce::String (juce::roundToInt (it->maxBpm)) + " bpm");
             if (it->maxSpeed > 0.0)  detail.add (juce::String (juce::roundToInt (it->maxSpeed * 100.0)) + " %");
             if (it->looper)          detail.add ("looper");
-            if (it->noGuitar)        detail.add ("no guitar");
+            if (it->noGuitar)        detail.add ("clock time");
             if (it->manual)          detail.add ("added by hand");
 
             lines.push_back ({ Line::entry, what, detail.joinIntoString ("  -  "), it->id });
@@ -341,7 +341,7 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
     };
     addAndMakeVisible (stopButton);
 
-    pauseButton.setTooltip ("This topic is timed without the guitar: pause the clock while you're away");
+    pauseButton.setTooltip ("This topic is timed without playing: pause the clock while you're away");
     pauseButton.onClick = [this]
     {
         tracker.setPaused (! tracker.isPaused());
@@ -661,7 +661,7 @@ void TodayPanel::updateNow()
     const auto startMode = tracker.isStartButtonMode();
     juce::String status = startMode ? (tracker.isPaused() ? "Not timing (microphone input): press Start to log practice"
                                                           : "Timing: press Pause when you stop")
-                        : onClock ? (tracker.isPaused() ? "Paused (timed without the guitar)" : "Timing (without the guitar)")
+                        : onClock ? (tracker.isPaused() ? "Paused (timed without playing)" : "Timing (without playing)")
                                   : (tracker.isPlaying() ? "Playing now" : "Not playing");
 
     if (active)
@@ -683,7 +683,7 @@ void TodayPanel::updateNow()
     pauseButton.setButtonText (tracker.isPaused() ? (startMode ? "Start" : "Resume") : "Pause");
     pauseButton.setTooltip (startMode ? "The input is a microphone (it hears the room too): practice time counts between Start and Pause. "
                                         "Change this per input in the Audio settings."
-                                      : "This topic is timed without the guitar: pause the clock while you're away");
+                                      : "This topic is timed without playing: pause the clock while you're away");
 
     if (! noteEditor.hasKeyboardFocus (true) && noteEditor.getText().trim() != tracker.getNote())
         noteEditor.setText (tracker.getNote(), false);

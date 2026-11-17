@@ -124,7 +124,7 @@ void AppEngine::start()
             return;
 
         if (! granted)
-            juce::Logger::writeToLog ("Audio input permission was NOT granted: the guitar input will be silent");
+            juce::Logger::writeToLog ("Audio input permission was NOT granted: the instrument input will be silent");
 
         auto savedState = juce::parseXML (getDeviceStateFile());
         juce::String savedAsioDriver;     // set when the saved setup is an ASIO driver
@@ -365,9 +365,9 @@ void AppEngine::performFootswitchAction (FootswitchAction action, double pressSe
                 onToggleRecording();
             break;
 
-        case Kind::guitarStem:
-            if (onToggleGuitarStem)
-                onToggleGuitarStem();
+        case Kind::stem:
+            if (onToggleStem)
+                onToggleStem (action.track);
             break;
 
         case Kind::none:

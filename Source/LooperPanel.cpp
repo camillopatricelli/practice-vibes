@@ -268,8 +268,8 @@ LooperPanel::LooperPanel (AppEngine& e)
         addAndMakeVisible (*b);
     }
 
-    afterFxButton.setTooltip ("Record the guitar as you hear it, with the rig's effects.");
-    beforeFxButton.setTooltip ("Record the dry guitar; loops are played through the rig, so changing the tone changes them too.");
+    afterFxButton.setTooltip ("Record your instrument as you hear it, with the rig's effects.");
+    beforeFxButton.setTooltip ("Record your dry instrument; loops are played through the rig, so changing the tone changes them too.");
     (looper.source.load() == (int) Looper::Source::beforeFx ? beforeFxButton : afterFxButton).setToggleState (true, juce::dontSendNotification);
     afterFxButton.onClick = [this] { looper.source = (int) Looper::Source::afterFx; saveSettings(); };
     beforeFxButton.onClick = [this] { looper.source = (int) Looper::Source::beforeFx; saveSettings(); };
@@ -359,7 +359,7 @@ LooperPanel::LooperPanel (AppEngine& e)
     styleLabel (hintLabel, {}, 0.7f);
     hintLabel.setJustificationType (juce::Justification::topLeft);
 
-    calibrateButton.setTooltip ("Measure the latency: play short muted strums right on the clicks "
+    calibrateButton.setTooltip ("Measure the latency: play short muted notes (or strums) right on the clicks "
                                 "(or connect the audio output to the input with a cable).");
     calibrateButton.onClick = [this]
     {
@@ -591,8 +591,8 @@ void LooperPanel::updateCalibration()
         if (juce::Time::getMillisecondCounterHiRes() - calibrationStartMs > calibrationTimeoutMs)
         {
             calibrationMessage = calibrationLags.empty()
-                                   ? "Calibration stopped: no strums detected. Check that the guitar input is working (meter in the Guitar rig tab)."
-                                   : "Calibration stopped: only " + juce::String (calibrationLags.size()) + " strums detected in 45 s. Try again.";
+                                   ? "Calibration stopped: no notes detected. Check that your instrument input is working (meter in the Rig tab)."
+                                   : "Calibration stopped: only " + juce::String (calibrationLags.size()) + " notes detected in 45 s. Try again.";
             endCalibration();
         }
 
@@ -608,13 +608,13 @@ void LooperPanel::updateCalibration()
         const auto offset = juce::jlimit (-100.0, 100.0, result.lagMs - deviceMs);
         offsetSlider.setValue (offset, juce::sendNotificationSync);
         saveSettings();
-        calibrationMessage = "Calibrated: your strums arrive " + juce::String (result.lagMs, 1) + " ms after the click (spread "
+        calibrationMessage = "Calibrated: your notes arrive " + juce::String (result.lagMs, 1) + " ms after the click (spread "
                              + juce::String (result.spreadMs, 1) + " ms); the audio device reports " + juce::String (deviceMs, 1)
                              + " ms, so the fine-tune is now " + juce::String (offset, 1) + " ms.";
     }
     else
     {
-        calibrationMessage = "Calibration failed: " + result.problem + ". Try again with short muted strums right on the clicks.";
+        calibrationMessage = "Calibration failed: " + result.problem + ". Try again with short muted notes right on the clicks.";
     }
 
     endCalibration();
@@ -716,7 +716,7 @@ void LooperPanel::timerCallback()
     if (calibrating)
     {
         const auto hits = juce::jmax (0, (int) calibrationLags.size() - warmUpHits);
-        hint = "Calibrating: play a short muted strum exactly on every click (or connect the output to the input with a cable). "
+        hint = "Calibrating: play a short muted note (or strum) exactly on every click (or connect the output to the input with a cable). "
                + juce::String (juce::jmin (hits, calibrationHits)) + " / " + juce::String (calibrationHits)
                + (calibrationLags.size() < (size_t) warmUpHits ? " (warming up)" : "");
     }
@@ -740,7 +740,7 @@ void LooperPanel::timerCallback()
 
     if (beforeFx && engine.chain->getOutputStage().muted.load())
         hint << (hint.isEmpty() ? "" : "\n")
-             << "Before-FX loops play through the rig: switch Monitor on in the Guitar rig tab to hear them.";
+             << "Before-FX loops play through the rig: switch Monitor on in the Rig tab to hear them.";
 
     if (metronome.followSong.load() && locked)
         hint << (hint.isEmpty() ? "" : "\n") << "\"Follow song beats\" is paused while there are loops.";

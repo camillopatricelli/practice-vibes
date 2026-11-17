@@ -77,7 +77,7 @@ RigPanel::RigPanel (AppEngine& e)
     };
 
     setupHeader (catalogueHeader, "Available plugins");
-    setupHeader (chainHeader, "Guitar chain");
+    setupHeader (chainHeader, "Effects chain");
     setupHeader (levelsHeader, "Input / output");
     setupHeader (midiHeader, "MIDI footswitch");
 
@@ -206,13 +206,13 @@ RigPanel::RigPanel (AppEngine& e)
     };
 
     setupGain (inputGainSlider, inputGainLabel, "Input gain", -24.0, 24.0, engine.chain->getInputStage());
-    setupGain (outputGainSlider, outputGainLabel, "Guitar level", -60.0, 12.0, engine.chain->getOutputStage());
+    setupGain (outputGainSlider, outputGainLabel, "Output level", -60.0, 12.0, engine.chain->getOutputStage());
 
     monitorButton.setToggleState (! engine.chain->getOutputStage().muted.load(), juce::dontSendNotification);
     monitorButton.onClick = [this]
     {
         engine.chain->getOutputStage().muted = ! monitorButton.getToggleState();
-        juce::Logger::writeToLog (monitorButton.getToggleState() ? "Guitar monitoring ON" : "Guitar monitoring OFF");
+        juce::Logger::writeToLog (monitorButton.getToggleState() ? "Monitoring ON" : "Monitoring OFF");
     };
     addAndMakeVisible (monitorButton);
 

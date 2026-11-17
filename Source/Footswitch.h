@@ -30,16 +30,17 @@ struct MidiTrigger
 /** Something a footswitch can do. */
 struct FootswitchAction
 {
-    enum class Kind { none, trackPress, trackClear, trackMute, undo, muteAll, clearAll, metronome, bypass, tuner, record, guitarStem };
+    enum class Kind { none, trackPress, trackClear, trackMute, undo, muteAll, clearAll, metronome, bypass, tuner, record, stem };
     Kind kind = Kind::none;
-    int track = 0;
+    int track = 0;              // the looper track, or for Kind::stem the stem (Stems::Index)
 
     bool operator== (const FootswitchAction& o) const noexcept
     {
-        return kind == o.kind && (track == o.track || ! usesTrack());
+        return kind == o.kind && (track == o.track || ! usesIndex());
     }
 
     bool usesTrack() const noexcept { return kind == Kind::trackPress || kind == Kind::trackClear || kind == Kind::trackMute; }
+    bool usesIndex() const noexcept { return usesTrack() || kind == Kind::stem; }
 
     juce::String describe() const;      // for menus and the log
     juce::String toString() const;      // "press:0" (saved in the settings)

@@ -6,7 +6,7 @@
 namespace pv
 {
 
-/** The "Guitar rig" tab: plugin catalogue, plugin chain, levels and MIDI footswitch. */
+/** The "Rig" tab: plugin catalogue, plugin chain, levels and MIDI footswitch. */
 class RigPanel final : public juce::Component,
                        private juce::Timer,
                        private juce::ChangeListener
@@ -57,7 +57,7 @@ private:
     std::unique_ptr<LevelMeter> inputMeter, outputMeter;
     juce::Slider inputGainSlider, outputGainSlider;
     juce::Label inputGainLabel, outputGainLabel;
-    juce::ToggleButton monitorButton { "Monitor guitar (use headphones!)" };
+    juce::ToggleButton monitorButton { "Monitor input (use headphones!)" };
 
     juce::Label midiDevicesLabel, lastMidiLabel;
     juce::TextButton footswitchButton { "Footswitch setup..." };
