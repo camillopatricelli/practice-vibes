@@ -6,7 +6,8 @@
 namespace pv
 {
 
-/** The "Rig" tab: plugin catalogue, plugin chain, levels and MIDI footswitch. */
+/** The "Rig" tab: plugin catalogue, plugin chain (an instrument on top, played from a MIDI keyboard, then the
+    effects), levels and MIDI footswitch. */
 class RigPanel final : public juce::Component,
                        private juce::Timer,
                        private juce::ChangeListener
@@ -48,7 +49,7 @@ private:
     std::unique_ptr<ListModel> catalogueModel, chainModel;
     juce::ListBox catalogueList, chainList;
     juce::TextButton addButton { "Add to chain" }, scanButton { "Scan VST3" };
-    juce::Label catalogueStatus;
+    juce::Label catalogueStatus, chainHint;
 
     juce::TextButton editButton { "Open UI" }, bypassButton { "Bypass" },
                      upButton { "Up" }, downButton { "Down" }, removeButton { "Remove" };

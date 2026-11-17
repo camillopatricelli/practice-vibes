@@ -87,6 +87,32 @@ juce::AudioPluginInstance* PluginChain::getPlugin (int index) const
     return nullptr;
 }
 
+bool PluginChain::isInstrument (int index) const
+{
+    return juce::isPositiveAndBelow (index, getNumPlugins()) && slots[(size_t) index].instrument;
+}
+
+bool PluginChain::isInstrumentPlugin (const juce::AudioPluginInstance& plugin)
+{
+    return plugin.getPluginDescription().isInstrument
+        || (plugin.acceptsMidi() && plugin.getMainBusNumInputChannels() == 0 && plugin.getMainBusNumOutputChannels() > 0);
+}
+
+void PluginChain::sendInstrumentMidi (const juce::MidiMessage& message)
+{
+    if (! instrumentTakesMidi.load() || ! audioRunning.load())
+        return;
+
+    // The collector places messages in the block by their timestamp (same clock as MIDI input).
+    auto copy = message;
+    const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+
+    if (copy.getTimeStamp() <= 0.0 || copy.getTimeStamp() > now)
+        copy.setTimeStamp (now);
+
+    player.getMidiMessageCollector().addMessageToQueue (copy);
+}
+
 bool PluginChain::isBypassed (int index) const
 {
     return juce::isPositiveAndBelow (index, getNumPlugins()) && slots[(size_t) index].node->isBypassed();
@@ -140,6 +166,7 @@ void PluginChain::loadPlugin (const juce::PluginDescription& description, NodeCa
 
             configureBuses (*instance);
 
+
             auto fullDescription = instance->getPluginDescription();
             const auto ins = instance->getMainBusNumInputChannels();
             const auto outs = instance->getMainBusNumOutputChannels();
@@ -176,10 +203,58 @@ void PluginChain::addPlugin (const juce::PluginDescription& description, LoadCal
     });
 }
 
+void PluginChain::addPluginInstance (std::unique_ptr<juce::AudioPluginInstance> instance)
+{
+    if (instance == nullptr)
+        return;
+
+    configureBuses (*instance);
+
+    if (auto node = graph.addNode (std::move (instance), std::nullopt, UpdateKind::none))
+        addSlot (node);
+
+    notifyChange();
+}
+
+void PluginChain::prepareForTests (int numDeviceIns, int numDeviceOuts, double sampleRate, int blockSize)
+{
+    deviceManager.removeAudioCallback (&deviceCallback);    // nothing else may drive the graph
+    player.setProcessor (nullptr);
+    graph.setPlayConfigDetails (numDeviceIns, numDeviceOuts, sampleRate, blockSize);
+    graph.prepareToPlay (sampleRate, blockSize);
+    rebuildConnections();
+}
+
+void PluginChain::processForTests (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+{
+    graph.processBlock (buffer, midi);
+}
+
 void PluginChain::addSlot (NodePtr node)
 {
     auto* plugin = dynamic_cast<juce::AudioPluginInstance*> (node->getProcessor());
-    slots.push_back ({ node, plugin != nullptr ? plugin->getPluginDescription() : juce::PluginDescription() });
+    Slot slot { node, plugin != nullptr ? plugin->getPluginDescription() : juce::PluginDescription(),
+                plugin != nullptr && isInstrumentPlugin (*plugin) };
+
+    if (slot.instrument)
+    {
+        if (hasInstrument())
+        {
+            juce::Logger::writeToLog ("Instrument " + slots.front().description.name + " replaced by " + slot.description.name);
+            const auto oldID = slots.front().node->nodeID;
+            slots.erase (slots.begin());
+            graph.removeNode (oldID, UpdateKind::none);
+        }
+
+        slots.insert (slots.begin(), slot);
+        lastAddedIndex = 0;
+    }
+    else
+    {
+        slots.push_back (slot);
+        lastAddedIndex = getNumPlugins() - 1;
+    }
+
     rebuildConnections();
 }
 
@@ -201,8 +276,9 @@ void PluginChain::movePlugin (int index, int delta)
 {
     const auto newIndex = index + delta;
 
-    if (! juce::isPositiveAndBelow (index, getNumPlugins()) || ! juce::isPositiveAndBelow (newIndex, getNumPlugins()))
-        return;
+    if (! juce::isPositiveAndBelow (index, getNumPlugins()) || ! juce::isPositiveAndBelow (newIndex, getNumPlugins())
+        || isInstrument (index) || isInstrument (newIndex))
+        return;     // the instrument stays on top
 
     std::swap (slots[(size_t) index], slots[(size_t) newIndex]);
     rebuildConnections();
@@ -231,7 +307,8 @@ int PluginChain::getPluginLatencySamples() const
     int total = 0;
 
     for (auto& slot : slots)
-        total += juce::jmax (0, slot.node->getProcessor()->getLatencySamples());
+        if (! slot.instrument)
+            total += juce::jmax (0, slot.node->getProcessor()->getLatencySamples());
 
     return total;
 }
@@ -271,36 +348,58 @@ void PluginChain::rebuildConnections()
         previous = looperBeforeNode->nodeID;
     }
 
+    // What feeds the next stage: the audio input, plus the instrument's sound (the graph sums them).
+    std::vector<std::pair<NodeID, int>> heads { { previous, previousChannels } };
+    auto connectHeads = [&] (NodeID dest, int numChannels)
+    {
+        for (int c = 0; c < numChannels; ++c)
+            for (auto& [node, channels] : heads)
+                connect (node, juce::jmin (c, channels - 1), dest, c);
+    };
+
+    auto takesMidi = false;
+
     for (auto& slot : slots)
     {
         auto* processor = slot.node->getProcessor();
         const auto ins = processor->getMainBusNumInputChannels();
         const auto outs = processor->getMainBusNumOutputChannels();
 
+        if (slot.instrument)
+        {
+            if (processor->acceptsMidi())
+            {
+                connect (midiInNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex,
+                         slot.node->nodeID, juce::AudioProcessorGraph::midiChannelIndex);
+                takesMidi = true;
+            }
+
+            if (outs > 0)
+                heads.push_back ({ slot.node->nodeID, outs });
+
+            continue;
+        }
+
         if (outs <= 0)
             continue; // nothing to pass on (e.g. a MIDI-only plugin)
 
-        for (int c = 0; c < ins; ++c)
-            connect (previous, juce::jmin (c, previousChannels - 1), slot.node->nodeID, c);
-
-        previous = slot.node->nodeID;
-        previousChannels = outs;
+        connectHeads (slot.node->nodeID, ins);
+        heads = { { slot.node->nodeID, outs } };
     }
 
-    for (int c = 0; c < 2; ++c)
-        connect (previous, juce::jmin (c, previousChannels - 1), outputStageNode->nodeID, c);
+    instrumentTakesMidi = takesMidi;
+    connectHeads (outputStageNode->nodeID, 2);
 
     for (int c = 0; c < 2; ++c)
         connect (outputStageNode->nodeID, c, masterNode->nodeID, c);
 
     if (looperAfterNode != nullptr)
     {
-        // Recorded before the guitar output stage, so loops record even with monitoring off.
+        // Recorded before the instrument output stage, so loops record even with monitoring off.
+        connectHeads (looperAfterNode->nodeID, 2);
+
         for (int c = 0; c < 2; ++c)
-        {
-            connect (previous, juce::jmin (c, previousChannels - 1), looperAfterNode->nodeID, c);
             connect (looperAfterNode->nodeID, c, masterNode->nodeID, c);
-        }
     }
 
     for (auto& source : sources)

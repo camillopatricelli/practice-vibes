@@ -123,14 +123,23 @@ RigPanel::RigPanel (AppEngine& e)
     chainModel->rowCount = [this] { return engine.chain->getNumPlugins(); };
     chainModel->rowText = [this] (int row)
     {
-        return juce::String (row + 1) + ".  " + engine.chain->getPluginName (row)
-             + (engine.chain->isBypassed (row) ? "   (bypassed)" : "");
+        const auto number = engine.chain->hasInstrument() ? row : row + 1;     // effects count from 1
+        return (engine.chain->isInstrument (row) ? juce::String ("Instrument:  ") : juce::String (number) + ".  ")
+             + engine.chain->getPluginName (row) + (engine.chain->isBypassed (row) ? "   (bypassed)" : "");
     };
     chainModel->onDoubleClick = [this] (int row) { openEditor (row); };
     chainList.setModel (chainModel.get());
     chainList.setRowHeight (44);
     chainList.setColour (juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
     addAndMakeVisible (chainList);
+
+    chainHint.setColour (juce::Label::textColourId, theme::highlight());
+    chainHint.setFont (juce::FontOptions (13.0f));
+    chainHint.setMinimumHorizontalScale (0.6f);
+    addAndMakeVisible (chainHint);
+
+    addButton.setTooltip ("Effects are added at the end of the chain. An instrument (a synth or piano plugin) goes on top "
+                          "and is played from your MIDI keyboard; adding another instrument replaces it.");
 
     // Icon buttons: five of them share the chain column, too narrow for their words in portrait.
     editButton.setTooltip ("Open the plugin's window");
@@ -304,6 +313,8 @@ void RigPanel::resized()
     for (auto* b : { &editButton, &bypassButton, &upButton, &downButton, &removeButton })
         b->setBounds (chainButtons.removeFromLeft (buttonWidth).reduced (3));
 
+    chainHint.setBounds (middle.removeFromBottom (26));
+
     chainList.setBounds (middle.reduced (theme::listCardPadX, theme::listCardPadY));
 
     // Right: levels and MIDI
@@ -358,6 +369,19 @@ void RigPanel::timerCallback()
 
     sync (inputGainSlider, engine.chain->getInputStage());
     sync (outputGainSlider, engine.chain->getOutputStage());
+
+    // An instrument is silent until monitoring is on (it goes through the same output stage as the input).
+    const auto hint = ! engine.chain->hasInstrument() ? juce::String()
+                    : engine.chain->getOutputStage().muted.load() ? juce::String ("Turn on Monitor input to hear the instrument")
+                                                                   : juce::String ("Play the instrument from your MIDI keyboard");
+
+    if (chainHint.getText() != hint)
+        chainHint.setText (hint, juce::dontSendNotification);
+
+    const auto selected = selectedChainIndex();
+    const auto movable = selected >= 0 && ! engine.chain->isInstrument (selected);
+    upButton.setEnabled (movable && ! engine.chain->isInstrument (selected - 1) && selected > 0);
+    downButton.setEnabled (movable && selected < engine.chain->getNumPlugins() - 1);
 }
 
 void RigPanel::changeListenerCallback (juce::ChangeBroadcaster* source)
@@ -445,7 +469,7 @@ void RigPanel::addSelectedPlugin()
         if (safeThis != nullptr)
         {
             safeThis->addButton.setEnabled (true);
-            safeThis->chainList.selectRow (safeThis->engine.chain->getNumPlugins() - 1);
+            safeThis->chainList.selectRow (safeThis->engine.chain->getLastAddedIndex());
         }
     });
 }

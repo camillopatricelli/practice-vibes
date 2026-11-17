@@ -90,6 +90,10 @@ public:
     /** Returns true if the message belonged to a switch (or was taken by learning). */
     bool handleMidi (const juce::MidiMessage&);
 
+    /** Any thread (the MIDI input thread): true if the message belongs to a learned switch, or a switch is
+        being learned. Such messages are kept away from the instrument plugin (a stomp must not play a note). */
+    bool isFootswitchMessage (const juce::MidiMessage&) const noexcept;
+
     /** Same, with an explicit time in seconds (tests). */
     bool handleMidi (const juce::MidiMessage&, double nowSeconds);
 
@@ -129,6 +133,8 @@ private:
     void fire (int index, const FootswitchAction&, const char* gesture, double pressSeconds);
     void finishPending (bool momentary);
     void changed();
+    void publish();             // copies the learned triggers for isFootswitchMessage()
+    static int encode (const MidiTrigger&) noexcept;
 
     std::array<Switch, numSwitches> switches;
     std::array<Runtime, numSwitches> runtime;
@@ -137,6 +143,9 @@ private:
     int learning = -1;
     int pending = -1;           // switch learned, waiting for a release (momentary) or the window to end
     double pendingSince = 0.0;
+
+    std::array<std::atomic<int>, numSwitches> publishedTriggers {};     // encode(), 0 = none
+    std::atomic<bool> publishedLearning { false };
 };
 
 } // namespace pv

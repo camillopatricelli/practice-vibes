@@ -83,7 +83,12 @@ AppEngine::AppEngine()
     if (auto xml = juce::parseXML (getFootswitchFile()))
         footswitch->fromXml (*xml);
 
-    midi = std::make_unique<MidiMonitor> (deviceManager);
+    // MIDI thread: everything but the pedal board's own messages goes straight to the instrument plugin.
+    midi = std::make_unique<MidiMonitor> (deviceManager, [this] (const juce::MidiMessage& message)
+    {
+        if (! message.isSysEx() && ! footswitch->isFootswitchMessage (message))
+            chain->sendInstrumentMidi (message);
+    });
 
     footswitch->onChange = [this] { footswitch->toXml()->writeTo (getFootswitchFile()); };
     footswitch->perform = [this] (FootswitchAction action, double pressSeconds) { performFootswitchAction (action, pressSeconds); };

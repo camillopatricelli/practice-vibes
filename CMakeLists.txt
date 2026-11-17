@@ -287,6 +287,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         Source/MediaFoundationAudio.cpp
         Source/MetronomeProcessor.cpp
         Source/PlayerProcessor.cpp
+        Source/PluginChain.cpp
         Source/PracticeLog.cpp
         Source/PracticePlanner.cpp
         Source/SessionPlans.cpp
@@ -302,6 +303,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     pv_use_onnxruntime(PracticeVibesTests)
 
     target_compile_definitions(PracticeVibesTests PRIVATE
+        $<$<PLATFORM_ID:Windows>:JUCE_PLUGINHOST_VST3=1>    # optional real-instrument check (PV_REAL_INSTRUMENT)
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_MODAL_LOOPS_PERMITTED=1)

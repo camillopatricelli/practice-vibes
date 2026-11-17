@@ -10,15 +10,20 @@ namespace pv
 
         device input (one selected channel)
           -> input stage (gain + meter, mono)
-          -> [looper, before FX: records the dry guitar, adds "before FX" loops]
+          -> [looper, before FX: records the dry input, adds "before FX" loops]  --+
+        MIDI input -> instrument plugin (optional, played from a MIDI keyboard) ---+ (mixed)
           -> plugin 1 -> plugin 2 -> ...        (AUv3 on iPad, VST3 on Windows, AU + VST3 on macOS)
           -> guitar output stage (gain + mute + meter, stereo)  --+
           -> [looper, after FX: records the processed guitar,    |
               plays "after FX" loops]  ----------------------------+-> master (meter) -> device output
         other sources (song player, metronome, drums...)  --------+
 
-    Sources sit outside the guitar path: monitoring off does not mute them and the looper
+    Sources sit outside the instrument path: monitoring off does not mute them and the looper
     does not record them. Every plugin gets the play head set with setPlayHead().
+
+    The instrument, if any, is always slot 0 (one at a time: adding another replaces it). Only it gets
+    MIDI, queued from the MIDI input thread with sendInstrumentMidi(). Its sound joins the audio input
+    after the "before FX" looper node, so before-FX loops don't contain it; after-FX loops and takes do.
 
     All methods must be called on the message thread.
 */
@@ -36,8 +41,31 @@ public:
 
     using LoadCallback = std::function<void (const juce::String& errorOrEmpty)>;
 
-    /** Loads a plugin asynchronously (required for AUv3) and appends it to the chain. */
+    /** Loads a plugin asynchronously (required for AUv3) and appends it to the chain; an instrument
+        goes to the top instead, replacing the current one. */
     void addPlugin (const juce::PluginDescription&, LoadCallback onDone = {});
+
+    /** Adds an already created plugin (synchronously); same placement rules as addPlugin(). */
+    void addPluginInstance (std::unique_ptr<juce::AudioPluginInstance>);
+
+    /** Tests only: run the graph offline, without an audio device. `buffer` holds the device inputs on the
+        way in and the device outputs on the way out; `midi` is what the MIDI input node delivers. */
+    void prepareForTests (int numDeviceIns, int numDeviceOuts, double sampleRate, int blockSize);
+    void processForTests (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi);
+
+    /** Index of the slot the last successful addPlugin() filled (-1 = none yet). */
+    int getLastAddedIndex() const noexcept              { return lastAddedIndex; }
+
+    /** Slot 0 when an instrument is loaded. */
+    bool isInstrument (int index) const;
+    bool hasInstrument() const                          { return isInstrument (0); }
+
+    /** Any thread (meant for the MIDI input thread): queues a message for the instrument plugin. Dropped
+        when there is none, it takes no MIDI, or the audio device isn't running. */
+    void sendInstrumentMidi (const juce::MidiMessage&);
+
+    /** Instruments: told by the description, or a plugin that takes MIDI and has no audio input. */
+    static bool isInstrumentPlugin (const juce::AudioPluginInstance&);
 
     void removePlugin (int index);
     void movePlugin (int index, int delta);
@@ -78,7 +106,8 @@ public:
 
     void setBlockListener (BlockListener* listener)    { blockListener = listener; }
 
-    /** Total latency the plugins report (the graph delays the other paths by as much). */
+    /** Total latency the effect plugins report (the graph delays the other paths by as much). The instrument's
+        isn't counted: the looper compensates the audio input's round trip. */
     int getPluginLatencySamples() const;
 
     /** Serialises the chain, including every plugin's own state. */
@@ -98,6 +127,7 @@ private:
     {
         NodePtr node;
         juce::PluginDescription description;
+        bool instrument = false;
     };
 
     struct PendingSlot
@@ -154,7 +184,8 @@ private:
     juce::AudioProcessorPlayer player;
     DeviceCallback deviceCallback { *this };
     std::atomic<BlockListener*> blockListener { nullptr };
-    std::atomic<bool> audioRunning { false };
+    std::atomic<bool> audioRunning { false }, instrumentTakesMidi { false };
+    int lastAddedIndex = -1;
 
     NodePtr midiInNode, audioInNode, audioOutNode, inputStageNode, outputStageNode, masterNode;
     NodePtr looperBeforeNode, looperAfterNode;

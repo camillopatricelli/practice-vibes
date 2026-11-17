@@ -13,6 +13,7 @@
 #include "../Source/MediaFoundationAudio.h"
 #include "../Source/MetronomeProcessor.h"
 #include "../Source/PlayerProcessor.h"
+#include "../Source/PluginChain.h"
 #include "../Source/PracticeLog.h"
 #include "../Source/PracticePlanner.h"
 #include "../Source/Recorder.h"
@@ -2618,6 +2619,201 @@ static void testStartButtonMode()
     folder.deleteRecursively();
 }
 
+namespace
+{
+    /** Stand-ins for real plugins: an instrument that outputs `level` (DC) while a note is held,
+        and an effect that scales its input. */
+    class FakePlugin : public juce::AudioPluginInstance
+    {
+    public:
+        FakePlugin (bool isSynth, float value, int latency = 0)
+            : juce::AudioPluginInstance (isSynth ? BusesProperties().withOutput ("Out", juce::AudioChannelSet::stereo())
+                                                 : BusesProperties().withInput ("In", juce::AudioChannelSet::stereo())
+                                                                    .withOutput ("Out", juce::AudioChannelSet::stereo())),
+              synth (isSynth), amount (value)
+        {
+            setLatencySamples (latency);
+        }
+
+        void fillInPluginDescription (juce::PluginDescription& d) const override
+        {
+            d.name = getName();
+            d.pluginFormatName = "Fake";
+            d.isInstrument = synth;
+            d.numInputChannels = synth ? 0 : 2;
+            d.numOutputChannels = 2;
+        }
+
+        const juce::String getName() const override             { return synth ? "Fake synth" : "Fake gain"; }
+        void prepareToPlay (double, int) override               {}
+        void releaseResources() override                        {}
+
+        void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override
+        {
+            if (! synth)
+            {
+                buffer.applyGain (amount);
+                return;
+            }
+
+            for (const auto m : midi)
+            {
+                const auto msg = m.getMessage();
+
+                if (msg.isNoteOn())
+                    ++held;
+                else if (msg.isNoteOff())
+                    held = juce::jmax (0, held - 1);
+            }
+
+            for (int c = 0; c < buffer.getNumChannels(); ++c)
+                juce::FloatVectorOperations::fill (buffer.getWritePointer (c), held > 0 ? amount : 0.0f, buffer.getNumSamples());
+        }
+
+        double getTailLengthSeconds() const override            { return 0.0; }
+        bool acceptsMidi() const override                       { return synth; }
+        bool producesMidi() const override                      { return false; }
+        juce::AudioProcessorEditor* createEditor() override     { return nullptr; }
+        bool hasEditor() const override                         { return false; }
+        int getNumPrograms() override                           { return 1; }
+        int getCurrentProgram() override                        { return 0; }
+        void setCurrentProgram (int) override                   {}
+        const juce::String getProgramName (int) override        { return {}; }
+        void changeProgramName (int, const juce::String&) override {}
+        void getStateInformation (juce::MemoryBlock&) override  {}
+        void setStateInformation (const void*, int) override    {}
+
+        const bool synth;
+        const float amount;
+        int held = 0;
+    };
+}
+
+static void testInstrumentSlot()
+{
+    std::cout << "\n[Rig: instrument plugin played from MIDI]\n";
+
+    juce::AudioDeviceManager deviceManager;
+    juce::AudioPluginFormatManager formats;
+    PluginChain chain (deviceManager, formats);
+    constexpr int block = 256;
+    chain.prepareForTests (1, 2, 48000.0, block);
+    chain.getOutputStage().muted = false;
+
+    // Runs a few blocks (gains are smoothed) with `input` on the device input; returns the last output sample.
+    auto run = [&] (float input, juce::MidiBuffer midi = {})
+    {
+        juce::AudioBuffer<float> buffer (2, block);
+        float out = 0.0f;
+
+        for (int i = 0; i < 20; ++i)
+        {
+            buffer.clear();
+            juce::FloatVectorOperations::fill (buffer.getWritePointer (0), input, block);
+            auto thisBlock = i == 0 ? midi : juce::MidiBuffer();
+            chain.processForTests (buffer, thisBlock);
+            out = buffer.getSample (1, block - 1);
+        }
+
+        return out;
+    };
+
+    auto note = [] (bool on)
+    {
+        juce::MidiBuffer m;
+        m.addEvent (on ? juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100) : juce::MidiMessage::noteOff (1, 60), 0);
+        return m;
+    };
+
+    chain.addPluginInstance (std::make_unique<FakePlugin> (false, 0.5f));       // effect first
+    chain.addPluginInstance (std::make_unique<FakePlugin> (true, 0.5f, 100));   // then an instrument
+
+    check (chain.getNumPlugins() == 2 && chain.hasInstrument() && chain.isInstrument (0) && ! chain.isInstrument (1)
+             && chain.getLastAddedIndex() == 0, "an instrument goes on top of the chain, above the effects");
+    check (chain.getPluginLatencySamples() == 0, "the instrument's latency isn't counted as chain latency");
+
+    check (std::abs (run (0.0f)) < 1.0e-4f, "no note, no input: silence");
+    check (std::abs (run (0.0f, note (true)) - 0.25f) < 0.01f, "note on: the instrument plays through the effect (0.5 x 0.5)");
+    check (std::abs (run (0.2f) - 0.35f) < 0.01f, "the audio input mixes with the instrument before the effects");
+    check (std::abs (run (0.2f, note (false)) - 0.1f) < 0.01f, "note off: only the audio input is left");
+
+    chain.movePlugin (1, -1);
+    check (chain.isInstrument (0) && chain.getPluginName (1) == "Fake gain", "effects can't move above the instrument");
+
+    chain.addPluginInstance (std::make_unique<FakePlugin> (true, 0.8f));
+    check (chain.getNumPlugins() == 2 && chain.isInstrument (0), "a second instrument replaces the first");
+    check (std::abs (run (0.0f, note (true)) - 0.4f) < 0.01f, "the new instrument plays (0.8 x 0.5)");
+
+    chain.getOutputStage().muted = true;
+    check (std::abs (run (0.0f)) < 1.0e-4f, "monitoring off silences the instrument too");
+    chain.getOutputStage().muted = false;
+
+    chain.removePlugin (0);
+    check (! chain.hasInstrument() && chain.getNumPlugins() == 1, "removing the instrument leaves the effects");
+    check (std::abs (run (0.2f, note (true)) - 0.1f) < 0.01f, "without an instrument MIDI makes no sound");
+
+    // The pedal board's messages never reach the instrument.
+    Footswitch fs;
+    fs.startLearning (0);
+    check (fs.isFootswitchMessage (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100)), "while learning, every message is kept back");
+    fs.handleMidi (juce::MidiMessage::controllerEvent (1, 80, 127), 1.0);
+    fs.handleMidi (juce::MidiMessage::controllerEvent (1, 80, 0), 1.1);
+    check (fs.isFootswitchMessage (juce::MidiMessage::controllerEvent (1, 80, 127))
+             && ! fs.isFootswitchMessage (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100))
+             && ! fs.isFootswitchMessage (juce::MidiMessage::controllerEvent (1, 64, 127)),
+           "a learned switch is kept back; keyboard notes and the sustain pedal pass");
+
+    // Optional, local only: a real instrument plugin (PV_REAL_INSTRUMENT=<path to a .vst3>).
+    const auto realPath = juce::SystemStats::getEnvironmentVariable ("PV_REAL_INSTRUMENT", {});
+
+    if (realPath.isNotEmpty())
+    {
+        juce::addDefaultFormatsToManager (formats);
+        juce::OwnedArray<juce::PluginDescription> found;
+
+        for (auto* format : formats.getFormats())
+            if (format->fileMightContainThisPluginType (realPath))
+                format->findAllTypesForFile (found, realPath);
+
+        std::unique_ptr<juce::AudioPluginInstance> instance;
+        juce::String error;
+
+        if (! found.isEmpty())
+            instance = formats.createPluginInstance (*found[0], 48000.0, block, error);
+
+        check (instance != nullptr, "real instrument loads: " + realPath + (error.isNotEmpty() ? " (" + error + ")" : juce::String()));
+
+        if (instance != nullptr)
+        {
+            const auto name = instance->getName();
+            check (PluginChain::isInstrumentPlugin (*instance), name + " is recognised as an instrument");
+            chain.addPluginInstance (std::move (instance));
+            chain.prepareForTests (1, 2, 48000.0, block);
+
+            float peak = 0.0f;
+            juce::AudioBuffer<float> buffer (2, block);
+
+            for (int i = 0; i < 200; ++i)       // ~1 s: some plugins load their samples in the background
+            {
+                buffer.clear();
+                juce::MidiBuffer midi;
+
+                if (i % 40 == 0)
+                    midi.addEvent (juce::MidiMessage::noteOn (1, i % 80 == 0 ? 60 : 36, (juce::uint8) 110), 0);   // C4, or C2 (a drum pad)
+
+                chain.processForTests (buffer, midi);
+
+                if (i > 0)
+                    peak = juce::jmax (peak, buffer.getMagnitude (0, block));
+
+                juce::MessageManager::getInstance()->runDispatchLoopUntil (5);   // plugins load samples via messages
+            }
+
+            check (peak > 0.001f, name + " sounds when a note is played (peak " + juce::String (peak, 4) + ")");
+        }
+    }
+}
+
 static void testMidiPracticeTiming()
 {
     std::cout << "\n[MIDI keyboard: practice timed from note-ons]\n";
@@ -4312,6 +4508,7 @@ int main()
     testLinks();
     testPracticeLog();
     testLogCorrections();
+    testInstrumentSlot();
     testMidiPracticeTiming();
     testNoGuitarTopics();
     testStartButtonMode();
