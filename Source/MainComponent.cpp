@@ -632,6 +632,12 @@ void MainComponent::tickTracker()
     activity.looperActive = ! engine.looper->isEmpty();
     activity.songName = practicePanel->getMediaName();
 
+    if (--practiceInputCountdown <= 0)
+    {
+        practiceInputCountdown = 10;   // once a second
+        updatePracticeInput();
+    }
+
     tracker.tick (seconds, engine.chain->getInputStage().takeActivityPeak(), activity, juce::Time::getCurrentTime());
 
     // The slot's clock counts only time spent playing. Time's up: a soft chime (no forced move: you go on when ready).
@@ -643,6 +649,37 @@ void MainComponent::tickTracker()
 
     if (--practisingButtonCountdown <= 0)
         updatePractisingButton();
+}
+
+void MainComponent::updatePracticeInput (bool force)
+{
+    const auto key = getInputKey (engine.deviceManager);
+
+    if (key == practiceInputKey && ! force)
+        return;
+
+    if (key != practiceInputKey)
+    {
+        practiceInputKey = key;
+        practiceInput = classifyInput (engine.deviceManager);
+
+        juce::Logger::writeToLog ("Practice input: " + (practiceInput.kind == InputKind::none ? juce::String ("none")
+                                                        : "\"" + practiceInput.name + "\" = "
+                                                              + (practiceInput.kind == InputKind::microphone ? "microphone" : "audio interface"))
+                                  + " (" + practiceInput.reason + ")");
+    }
+
+    const auto startButton = usesStartButton (practiceInput, practiceInputSettings.get (practiceInput.name));
+
+    if (startButton != tracker.isStartButtonMode())
+    {
+        tracker.setStartButtonMode (startButton);
+        juce::Logger::writeToLog (startButton ? "Practice is timed with Start / Pause (Today tab)" : "Practice is timed from the input automatically");
+        updatePractisingButton();
+
+        if (todayPanel != nullptr && todayPanel->isShowing())
+            todayPanel->refresh();
+    }
 }
 
 void MainComponent::updatePractisingButton()
@@ -659,7 +696,8 @@ void MainComponent::updatePractisingButton()
         const auto n = (int) session.getSlots().size();
         text = juce::String (session.getIndex() + 1) + "/" + juce::String (n) + "  " + slot->title + "  -  "
              + formatClock (juce::jmax (0.0, session.getRemainingSeconds()))
-             + (session.isPaused() ? (tracker.clockMode() ? "  (paused: Resume on the Today tab)" : "  (paused: play to continue)") : "");
+             + (session.isPaused() ? (tracker.isStartButtonMode() && tracker.isPaused() ? "  (paused: Start on the Today tab)"
+                                      : tracker.isTimedByHand() ? "  (paused: Resume on the Today tab)" : "  (paused: play to continue)") : "");
 
         if (session.isTimeUp())
             text = session.getNext() != nullptr ? "Time's up - next: " + session.getNext()->title
@@ -668,7 +706,7 @@ void MainComponent::updatePractisingButton()
 
     juce::String prefix;
 
-    if (tracker.clockMode())
+    if (tracker.isTimedByHand())
         prefix = tracker.isPaused() ? "(paused) " : "(timing) ";
     else if (tracker.isPlaying() && ! session.isTimeUp())
         prefix = "(playing) ";
@@ -1589,13 +1627,39 @@ void MainComponent::openAudioSettings()
 
     // A card: "Display" (theme, Log tab) on top, so the theme menu has room to open downwards,
     // then "Audio and MIDI" with JUCE's device selector.
-    struct Settings final : public juce::Component
+    struct Settings final : public juce::Component,
+                            private juce::Timer
     {
-        Settings (std::unique_ptr<juce::Component> s, bool logShown, std::function<void (bool)> onLog)
-            : selector (std::move (s))
+        Settings (std::unique_ptr<juce::Component> s, bool logShown, std::function<void (bool)> onLog,
+                  std::function<InputInfo()> getInput, std::function<PracticeTiming (const juce::String&)> getTiming,
+                  std::function<void (const juce::String&, PracticeTiming)> setTiming)
+            : selector (std::move (s)), currentInput (std::move (getInput)), timingFor (std::move (getTiming)),
+              onTiming (std::move (setTiming))
         {
+            // Practice log: how time is counted from this input (a microphone hears the room too).
+            timingLabel.setText ("Practice log", juce::dontSendNotification);
+            timingLabel.setJustificationType (juce::Justification::centredRight);
+            addAndMakeVisible (timingLabel);
+
+            timingBox.setTooltip ("How practice time is counted with this input. A microphone also hears talking and "
+                                  "other room noise, so by default it counts only between Start and Pause (Today tab).");
+            timingBox.onChange = [this]
+            {
+                if (shownInput.name.isNotEmpty() && timingBox.getSelectedId() > 0)
+                    onTiming (shownInput.name, (PracticeTiming) (timingBox.getSelectedId() - 1));
+            };
+            addAndMakeVisible (timingBox);
+
+            timingInfo.setColour (juce::Label::textColourId, theme::text().withAlpha (0.6f));
+            timingInfo.setFont (juce::FontOptions (13.0f));
+            timingInfo.setMinimumHorizontalScale (0.7f);
+            addAndMakeVisible (timingInfo);
+
+            updateTiming();
+            startTimer (500);   // follows device changes made in the selector below
+
             getProperties().set ("overlayWidth", 760);
-            getProperties().set ("overlayHeight", 820);
+            getProperties().set ("overlayHeight", 890);
 
             displayHeader.setText ("Display", juce::dontSendNotification);
             audioHeader.setText ("Audio and MIDI", juce::dontSendNotification);
@@ -1655,8 +1719,53 @@ void MainComponent::openAudioSettings()
             r.removeFromTop (18);
             audioHeader.setBounds (r.removeFromTop (30));
             r.removeFromTop (6);
+
+            auto timingRow = r.removeFromTop (40).reduced (0, 4);
+            timingLabel.setBounds (timingRow.removeFromLeft (110));
+            timingRow.removeFromLeft (10);
+            timingBox.setBounds (timingRow.removeFromLeft (juce::jmin (420, timingRow.getWidth())));
+            timingInfo.setBounds (r.removeFromTop (22).withTrimmedLeft (120));
+            r.removeFromTop (8);
+
             selector->setBounds (r);
         }
+
+        void timerCallback() override   { updateTiming(); }
+
+        void updateTiming()
+        {
+            const auto info = currentInput();
+
+            if (info.kind == shownInput.kind && info.name == shownInput.name && timingBox.getNumItems() > 0)
+                return;
+
+            shownInput = info;
+            timingBox.clear (juce::dontSendNotification);
+
+            if (info.kind == InputKind::none)
+            {
+                timingBox.setTextWhenNothingSelected ("No input open");
+                timingBox.setEnabled (false);
+                timingInfo.setText ({}, juce::dontSendNotification);
+                return;
+            }
+
+            const auto mic = info.kind == InputKind::microphone;
+            timingBox.addItem (juce::String ("Default for this input: ") + (mic ? "with Start / Pause" : "automatic"), 1 + (int) PracticeTiming::byInputType);
+            timingBox.addItem ("Automatic: count the time I play", 1 + (int) PracticeTiming::automatic);
+            timingBox.addItem ("Only between Start and Pause (Today tab)", 1 + (int) PracticeTiming::startButton);
+            timingBox.setSelectedId (1 + (int) timingFor (info.name), juce::dontSendNotification);
+            timingBox.setEnabled (true);
+            timingInfo.setText ("\"" + info.name + "\" looks like " + (mic ? "a microphone: it hears the room too" : "an audio interface"),
+                                juce::dontSendNotification);
+        }
+
+        std::function<InputInfo()> currentInput;
+        std::function<PracticeTiming (const juce::String&)> timingFor;
+        std::function<void (const juce::String&, PracticeTiming)> onTiming;
+        InputInfo shownInput;
+        juce::Label timingLabel, timingInfo;
+        juce::ComboBox timingBox;
 
         juce::Label displayHeader, audioHeader;
         std::unique_ptr<juce::Component> selector;
@@ -1670,6 +1779,17 @@ void MainComponent::openAudioSettings()
                                                                {
                                                                    setLogTabShown (shown);
                                                                    saveUiSetting ("showLogTab", shown);
+                                                               },
+                                                               [this]
+                                                               {
+                                                                   updatePracticeInput();
+                                                                   return practiceInput;
+                                                               },
+                                                               [this] (const juce::String& name) { return practiceInputSettings.get (name); },
+                                                               [this] (const juce::String& name, PracticeTiming timing)
+                                                               {
+                                                                   practiceInputSettings.set (name, timing);
+                                                                   updatePracticeInput (true);
                                                                }));
 }
 

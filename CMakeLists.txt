@@ -135,6 +135,7 @@ target_sources(PracticeVibes PRIVATE
     Source/PluginCatalogue.cpp
     Source/PluginChain.cpp
     Source/PracticeLog.cpp
+    Source/PracticeInput.cpp
     Source/PracticePanel.cpp
     Source/PracticePlanner.cpp
     Source/SessionPlans.cpp
@@ -164,7 +165,7 @@ target_compile_definitions(PracticeVibes PRIVATE
 
 # iPad: exported mixes go out through the share sheet; library folders in cloud drives need folder access (bookmarks).
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    target_sources(PracticeVibes PRIVATE Source/FolderAccess_ios.mm Source/BluetoothMidiView_ios.mm)
+    target_sources(PracticeVibes PRIVATE Source/FolderAccess_ios.mm Source/BluetoothMidiView_ios.mm Source/PracticeInput_ios.mm)
     target_compile_definitions(PracticeVibes PRIVATE JUCE_CONTENT_SHARING=1)
 endif()
 

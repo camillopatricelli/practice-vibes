@@ -225,7 +225,7 @@ public:
     /** The open entry, or nullptr. */
     const PracticeEntry* getCurrent() const noexcept                { return current ? &*current : nullptr; }
 
-    bool isPlaying() const noexcept                                 { return clockMode() ? ! paused : detector.isPlaying(); }
+    bool isPlaying() const noexcept                                 { return isTimedByHand() ? ! paused : detector.isPlaying(); }
 
     /** Tells whether a topic is "timed without the guitar" (ear training, theory...). For those, time counts on the
         clock while the topic is active and not paused, instead of from the guitar input. */
@@ -234,7 +234,16 @@ public:
     /** True while the active topic is timed without the guitar. */
     bool clockMode() const                                          { return topicId.isNotEmpty() && isNoGuitarTopic != nullptr
                                                                              && isNoGuitarTopic (topicId); }
-    void setPaused (bool shouldPause) noexcept                      { paused = shouldPause; }
+    /** Start-button mode (the input is a microphone: room noise would count as playing). Time counts on the clock
+        between Start and Pause, for every topic; it starts paused, and pauses itself after autoPauseSeconds of
+        silence (you forgot to press Pause). Topic changes keep the paused state. */
+    void setStartButtonMode (bool);
+    bool isStartButtonMode() const noexcept                         { return startButton; }
+
+    /** True when time counts on the clock (Start/Pause) instead of from the input: a no-guitar topic or Start-button mode. */
+    bool isTimedByHand() const                                      { return startButton || clockMode(); }
+
+    void setPaused (bool shouldPause) noexcept                      { paused = shouldPause; quietSeconds = 0.0; }
     bool isPaused() const noexcept                                  { return paused; }
 
     /** Seconds counted as played in the last tick() (drives the practice session's clock). */
@@ -252,6 +261,7 @@ public:
     static constexpr double minimumSeconds = 20.0;      // shorter entries aren't kept
     static constexpr double saveEverySeconds = 60.0;
     static constexpr double noteSeconds = 15.0 * 60.0;  // a note this long after the end still belongs to that entry
+    static constexpr double autoPauseSeconds = 600.0;   // Start-button mode: this long without a sound pauses the clock
 
 private:
     void open (juce::Time now);
@@ -266,7 +276,9 @@ private:
 
     std::optional<PracticeEntry> lastFinished;           // the entry that just ended (still takes a note)
     double sinceFinished = 0.0, sinceNoteEdit = 0.0, lastTickPlayed = 0.0;
-    bool paused = false;                                 // clock mode only
+    bool paused = false;                                 // timed by hand only
+    bool startButton = false;
+    double quietSeconds = 0.0;                           // Start-button mode: time since the input last heard a note
     bool noteDirty = false;
 };
 

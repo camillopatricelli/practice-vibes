@@ -5,6 +5,7 @@
 #include "AppLog.h"
 #include "Library.h"
 #include "PracticeLog.h"
+#include "PracticeInput.h"
 #include "PracticePlanner.h"
 #include "SessionPlans.h"
 #include "Take.h"
@@ -56,6 +57,8 @@ private:
     void tickTracker();
     void updatePractisingButton();
     void showPractisingMenu();
+    /** Classifies the input again if it changed (or `force`), and sets the tracker's Start-button mode from it. */
+    void updatePracticeInput (bool force = false);
 
     // Dice, sessions, history
     std::vector<PlanCandidate> rotationCandidates (const juce::String& tag);
@@ -111,6 +114,12 @@ private:
     double lastTrackerTick = 0.0;
     juce::File lastSongFile;
     int practisingButtonCountdown = 0;
+
+    // The input practice is timed from: a microphone uses the Start button (it hears the room too).
+    PracticeInputSettings practiceInputSettings;
+    InputInfo practiceInput;
+    juce::String practiceInputKey;
+    int practiceInputCountdown = 0;
 
     // The take being recorded: where it goes and what it was played along to.
     juce::File recordingFile, recordingFolder;

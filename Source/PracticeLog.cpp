@@ -595,7 +595,19 @@ void PracticeTracker::setActiveTopic (const juce::String& newId, const juce::Str
     topicTitle = title;
     activeSeconds = 0.0;
     pendingNote = {};
-    paused = false;
+
+    if (! startButton)
+        paused = false;   // Start-button mode: a new topic doesn't start the clock (nor stop it)
+}
+
+void PracticeTracker::setStartButtonMode (bool shouldUse)
+{
+    if (shouldUse == startButton)
+        return;
+
+    startButton = shouldUse;
+    paused = shouldUse;   // a microphone: wait for Start. Back to the guitar input: the input decides again
+    quietSeconds = 0.0;
 }
 
 void PracticeTracker::open (juce::Time now)
@@ -620,8 +632,23 @@ void PracticeTracker::open (juce::Time now)
 void PracticeTracker::tick (double seconds, float inputPeak, const Activity& activity, juce::Time now)
 {
     seconds = juce::jlimit (0.0, 5.0, seconds);   // the app was suspended: don't count the gap
-    const auto onClock = clockMode();
+    const auto onClock = isTimedByHand();
     const auto heard = detector.process (inputPeak, seconds);   // keeps its noise floor up to date either way
+
+    // Start-button mode, but nothing heard for a long while: you left without pressing Pause.
+    // (Not for a no-guitar topic: silence is normal there.)
+    if (startButton && ! paused && ! clockMode())
+    {
+        quietSeconds = heard > 0.0 ? 0.0 : quietSeconds + seconds;
+
+        if (quietSeconds > autoPauseSeconds)
+        {
+            paused = true;
+            quietSeconds = 0.0;
+            juce::Logger::writeToLog ("Practice timing paused: nothing heard for " + juce::String (juce::roundToInt (autoPauseSeconds / 60.0)) + " minutes");
+        }
+    }
+
     const auto played = onClock ? (paused ? 0.0 : seconds) : heard;
     lastTickPlayed = played;
 
@@ -663,7 +690,7 @@ void PracticeTracker::tick (double seconds, float inputPeak, const Activity& act
         e.songName = activity.songName;
 
     e.looper = e.looper || activity.looperActive;
-    e.noGuitar = e.noGuitar || onClock;
+    e.noGuitar = e.noGuitar || clockMode();
 
     if (captureSetup != nullptr)
         e.setup = captureSetup();

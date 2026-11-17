@@ -2453,6 +2453,81 @@ static void testLogCorrections()
     folder.deleteRecursively();
 }
 
+static void testStartButtonMode()
+{
+    std::cout << "\n[Microphone input: practice timed with Start / Pause]\n";
+
+    const auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("pv-startbutton-test");
+    folder.deleteRecursively();
+
+    PracticeLog log (folder, "pc");
+    PracticeTracker tracker;
+    tracker.setLog (&log);
+
+    PracticeTracker::Activity a;
+    auto clock = juce::Time (2026, 10, 17, 18, 0, 0, 0, true);
+
+    auto run = [&] (double seconds, float peak)
+    {
+        for (double t = 0.0; t < seconds - 1.0e-9; t += 0.1)
+        {
+            clock = clock + juce::RelativeTime::milliseconds (100);
+            // Room noise: loud bursts now and then over a quiet floor.
+            const auto noisy = peak > 0.0f && std::fmod (t, 7.0) < 1.0;
+            tracker.tick (0.1, noisy ? peak : 0.0005f, a, clock);
+        }
+    };
+
+    auto played = [&]
+    {
+        double total = 0.0;
+        for (auto& e : log.getEntries())
+            total += e.playedSeconds;
+        if (auto* c = tracker.getCurrent(); c != nullptr && log.find (c->id) == nullptr)
+            total += c->playedSeconds;
+        else if (c != nullptr)
+            total += c->playedSeconds - log.find (c->id)->playedSeconds;
+        return total;
+    };
+
+    run (120.0, 0.1f);
+    check (played() > 60.0, "automatic: room noise counts as playing (what the Start button is for)");
+
+    tracker.finish();
+    const auto before = played();
+
+    tracker.setStartButtonMode (true);
+    check (tracker.isPaused() && tracker.isTimedByHand() && ! tracker.isPlaying(), "Start-button mode starts paused");
+
+    run (120.0, 0.1f);
+    check (std::abs (played() - before) < 0.01, "paused: room noise logs nothing");
+
+    tracker.setPaused (false);   // Start
+    run (90.0, 0.0f);            // silent stretches count too (reading the next exercise)
+    check (std::abs (played() - before - 90.0) < 0.5, "after Start the clock counts, sound or not (90 s)");
+
+    tracker.setActiveTopic ("t1", "Scales");
+    check (! tracker.isPaused(), "a topic change keeps the clock running");
+    tracker.setPaused (true);
+    tracker.setActiveTopic ({}, {});
+    check (tracker.isPaused(), "... and keeps it paused");
+
+    tracker.setPaused (false);
+    run (PracticeTracker::autoPauseSeconds + 5.0, 0.0f);
+    check (tracker.isPaused(), "ten silent minutes: the clock pauses itself");
+
+    bool anyNoGuitar = false;
+    for (auto& e : log.getEntries())
+        anyNoGuitar = anyNoGuitar || e.noGuitar;
+    check (! anyNoGuitar, "entries timed with Start aren't marked \"no guitar\"");
+
+    tracker.setStartButtonMode (false);
+    check (! tracker.isPaused() && ! tracker.isTimedByHand(), "back to an interface: the input decides again");
+
+    tracker.setLog (nullptr);
+    folder.deleteRecursively();
+}
+
 static void testNoGuitarTopics()
 {
     std::cout << "\n[Topics timed without the guitar, time added by hand]\n";
@@ -4062,6 +4137,7 @@ int main()
     testPracticeLog();
     testLogCorrections();
     testNoGuitarTopics();
+    testStartButtonMode();
     testOutsideSongs();
     testPracticePlanner();
     testSessionPlans();

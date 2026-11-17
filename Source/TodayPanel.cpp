@@ -590,6 +590,7 @@ void TodayPanel::updateSession()
             sessionTitle.setText (session.isTimeUp() ? juce::String ("Time's up!")
                                                      : "Session: topic " + juce::String (session.getIndex() + 1) + " of " + juce::String (n)
                                                          + (! session.isPaused() ? juce::String()
+                                                              : tracker.isStartButtonMode() ? juce::String ("  -  paused: press Start")
                                                               : tracker.clockMode() ? juce::String ("  -  paused: press Resume")
                                                                                     : juce::String ("  -  the clock runs while you play")),
                                   juce::dontSendNotification);
@@ -656,14 +657,18 @@ void TodayPanel::updateNow()
     const auto active = tracker.getActiveTopicId().isNotEmpty();
     nowTitle.setText (active ? "Practising: " + tracker.getActiveTopicTitle() : juce::String ("Free practice"), juce::dontSendNotification);
 
-    const auto onClock = tracker.clockMode();
-    juce::String status = onClock ? (tracker.isPaused() ? "Paused (timed without the guitar)" : "Timing (without the guitar)")
+    const auto onClock = tracker.isTimedByHand();
+    const auto startMode = tracker.isStartButtonMode();
+    juce::String status = startMode ? (tracker.isPaused() ? "Not timing (microphone input): press Start to log practice"
+                                                          : "Timing: press Pause when you stop")
+                        : onClock ? (tracker.isPaused() ? "Paused (timed without the guitar)" : "Timing (without the guitar)")
                                   : (tracker.isPlaying() ? "Playing now" : "Not playing");
 
     if (active)
         status << "  -  " << formatPracticeDuration (tracker.getActiveSeconds()) << " on this topic so far";
     else
-        status << "  -  pick a topic from the Practice rotation, or just play: it's logged as free practice";
+        status << (startMode ? juce::String ("  -  without a topic it's logged as free practice")
+                             : juce::String ("  -  pick a topic from the Practice rotation, or just play: it's logged as free practice"));
 
     nowStatus.setText (status, juce::dontSendNotification);
     nowStatus.setColour (juce::Label::textColourId, tracker.isPlaying() ? theme::good() : theme::text().withAlpha (0.65f));
@@ -675,7 +680,10 @@ void TodayPanel::updateNow()
         resized();
     }
 
-    pauseButton.setButtonText (tracker.isPaused() ? "Resume" : "Pause");
+    pauseButton.setButtonText (tracker.isPaused() ? (startMode ? "Start" : "Resume") : "Pause");
+    pauseButton.setTooltip (startMode ? "The input is a microphone (it hears the room too): practice time counts between Start and Pause. "
+                                        "Change this per input in the Audio settings."
+                                      : "This topic is timed without the guitar: pause the clock while you're away");
 
     if (! noteEditor.hasKeyboardFocus (true) && noteEditor.getText().trim() != tracker.getNote())
         noteEditor.setText (tracker.getNote(), false);
