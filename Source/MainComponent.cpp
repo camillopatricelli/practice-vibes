@@ -1103,7 +1103,8 @@ void MainComponent::editLogEntry (const juce::String& entryId, const juce::Strin
         return;
 
     const auto* current = tracker.getCurrent();
-    auto editor = std::make_unique<EntryEditor> (*entry, current != nullptr && current->id == entryId);
+    auto editor = std::make_unique<EntryEditor> (*entry, current != nullptr && current->id == entryId, logTopicChoices());
+    auto* editorPtr = editor.get();
 
     auto done = [this, historyTopicId]
     {
@@ -1122,12 +1123,18 @@ void MainComponent::editLogEntry (const juce::String& entryId, const juce::Strin
     };
 
     editor->onCancel = done;
-    editor->onSave = [this, entryId, done] (juce::Time start, double played, const juce::String& note)
+    editor->onSave = [this, entryId, editorPtr, done] (juce::Time start, double played, const juce::String& note)
     {
-        if (practiceLog != nullptr)
-            practiceLog->editEntry (entryId, start, played, note);
+        const auto topicId = editorPtr->getTopicId();
+        const auto* before = practiceLog != nullptr ? practiceLog->find (entryId) : nullptr;
+        const auto moved = before != nullptr && before->topicId != topicId;
 
-        juce::Logger::writeToLog ("Practice log: entry corrected (" + formatPracticeDuration (played) + ")");
+        if (practiceLog != nullptr)
+            practiceLog->editEntry (entryId, start, played, note, std::make_pair (topicId, editorPtr->getTopicTitle()));
+
+        juce::Logger::writeToLog ("Practice log: entry corrected (" + formatPracticeDuration (played)
+                                  + (moved ? (topicId.isEmpty() ? ", moved to free practice" : ", moved to another topic") : "")
+                                  + ")");
         done();
     };
     editor->onDelete = [this, entryId, done]
@@ -1209,6 +1216,23 @@ void MainComponent::offerAddToInbox (const juce::URL& song)
     });
 }
 
+std::vector<std::pair<juce::String, juce::String>> MainComponent::logTopicChoices() const
+{
+    auto* lib = libraryPanel->getLibrary();
+
+    if (lib == nullptr)
+        return {};
+
+    std::vector<std::pair<juce::String, juce::String>> choices { { {}, "Free practice" } }, topics;
+
+    for (auto& t : lib->getTopics())
+        topics.push_back ({ t.id, t.title.isNotEmpty() ? t.title : juce::String ("(untitled)") });
+
+    std::sort (topics.begin(), topics.end(), [] (const auto& a, const auto& b) { return a.second.compareNatural (b.second) < 0; });
+    choices.insert (choices.end(), topics.begin(), topics.end());
+    return choices;
+}
+
 void MainComponent::addLogTime (const juce::String& topicId, const juce::String& historyTopicId)
 {
     auto* lib = libraryPanel->getLibrary();
@@ -1232,15 +1256,7 @@ void MainComponent::addLogTime (const juce::String& topicId, const juce::String&
     else
     {
         defaults.topicId = tracker.getActiveTopicId();
-        choices.push_back ({ {}, "Free practice" });
-
-        std::vector<std::pair<juce::String, juce::String>> topics;
-
-        for (auto& t : lib->getTopics())
-            topics.push_back ({ t.id, t.title.isNotEmpty() ? t.title : juce::String ("(untitled)") });
-
-        std::sort (topics.begin(), topics.end(), [] (const auto& a, const auto& b) { return a.second.compareNatural (b.second) < 0; });
-        choices.insert (choices.end(), topics.begin(), topics.end());
+        choices = logTopicChoices();
     }
 
     auto editor = std::make_unique<EntryEditor> (EntryEditor::NewEntry {}, defaults, std::move (choices));

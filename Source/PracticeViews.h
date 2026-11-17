@@ -69,12 +69,13 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SessionPlanner)
 };
 
-/** Overlay form: correct or delete one practice log entry (start time, played minutes, note). */
+/** Overlay form: correct or delete one practice log entry (topic, start time, played minutes, note). */
 class EntryEditor final : public juce::Component
 {
 public:
-    /** `stillRunning`: the entry is the one being recorded right now (it can't be changed until it ends). */
-    EntryEditor (const PracticeEntry&, bool stillRunning);
+    /** `stillRunning`: the entry is the one being recorded right now (it can't be changed until it ends).
+        `topics` (id, title; "" = free practice) offers moving the entry to another topic; empty = no topic choice. */
+    EntryEditor (const PracticeEntry&, bool stillRunning, std::vector<std::pair<juce::String, juce::String>> topics = {});
 
     /** "Add time": a new entry. `topics` (id, title) offers a topic choice ("" = free practice); empty = keep the
         entry's own topic. */
@@ -84,7 +85,7 @@ public:
     std::function<void (juce::Time start, double playedSeconds, const juce::String& note)> onSave;
     std::function<void()> onDelete, onCancel;
 
-    /** The topic picked in "Add time" mode (the entry's own topic otherwise). */
+    /** The topic picked in the form (the entry's own topic when there is no choice). */
     juce::String getTopicId() const;
     juce::String getTopicTitle() const;
 
@@ -93,6 +94,7 @@ public:
 
 private:
     void setUpFields (const PracticeEntry&);
+    void setUpTopicChoice (const juce::String& selectedId);
     void save();
 
     std::vector<std::pair<juce::String, juce::String>> topicChoices;

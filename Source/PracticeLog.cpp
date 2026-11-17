@@ -216,6 +216,13 @@ void PracticeLog::reload()
             if (auto* n = e->getChildByName ("NOTE"))
                 c.note = n->getAllSubText();
 
+            if (e->hasAttribute ("topic"))
+            {
+                c.topicSet = true;
+                c.topicId = e->getStringAttribute ("topic");
+                c.topicTitle = e->getStringAttribute ("topicTitle");
+            }
+
             if (c.id.isEmpty())
                 continue;
 
@@ -257,6 +264,12 @@ void PracticeLog::apply (const Correction& c, PracticeEntry& e)
 
     e.playedSeconds = c.playedSeconds;
     e.note = c.note;
+
+    if (c.topicSet)
+    {
+        e.topicId = c.topicId;
+        e.topicTitle = c.topicId.isNotEmpty() ? c.topicTitle : juce::String();
+    }
 }
 
 const PracticeEntry* PracticeLog::find (const juce::String& id) const
@@ -309,6 +322,14 @@ bool PracticeLog::writeOwnCorrections() const
         e->setAttribute ("start", c.start.toISO8601 (true));
         e->setAttribute ("played", juce::roundToInt (c.playedSeconds));
 
+        if (c.topicSet)
+        {
+            e->setAttribute ("topic", c.topicId);
+
+            if (c.topicId.isNotEmpty())
+                e->setAttribute ("topicTitle", c.topicTitle);
+        }
+
         if (c.note.isNotEmpty())
             e->createNewChildElement ("NOTE")->addTextElement (c.note);
     }
@@ -316,9 +337,12 @@ bool PracticeLog::writeOwnCorrections() const
     return folder.createDirectory() && xml.writeTo (editsFile());
 }
 
-bool PracticeLog::editEntry (const juce::String& id, juce::Time newStart, double playedSeconds, const juce::String& note)
+bool PracticeLog::editEntry (const juce::String& id, juce::Time newStart, double playedSeconds, const juce::String& note,
+                             std::optional<std::pair<juce::String, juce::String>> topic)
 {
-    if (find (id) == nullptr)
+    const auto* entry = find (id);
+
+    if (entry == nullptr)
         return false;
 
     Correction c;
@@ -327,6 +351,21 @@ bool PracticeLog::editEntry (const juce::String& id, juce::Time newStart, double
     c.start = newStart;
     c.playedSeconds = juce::jmax (0.0, playedSeconds);
     c.note = note;
+
+    // A topic change sticks; so does an earlier one when this edit leaves the topic alone (newest correction wins whole).
+    if (topic.has_value() && (topic->first != entry->topicId || (topic->first.isNotEmpty() && topic->second != entry->topicTitle)))
+    {
+        c.topicSet = true;
+        c.topicId = topic->first;
+        c.topicTitle = topic->first.isNotEmpty() ? topic->second : juce::String();
+    }
+    else if (auto old = corrections.find (id); old != corrections.end() && old->second.topicSet)
+    {
+        c.topicSet = true;
+        c.topicId = old->second.topicId;
+        c.topicTitle = old->second.topicTitle;
+    }
+
     return addCorrection (c);
 }
 

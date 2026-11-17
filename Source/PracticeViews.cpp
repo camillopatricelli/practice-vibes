@@ -1412,8 +1412,8 @@ void TopicHistory::resized()
 }
 
 //==============================================================================
-EntryEditor::EntryEditor (const PracticeEntry& entry, bool stillRunning)
-    : ownTopicId (entry.topicId), ownTopicTitle (entry.topicTitle)
+EntryEditor::EntryEditor (const PracticeEntry& entry, bool stillRunning, std::vector<std::pair<juce::String, juce::String>> topics)
+    : topicChoices (std::move (topics)), ownTopicId (entry.topicId), ownTopicTitle (entry.topicTitle)
 {
     auto what = entry.isFree() ? juce::String ("Free practice") : entry.topicTitle;
 
@@ -1425,13 +1425,23 @@ EntryEditor::EntryEditor (const PracticeEntry& entry, bool stillRunning)
                           juce::dontSendNotification);
     setUpFields (entry);
 
+    if (! topicChoices.empty())
+    {
+        // A topic deleted since (or not in the library) stays selectable, so saving doesn't move the entry by accident.
+        if (std::none_of (topicChoices.begin(), topicChoices.end(), [&] (const auto& t) { return t.first == entry.topicId; }))
+            topicChoices.push_back ({ entry.topicId, entry.topicTitle.isNotEmpty() ? entry.topicTitle : juce::String ("(untitled)") });
+
+        setUpTopicChoice (entry.topicId);
+    }
+
     if (stillRunning)
     {
         errorLabel.setText ("This session is still being recorded: stop it first (Stop on the Today tab), then correct it.",
                             juce::dontSendNotification);
 
         for (juce::Component* c : { (juce::Component*) &startEditor, (juce::Component*) &minutesEditor,
-                                    (juce::Component*) &noteEditor, (juce::Component*) &saveButton, (juce::Component*) &deleteButton })
+                                    (juce::Component*) &noteEditor, (juce::Component*) &saveButton, (juce::Component*) &deleteButton,
+                                    (juce::Component*) &topicBox })
             c->setEnabled (false);
     }
 }
@@ -1448,20 +1458,23 @@ EntryEditor::EntryEditor (NewEntry, const PracticeEntry& defaults, std::vector<s
     saveButton.setButtonText ("Add");
 
     if (! topicChoices.empty())
-    {
-        addAndMakeVisible (styleCaption (topicLabel, "Topic"));
+        setUpTopicChoice (defaults.topicId);
+}
 
-        for (size_t i = 0; i < topicChoices.size(); ++i)
-            topicBox.addItem (topicChoices[i].first.isEmpty() ? juce::String ("Free practice") : topicChoices[i].second, (int) i + 1);
+void EntryEditor::setUpTopicChoice (const juce::String& selectedId)
+{
+    addAndMakeVisible (styleCaption (topicLabel, "Topic"));
 
-        topicBox.setSelectedItemIndex (0, juce::dontSendNotification);
+    for (size_t i = 0; i < topicChoices.size(); ++i)
+        topicBox.addItem (topicChoices[i].first.isEmpty() ? juce::String ("Free practice") : topicChoices[i].second, (int) i + 1);
 
-        for (size_t i = 0; i < topicChoices.size(); ++i)
-            if (topicChoices[i].first == defaults.topicId)
-                topicBox.setSelectedItemIndex ((int) i, juce::dontSendNotification);
+    topicBox.setSelectedItemIndex (0, juce::dontSendNotification);
 
-        addAndMakeVisible (topicBox);
-    }
+    for (size_t i = 0; i < topicChoices.size(); ++i)
+        if (topicChoices[i].first == selectedId)
+            topicBox.setSelectedItemIndex ((int) i, juce::dontSendNotification);
+
+    addAndMakeVisible (topicBox);
 }
 
 juce::String EntryEditor::getTopicId() const
@@ -1570,7 +1583,7 @@ void EntryEditor::resized()
     deleteButton.setBounds (buttons.removeFromLeft (140).reduced (3));
     errorLabel.setBounds (area.removeFromBottom (40));
 
-    summaryLabel.setBounds (area.removeFromTop (topicBox.isVisible() ? 26 : 48));
+    summaryLabel.setBounds (area.removeFromTop (summaryLabel.getText().containsChar ('\n') ? 48 : 26));
     area.removeFromTop (8);
 
     if (topicBox.isVisible())

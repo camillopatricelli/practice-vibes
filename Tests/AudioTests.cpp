@@ -2440,6 +2440,38 @@ static void testLogCorrections()
     pc.reload();
     check (pc.find ("b")->playedSeconds == 1200.0 && pc.find ("b")->note.isEmpty(), "the newest correction wins on every device");
 
+    // Free practice assigned to a topic afterwards (and back); a later edit without a topic keeps the move.
+    {
+        PracticeEntry freeEntry = makeEntry ("f", 4, 600.0);
+        freeEntry.topicId = {};
+        freeEntry.topicTitle = {};
+        ipad.save (freeEntry);
+        pc.reload();
+        check (pc.find ("f") != nullptr && pc.find ("f")->isFree(), "free practice entry logged");
+
+        const auto fStart = pc.find ("f")->start;
+        check (pc.editEntry ("f", fStart, 600.0, {}, std::make_pair (juce::String ("t2"), juce::String ("Chords"))),
+               "assign a topic to free practice");
+        check (pc.find ("f")->topicId == "t2" && pc.find ("f")->topicTitle == "Chords"
+                   && pc.summarise ("t2").sessions == 1 && pc.summarise ("t2").totalSeconds == 600.0,
+               "the entry now counts for the topic");
+
+        juce::Thread::sleep (5);
+        pc.editEntry ("f", fStart, 700.0, "longer");
+        check (pc.find ("f")->topicId == "t2" && pc.find ("f")->playedSeconds == 700.0, "a later edit keeps the new topic");
+
+        PracticeLog ipad2 (folder, "ipad");
+        check (ipad2.find ("f")->topicId == "t2" && ipad2.find ("f")->topicTitle == "Chords", "other devices see the move");
+        ipad2.save (freeEntry);
+        check (ipad2.find ("f")->topicId == "t2", "re-saving the original entry keeps the move");
+
+        juce::Thread::sleep (5);
+        ipad2.editEntry ("f", fStart, 700.0, {}, std::make_pair (juce::String(), juce::String ("ignored")));
+        pc.reload();
+        check (pc.find ("f")->isFree() && pc.find ("f")->topicTitle.isEmpty() && pc.summarise ("t2").sessions == 0,
+               "moved back to free practice");
+    }
+
     check (parseEntryTime ("15/11/2026 14:30") == juce::Time (2026, 10, 15, 14, 30, 0, 0, true)
                && parseEntryTime (formatEntryTime (day)) == day && parseEntryTime ("5.3.26 9:05").has_value()
                && ! parseEntryTime ("31/02/2026 10:00").has_value() && ! parseEntryTime ("15/11/2026").has_value()

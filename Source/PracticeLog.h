@@ -80,10 +80,12 @@ public:
 
     const PracticeEntry* find (const juce::String& id) const;
 
-    /** Corrects an entry from any device: start time (the end moves with it), played time and note.
-        Stored as a correction in this device's own edits file (edits-<device>.xml), so no file is ever written by
-        two devices; every device applies the newest correction for each entry when it reads the log. */
-    bool editEntry (const juce::String& id, juce::Time newStart, double playedSeconds, const juce::String& note);
+    /** Corrects an entry from any device: start time (the end moves with it), played time, note and, when `topic`
+        (id, title) is given, the topic (empty id = free practice). Stored as a correction in this device's own edits
+        file (edits-<device>.xml), so no file is ever written by two devices; every device applies the newest
+        correction for each entry when it reads the log. */
+    bool editEntry (const juce::String& id, juce::Time newStart, double playedSeconds, const juce::String& note,
+                    std::optional<std::pair<juce::String, juce::String>> topic = std::nullopt);
 
     /** Removes an entry from any device (also stored as a correction). */
     bool deleteEntry (const juce::String& id);
@@ -134,6 +136,8 @@ private:
         juce::Time start;
         double playedSeconds = 0.0;
         juce::String note;
+        bool topicSet = false;      // the topic was changed (older corrections keep the entry's own topic)
+        juce::String topicId, topicTitle;
     };
 
     std::vector<double> weeklySecondsWhere (const std::function<bool (const PracticeEntry&)>&, juce::Time now, int weeks) const;

@@ -80,6 +80,8 @@ private:
     void editLogEntry (const juce::String& entryId, const juce::String& historyTopicId);
     /** "Add time": a log entry typed by hand. Empty topicId = choose the topic in the form (from the Today tab). */
     void addLogTime (const juce::String& topicId, const juce::String& historyTopicId);
+    /** Topic choices for the entry forms: free practice, then the library's topics by title (empty without a library). */
+    std::vector<std::pair<juce::String, juce::String>> logTopicChoices() const;
     /** A song picked from outside the library: offers to copy it into the Inbox (asked once per file per run). */
     void offerAddToInbox (const juce::URL& song);
     juce::StringArray inboxDeclined;
