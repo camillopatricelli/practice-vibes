@@ -297,6 +297,7 @@ bool usesStartButton (const InputInfo& info, PracticeTiming timing)
     switch (timing)
     {
         case PracticeTiming::automatic:   return false;
+        case PracticeTiming::midiNotes:   return false;
         case PracticeTiming::startButton: return true;
         case PracticeTiming::byInputType: break;
     }
@@ -314,15 +315,39 @@ PracticeInputSettings::PracticeInputSettings()
 {
     if (auto xml = juce::parseXML (getPracticeInputsFile()); xml != nullptr && xml->hasTagName ("PRACTICE_INPUTS"))
     {
+        midiDevice = xml->getStringAttribute ("midiDevice");
+
         for (auto* e : xml->getChildWithTagNameIterator ("INPUT"))
         {
             const auto timing = e->getStringAttribute ("timing");
             const auto name = e->getStringAttribute ("name");
 
-            if (name.isNotEmpty() && (timing == "automatic" || timing == "startButton"))
-                timings[name] = timing == "automatic" ? PracticeTiming::automatic : PracticeTiming::startButton;
+            if (name.isNotEmpty() && (timing == "automatic" || timing == "startButton" || timing == "midiNotes"))
+                timings[name] = timing == "automatic" ? PracticeTiming::automatic
+                              : timing == "midiNotes" ? PracticeTiming::midiNotes
+                                                      : PracticeTiming::startButton;
         }
     }
+}
+
+void PracticeInputSettings::setMidiDevice (const juce::String& name)
+{
+    if (name == midiDevice)
+        return;
+
+    midiDevice = name;
+    save();
+}
+
+bool PracticeInputSettings::midiNoteCounts (const juce::String& sourceName, PracticeTiming timing) const
+{
+    if (midiDevice == anyMidi)
+        return true;
+
+    if (midiDevice == noMidi)
+        return timing == PracticeTiming::midiNotes;
+
+    return sourceName == midiDevice;
 }
 
 PracticeTiming PracticeInputSettings::get (const juce::String& inputName) const
@@ -341,13 +366,22 @@ void PracticeInputSettings::set (const juce::String& inputName, PracticeTiming t
     else
         timings[inputName] = timing;
 
+    save();
+}
+
+void PracticeInputSettings::save() const
+{
     juce::XmlElement xml ("PRACTICE_INPUTS");
+
+    if (midiDevice.isNotEmpty())
+        xml.setAttribute ("midiDevice", midiDevice);
 
     for (auto& [name, t] : timings)
     {
         auto* e = xml.createNewChildElement ("INPUT");
         e->setAttribute ("name", name);
-        e->setAttribute ("timing", t == PracticeTiming::automatic ? "automatic" : "startButton");
+        e->setAttribute ("timing", t == PracticeTiming::automatic ? "automatic"
+                                 : t == PracticeTiming::midiNotes ? "midiNotes" : "startButton");
     }
 
     xml.writeTo (getPracticeInputsFile());

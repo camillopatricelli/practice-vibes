@@ -54,6 +54,7 @@ public:
     // MIDI pedal board: every incoming message goes to the footswitch first, then to onMidiMessage.
     std::unique_ptr<Footswitch> footswitch;
     std::function<void (const juce::MidiMessage&, const juce::String& sourceName)> onMidiMessage;   // UI (message display)
+    std::function<void (const juce::String& sourceName)> onMidiNoteOn;  // a note-on the footswitch didn't take (practice timing)
     std::function<int()> getBypassTarget;
     std::function<void()> onSaveState;          // UI: write pending edits (e.g. topic notes) to disk
     std::function<void()> onToggleTuner;        // UI: open / close the tuner (footswitch action)

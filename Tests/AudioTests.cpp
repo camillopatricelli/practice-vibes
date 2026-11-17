@@ -2618,6 +2618,92 @@ static void testStartButtonMode()
     folder.deleteRecursively();
 }
 
+static void testMidiPracticeTiming()
+{
+    std::cout << "\n[MIDI keyboard: practice timed from note-ons]\n";
+
+    PlayDetector detector;
+    double played = 0.0;
+    played += detector.process (0.0f, 0.1, true);
+    check (played > 0.09 && detector.isPlaying(), "a MIDI note counts as playing with a silent input");
+
+    for (int i = 0; i < 45; ++i)
+        played += detector.process (0.0f, 0.1);
+
+    check (detector.isPlaying() && played > 4.5, "short pause after a MIDI note still counts (grace)");
+
+    for (int i = 0; i < 20; ++i)
+        detector.process (0.0f, 0.1);
+
+    check (! detector.isPlaying(), "more than 5 s after the last note: not playing");
+
+    const auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("pv-midi-timing-test");
+    folder.deleteRecursively();
+
+    {
+        PracticeLog log (folder, "pc");
+        PracticeTracker tracker;
+        tracker.setLog (&log);
+        PracticeTracker::Activity a;
+        auto clock = juce::Time (2026, 10, 17, 18, 0, 0, 0, true);
+
+        // A note every 2 s for 60 s, nothing on the audio input.
+        auto run = [&] (double seconds, float peak, bool notes)
+        {
+            double total = 0.0;
+
+            for (int i = 0; i < juce::roundToInt (seconds * 10.0); ++i)
+            {
+                clock = clock + juce::RelativeTime::milliseconds (100);
+
+                if (notes && i % 20 == 0)
+                    tracker.midiNotePlayed();
+
+                tracker.tick (0.1, peak, a, clock);
+                total += tracker.getLastTickPlayedSeconds();
+            }
+
+            return total;
+        };
+
+        check (std::abs (run (60.0, 0.0f, true) - 60.0) < 0.5, "notes every 2 s for a minute: 60 s played");
+        check (run (30.0, 0.0f, false) < 5.5, "no notes, silent input: only the grace counts");
+
+        tracker.setAudioLevelCounts (false);
+        check (run (30.0, 0.2f, false) < 0.01, "MIDI notes only: a loud audio input counts nothing");
+        check (std::abs (run (20.0, 0.2f, true) - 20.0) < 0.5, "MIDI notes only: notes still count");
+
+        tracker.setAudioLevelCounts (true);
+        run (10.0, 0.0f, false);
+        check (run (10.0, 0.2f, false) > 9.5, "back to automatic: the audio level counts again");
+    }
+
+    {
+        // Start-button mode: notes don't start the clock, but keep it from pausing itself.
+        PracticeLog log (folder, "pc2");
+        PracticeTracker tracker;
+        tracker.setLog (&log);
+        tracker.setStartButtonMode (true);
+        tracker.setPaused (false);
+        PracticeTracker::Activity a;
+        auto clock = juce::Time (2026, 10, 17, 19, 0, 0, 0, true);
+
+        for (int i = 0; i < (int) (PracticeTracker::autoPauseSeconds + 60.0); ++i)
+        {
+            clock = clock + juce::RelativeTime::seconds (1.0);
+
+            if (i % 4 == 0)
+                tracker.midiNotePlayed();
+
+            tracker.tick (1.0, 0.0f, a, clock);
+        }
+
+        check (! tracker.isPaused(), "Start-button mode: MIDI notes keep the clock from pausing itself");
+    }
+
+    folder.deleteRecursively();
+}
+
 static void testNoGuitarTopics()
 {
     std::cout << "\n[Topics timed without the guitar, time added by hand]\n";
@@ -4226,6 +4312,7 @@ int main()
     testLinks();
     testPracticeLog();
     testLogCorrections();
+    testMidiPracticeTiming();
     testNoGuitarTopics();
     testStartButtonMode();
     testOutsideSongs();

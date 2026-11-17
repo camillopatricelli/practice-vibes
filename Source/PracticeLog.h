@@ -165,8 +165,9 @@ private:
 class PlayDetector
 {
 public:
-    /** `peak`: the input's peak level over the last `seconds`. Returns how many of those seconds count as played. */
-    double process (float peak, double seconds);
+    /** `peak`: the input's peak level over the last `seconds`; `midiNote`: a MIDI note was played in that time
+        (counts like a note heard on the input). Returns how many of those seconds count as played. */
+    double process (float peak, double seconds, bool midiNote = false);
 
     bool isPlaying() const noexcept     { return sinceLastNote <= graceSeconds; }
     void reset();
@@ -211,8 +212,15 @@ public:
         juce::String songName;
     };
 
-    /** Called regularly: `seconds` since the last call, the guitar input's peak level in that time. */
+    /** Called regularly: `seconds` since the last call, the instrument input's peak level in that time. */
     void tick (double seconds, float inputPeak, const Activity&, juce::Time now);
+
+    /** A note-on from a MIDI keyboard: counts as playing in the next tick() (same grace as a sound on the input). */
+    void midiNotePlayed() noexcept                                  { midiNoteSinceTick = true; }
+
+    /** False: the audio input's level is ignored and only MIDI notes count ("MIDI notes only" timing). */
+    void setAudioLevelCounts (bool shouldCount) noexcept            { audioLevelCounts = shouldCount; }
+    bool doesAudioLevelCount() const noexcept                       { return audioLevelCounts; }
 
     /** What to store as the setup (called while you play). */
     std::function<PracticeSetup()> captureSetup;
@@ -231,8 +239,8 @@ public:
 
     bool isPlaying() const noexcept                                 { return isTimedByHand() ? ! paused : detector.isPlaying(); }
 
-    /** Tells whether a topic is "timed without the guitar" (ear training, theory...). For those, time counts on the
-        clock while the topic is active and not paused, instead of from the guitar input. */
+    /** Tells whether a topic is "timed without playing" (ear training, theory...). For those, time counts on the
+        clock while the topic is active and not paused, instead of from the instrument input. */
     std::function<bool (const juce::String& topicId)> isNoGuitarTopic;
 
     /** True while the active topic is timed without the guitar. */
@@ -284,6 +292,7 @@ private:
     bool startButton = false;
     double quietSeconds = 0.0;                           // Start-button mode: time since the input last heard a note
     bool noteDirty = false;
+    bool midiNoteSinceTick = false, audioLevelCounts = true;
 };
 
 /** "12 min", "1 h 05 min", "< 1 min". */

@@ -90,7 +90,11 @@ AppEngine::AppEngine()
 
     midi->onMessage = [this] (const juce::MidiMessage& message, const juce::String& source)
     {
-        footswitch->handleMidi (message);
+        const auto taken = footswitch->handleMidi (message);
+
+        // Note-ons (velocity > 0) only: sustain pedal, other CCs and the pedal board's own messages don't count.
+        if (! taken && message.isNoteOn() && onMidiNoteOn)
+            onMidiNoteOn (source);
 
         if (onMidiMessage)
             onMidiMessage (message, source);

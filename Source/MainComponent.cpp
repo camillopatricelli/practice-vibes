@@ -238,6 +238,12 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
         if (practicePanel != nullptr)
             juce::Logger::writeToLog ("Footswitch: " + practicePanel->toggleStem (stem));
     };
+    // MIDI keyboard notes count as playing (from the chosen MIDI input; the footswitch's messages never reach here).
+    engine.onMidiNoteOn = [this] (const juce::String& source)
+    {
+        if (practiceInputSettings.midiNoteCounts (source, practiceInputSettings.get (practiceInput.name)))
+            tracker.midiNotePlayed();
+    };
     engine.onSaveState = [this]
     {
         if (libraryPanel != nullptr)
@@ -448,6 +454,7 @@ MainComponent::~MainComponent()
 
     engine.onToggleRecording = nullptr;
     engine.onToggleStem = nullptr;
+    engine.onMidiNoteOn = nullptr;
     tracker.finish();
     tracker.onSaved = nullptr;
     tracker.captureSetup = nullptr;
@@ -669,7 +676,15 @@ void MainComponent::updatePracticeInput (bool force)
                                   + " (" + practiceInput.reason + ")");
     }
 
-    const auto startButton = usesStartButton (practiceInput, practiceInputSettings.get (practiceInput.name));
+    const auto timing = practiceInputSettings.get (practiceInput.name);
+    const auto startButton = usesStartButton (practiceInput, timing);
+
+    if (countsAudioLevel (timing) != tracker.doesAudioLevelCount())
+    {
+        tracker.setAudioLevelCounts (countsAudioLevel (timing));
+        juce::Logger::writeToLog (countsAudioLevel (timing) ? "Practice is timed from the input level and MIDI notes"
+                                                            : "Practice is timed from MIDI notes only");
+    }
 
     if (startButton != tracker.isStartButtonMode())
     {
@@ -1648,10 +1663,32 @@ void MainComponent::openAudioSettings()
     {
         Settings (std::unique_ptr<juce::Component> s, bool logShown, std::function<void (bool)> onLog,
                   std::function<InputInfo()> getInput, std::function<PracticeTiming (const juce::String&)> getTiming,
-                  std::function<void (const juce::String&, PracticeTiming)> setTiming)
+                  std::function<void (const juce::String&, PracticeTiming)> setTiming,
+                  std::function<juce::StringArray()> getMidiInputs, std::function<juce::String()> getMidiDevice,
+                  std::function<void (const juce::String&)> setMidiDevice)
             : selector (std::move (s)), currentInput (std::move (getInput)), timingFor (std::move (getTiming)),
-              onTiming (std::move (setTiming))
+              onTiming (std::move (setTiming)), midiInputs (std::move (getMidiInputs)), midiDeviceFor (std::move (getMidiDevice)),
+              onMidiDevice (std::move (setMidiDevice))
         {
+            // Which MIDI input's notes count as playing (a MIDI keyboard; the footswitch's messages never count).
+            midiLabel.setText ("MIDI notes", juce::dontSendNotification);
+            midiLabel.setJustificationType (juce::Justification::centredRight);
+            addAndMakeVisible (midiLabel);
+            midiBox.setTooltip ("Notes played on a MIDI keyboard count as practice time, like sound on the input. "
+                                "Choose one device if other MIDI gear (a pad, a sequencer) sends notes too.");
+            midiBox.onChange = [this]
+            {
+                const auto id = midiBox.getSelectedId();
+
+                if (id == 1)
+                    onMidiDevice (PracticeInputSettings::anyMidi);
+                else if (id == 2)
+                    onMidiDevice (PracticeInputSettings::noMidi);
+                else if (id > 2 && id - 3 < shownMidiInputs.size())
+                    onMidiDevice (shownMidiInputs[id - 3]);
+            };
+            addAndMakeVisible (midiBox);
+
             // Practice log: how time is counted from this input (a microphone hears the room too).
             timingLabel.setText ("Practice log", juce::dontSendNotification);
             timingLabel.setJustificationType (juce::Justification::centredRight);
@@ -1672,10 +1709,11 @@ void MainComponent::openAudioSettings()
             addAndMakeVisible (timingInfo);
 
             updateTiming();
+            updateMidi();
             startTimer (500);   // follows device changes made in the selector below
 
             getProperties().set ("overlayWidth", 760);
-            getProperties().set ("overlayHeight", 890);
+            getProperties().set ("overlayHeight", 930);
 
             displayHeader.setText ("Display", juce::dontSendNotification);
             audioHeader.setText ("Audio and MIDI", juce::dontSendNotification);
@@ -1741,12 +1779,42 @@ void MainComponent::openAudioSettings()
             timingRow.removeFromLeft (10);
             timingBox.setBounds (timingRow.removeFromLeft (juce::jmin (420, timingRow.getWidth())));
             timingInfo.setBounds (r.removeFromTop (22).withTrimmedLeft (120));
+
+            auto midiRow = r.removeFromTop (40).reduced (0, 4);
+            midiLabel.setBounds (midiRow.removeFromLeft (110));
+            midiRow.removeFromLeft (10);
+            midiBox.setBounds (midiRow.removeFromLeft (juce::jmin (420, midiRow.getWidth())));
             r.removeFromTop (8);
 
             selector->setBounds (r);
         }
 
-        void timerCallback() override   { updateTiming(); }
+        void timerCallback() override   { updateTiming(); updateMidi(); }
+
+        void updateMidi()
+        {
+            auto inputs = midiInputs();
+            const auto chosen = midiDeviceFor();
+
+            if (chosen.isNotEmpty() && chosen != PracticeInputSettings::noMidi && ! inputs.contains (chosen))
+                inputs.add (chosen);    // remembered while unplugged
+
+            if (inputs == shownMidiInputs && chosen == shownMidiDevice && midiBox.getNumItems() > 0)
+                return;
+
+            shownMidiInputs = inputs;
+            shownMidiDevice = chosen;
+            midiBox.clear (juce::dontSendNotification);
+            midiBox.addItem ("From any MIDI input", 1);
+            midiBox.addItem ("Don't count MIDI notes", 2);
+
+            for (int i = 0; i < inputs.size(); ++i)
+                midiBox.addItem ("Only from " + inputs[i] + (midiInputs().contains (inputs[i]) ? "" : " (not connected)"), i + 3);
+
+            midiBox.setSelectedId (chosen == PracticeInputSettings::anyMidi ? 1
+                                   : chosen == PracticeInputSettings::noMidi ? 2
+                                   : inputs.indexOf (chosen) + 3, juce::dontSendNotification);
+        }
 
         void updateTiming()
         {
@@ -1760,9 +1828,9 @@ void MainComponent::openAudioSettings()
 
             if (info.kind == InputKind::none)
             {
-                timingBox.setTextWhenNothingSelected ("No input open");
+                timingBox.setTextWhenNothingSelected ("No audio input open");
                 timingBox.setEnabled (false);
-                timingInfo.setText ({}, juce::dontSendNotification);
+                timingInfo.setText ("MIDI keyboard notes still count as playing", juce::dontSendNotification);
                 return;
             }
 
@@ -1770,6 +1838,7 @@ void MainComponent::openAudioSettings()
             timingBox.addItem (juce::String ("Default for this input: ") + (mic ? "with Start / Pause" : "automatic"), 1 + (int) PracticeTiming::byInputType);
             timingBox.addItem ("Automatic: count the time I play", 1 + (int) PracticeTiming::automatic);
             timingBox.addItem ("Only between Start and Pause (Today tab)", 1 + (int) PracticeTiming::startButton);
+            timingBox.addItem ("Only MIDI keyboard notes (ignore the sound)", 1 + (int) PracticeTiming::midiNotes);
             timingBox.setSelectedId (1 + (int) timingFor (info.name), juce::dontSendNotification);
             timingBox.setEnabled (true);
             timingInfo.setText ("\"" + info.name + "\" looks like " + (mic ? "a microphone: it hears the room too" : "an audio interface"),
@@ -1782,6 +1851,13 @@ void MainComponent::openAudioSettings()
         InputInfo shownInput;
         juce::Label timingLabel, timingInfo;
         juce::ComboBox timingBox;
+        std::function<juce::StringArray()> midiInputs;
+        std::function<juce::String()> midiDeviceFor;
+        std::function<void (const juce::String&)> onMidiDevice;
+        juce::StringArray shownMidiInputs;
+        juce::String shownMidiDevice;
+        juce::Label midiLabel;
+        juce::ComboBox midiBox;
 
         juce::Label displayHeader, audioHeader;
         std::unique_ptr<juce::Component> selector;
@@ -1806,6 +1882,15 @@ void MainComponent::openAudioSettings()
                                                                {
                                                                    practiceInputSettings.set (name, timing);
                                                                    updatePracticeInput (true);
+                                                               },
+                                                               [this] { return engine.midi->getEnabledInputNames(); },
+                                                               [this] { return practiceInputSettings.getMidiDevice(); },
+                                                               [this] (const juce::String& name)
+                                                               {
+                                                                   practiceInputSettings.setMidiDevice (name);
+                                                                   juce::Logger::writeToLog ("Practice timing MIDI notes: "
+                                                                       + (name == PracticeInputSettings::anyMidi ? juce::String ("any input")
+                                                                          : name == PracticeInputSettings::noMidi ? juce::String ("off") : name));
                                                                }));
 }
 

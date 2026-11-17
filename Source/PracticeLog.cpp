@@ -580,7 +580,7 @@ void PlayDetector::reset()
     sinceLastNote = 1.0e9;
 }
 
-double PlayDetector::process (float peak, double seconds)
+double PlayDetector::process (float peak, double seconds, bool midiNote)
 {
     if (seconds <= 0.0)
         return 0.0;
@@ -602,7 +602,7 @@ double PlayDetector::process (float peak, double seconds)
         history.pop_front();
     }
 
-    if (peak > threshold)
+    if (peak > threshold || midiNote)
         sinceLastNote = 0.0;
     else
         sinceLastNote += seconds;
@@ -672,7 +672,9 @@ void PracticeTracker::tick (double seconds, float inputPeak, const Activity& act
 {
     seconds = juce::jlimit (0.0, 5.0, seconds);   // the app was suspended: don't count the gap
     const auto onClock = isTimedByHand();
-    const auto heard = detector.process (inputPeak, seconds);   // keeps its noise floor up to date either way
+    // Keeps its noise floor up to date either way. A MIDI note counts like a sound on the input.
+    const auto heard = detector.process (audioLevelCounts ? inputPeak : 0.0f, seconds, midiNoteSinceTick);
+    midiNoteSinceTick = false;
 
     // Start-button mode, but nothing heard for a long while: you left without pressing Pause.
     // (Not for a no-guitar topic: silence is normal there.)
