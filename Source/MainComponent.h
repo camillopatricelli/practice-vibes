@@ -58,6 +58,12 @@ private:
     void libraryOpened();
     void practiseTopic (const juce::String& topicId);
     void tickTracker();
+
+    /** Teaching mode: the app works as usual but writes no practice log (lessons aren't your practice).
+        The top-bar switch is shown when "I teach" is on (audio settings); every launch starts with teaching off. */
+    void setTeaching (bool);
+    void setTeacherSetting (bool);
+    void updateTeachingButton();
     void updatePractisingButton();
     void showPractisingMenu();
     /** Classifies the input again if it changed (or `force`), and sets the tracker's Start-button mode from it. */
@@ -111,7 +117,9 @@ private:
                      audioSettingsButton { "Audio settings" },
                      bluetoothButton     { "Bluetooth MIDI" },
                      saveButton          { "Save" },
-                     practisingButton;
+                     practisingButton,
+                     teachingButton      { "Teaching" };
+    bool teaching = false, teacherSetting = false;
 
     // The log outlives the tracker (which writes its last entry when destroyed).
     std::unique_ptr<PracticeLog> practiceLog;

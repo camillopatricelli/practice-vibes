@@ -222,6 +222,9 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     for (auto* b : { &recordButton, &tunerButton, &audioSettingsButton, &bluetoothButton, &saveButton, &practisingButton })
         addAndMakeVisible (*b);
 
+    addChildComponent (teachingButton);
+    teachingButton.onClick = [this] { setTeaching (! teaching); };
+
     practisingButton.setTooltip ("What you're practising: played time is logged to this topic (see the Today tab)");
     practisingButton.onClick = [this] { showPractisingMenu(); };
 
@@ -380,7 +383,12 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
 
     // The Log tab is for troubleshooting: off unless switched on in the audio settings.
     if (auto ui = juce::parseXML (getUiSettingsFile()))
+    {
         setLogTabShown (ui->getBoolAttribute ("showLogTab", false));
+        teacherSetting = ui->getBoolAttribute ("teacher", false);   // not setTeacherSetting(): no layout before every child exists
+    }
+
+    updateTeachingButton();
 
     youtube = std::make_unique<YouTubePlayer>();
     addChildComponent (*youtube);
@@ -498,6 +506,10 @@ void MainComponent::resized()
     top.removeFromRight (4);
     tunerButton.setBounds (top.removeFromRight (112).reduced (4));
     recordButton.setBounds (top.removeFromRight (juce::jlimit (96, 140, top.getWidth() / 6)).reduced (4));
+
+    if (teachingButton.isVisible())
+        teachingButton.setBounds (top.removeFromRight (teaching ? 210 : 120).reduced (4));
+
     practisingButton.setBounds (top.removeFromRight (juce::jlimit (150, 320, top.getWidth() - 180)).reduced (4));
     iconBounds = top.removeFromLeft (iconSize + 6).withSizeKeepingCentre (iconSize, iconSize);
     titleLabel.setBounds (top);
@@ -652,6 +664,17 @@ void MainComponent::tickTracker()
         updatePracticeInput();
     }
 
+    if (teaching)
+    {
+        // A lesson: nothing is timed or logged (the input meter's peak is still taken, so it doesn't pile up).
+        engine.chain->getInputStage().takeActivityPeak();
+
+        if (--practisingButtonCountdown <= 0)
+            updatePractisingButton();
+
+        return;
+    }
+
     tracker.tick (seconds, engine.chain->getInputStage().takeActivityPeak(), activity, juce::Time::getCurrentTime());
 
     // The slot's clock counts only time spent playing. Time's up: a soft chime (no forced move: you go on when ready).
@@ -733,6 +756,13 @@ void MainComponent::updatePractisingButton()
     else if (tracker.isPlaying() && ! session.isTimeUp())
         prefix = "(playing) ";
 
+    if (teaching)
+    {
+        prefix = "Lesson: ";
+        text = active ? tracker.getActiveTopicTitle() : juce::String ("no topic");
+        text << "  (not logged)";
+    }
+
     practisingButton.setButtonText (prefix + text);
 
     if (session.isRunning() && session.isTimeUp())
@@ -748,6 +778,54 @@ void MainComponent::updatePractisingButton()
             practisingButton.setColour (juce::TextButton::buttonColourId, theme::accent());
         else
             practisingButton.removeColour (juce::TextButton::buttonColourId);
+    }
+}
+
+void MainComponent::setTeaching (bool on)
+{
+    if (on == teaching)
+        return;
+
+    if (on)
+        tracker.finish();   // your own practice so far is saved and closed; the lesson starts a clean slate
+
+    teaching = on;
+    juce::Logger::writeToLog (on ? "Teaching mode on: practice is not logged" : "Teaching mode off: practice is logged again");
+    updateTeachingButton();
+    updatePractisingButton();
+    resized();
+
+    if (todayPanel != nullptr && todayPanel->isShowing())
+        todayPanel->refresh();
+}
+
+void MainComponent::setTeacherSetting (bool on)
+{
+    teacherSetting = on;
+
+    if (! on)
+        setTeaching (false);
+
+    updateTeachingButton();
+    resized();
+}
+
+void MainComponent::updateTeachingButton()
+{
+    teachingButton.setVisible (teacherSetting);
+    teachingButton.setButtonText (teaching ? "Teaching: tap to stop" : "Teaching");
+    teachingButton.setTooltip (teaching ? "Lesson mode is on: nothing goes to your practice log. Tap when the lesson is over."
+                                        : "Start a lesson: the app works as usual but nothing goes to your practice log");
+
+    if (teaching)
+    {
+        teachingButton.setColour (juce::TextButton::buttonColourId, theme::good());
+        teachingButton.setColour (juce::TextButton::textColourOffId, theme::onAccent());
+    }
+    else
+    {
+        teachingButton.removeColour (juce::TextButton::buttonColourId);
+        teachingButton.removeColour (juce::TextButton::textColourOffId);
     }
 }
 
@@ -1672,7 +1750,8 @@ void MainComponent::openAudioSettings()
                   std::function<InputInfo()> getInput, std::function<PracticeTiming (const juce::String&)> getTiming,
                   std::function<void (const juce::String&, PracticeTiming)> setTiming,
                   std::function<juce::StringArray()> getMidiInputs, std::function<juce::String()> getMidiDevice,
-                  std::function<void (const juce::String&)> setMidiDevice)
+                  std::function<void (const juce::String&)> setMidiDevice,
+                  bool teacher, std::function<void (bool)> onTeacher)
             : selector (std::move (s)), currentInput (std::move (getInput)), timingFor (std::move (getTiming)),
               onTiming (std::move (setTiming)), midiInputs (std::move (getMidiInputs)), midiDeviceFor (std::move (getMidiDevice)),
               onMidiDevice (std::move (setMidiDevice))
@@ -1737,6 +1816,12 @@ void MainComponent::openAudioSettings()
             logToggle.onClick = [this, onLog] { onLog (logToggle.getToggleState()); };
             addAndMakeVisible (logToggle);
 
+            teacherToggle.setToggleState (teacher, juce::dontSendNotification);
+            teacherToggle.setTooltip ("Shows a Teaching switch in the top bar: during a lesson the app works as usual "
+                                      "but nothing goes to your practice log");
+            teacherToggle.onClick = [this, onTeacher] { onTeacher (teacherToggle.getToggleState()); };
+            addAndMakeVisible (teacherToggle);
+
             themeLabel.setText ("Theme", juce::dontSendNotification);
             themeLabel.setJustificationType (juce::Justification::centredRight);
             addAndMakeVisible (themeLabel);
@@ -1771,7 +1856,8 @@ void MainComponent::openAudioSettings()
             r.removeFromTop (6);
 
             auto row = r.removeFromTop (40).reduced (0, 4);
-            logToggle.setBounds (row.removeFromRight (juce::jmin (220, row.getWidth() / 3)));
+            logToggle.setBounds (row.removeFromRight (juce::jmin (180, row.getWidth() / 4)));
+            teacherToggle.setBounds (row.removeFromRight (juce::jmin (110, row.getWidth() / 4)));
             row.removeFromRight (12);
             themeLabel.setBounds (row.removeFromLeft (110));
             row.removeFromLeft (10);
@@ -1868,7 +1954,7 @@ void MainComponent::openAudioSettings()
 
         juce::Label displayHeader, audioHeader;
         std::unique_ptr<juce::Component> selector;
-        juce::ToggleButton logToggle { "Show the Log tab" };
+        juce::ToggleButton logToggle { "Show the Log tab" }, teacherToggle { "I teach" };
         juce::Label themeLabel;
         juce::ComboBox themeBox;
     };
@@ -1898,6 +1984,12 @@ void MainComponent::openAudioSettings()
                                                                    juce::Logger::writeToLog ("Practice timing MIDI notes: "
                                                                        + (name == PracticeInputSettings::anyMidi ? juce::String ("any input")
                                                                           : name == PracticeInputSettings::noMidi ? juce::String ("off") : name));
+                                                               },
+                                                               teacherSetting,
+                                                               [this] (bool on)
+                                                               {
+                                                                   setTeacherSetting (on);
+                                                                   saveUiSetting ("teacher", on);
                                                                }));
 }
 
