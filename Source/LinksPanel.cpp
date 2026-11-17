@@ -217,10 +217,13 @@ void LinksPanel::edit (const juce::String& id)
             }
         }
 
+        // Closing the overlay deletes the editor, and this lambda with it: read `this` before that.
+        auto* self = this;
+
         if (hideOverlay)
             hideOverlay();
 
-        rebuild();
+        self->rebuild();
     };
 
     showOverlay (id.isEmpty() ? "New link" : "Edit link", std::move (editor));

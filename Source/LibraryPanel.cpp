@@ -1171,44 +1171,50 @@ void LibraryPanel::shareTopic (const juce::String& topicId)
     lastSentMembers.clear();
     panel->onWritten = [this, topicId] (const juce::Array<juce::File>& files, bool isDocument)
     {
-        juce::ignoreUnused (isDocument);   // used on iPad / Mac only
+        // Closing the overlay deletes the panel, and this lambda with it: the rest runs from a copy on the stack.
+        auto rest = [this, topicId, files, isDocument]
+        {
+            juce::ignoreUnused (isDocument);   // used on iPad / Mac only
+
+            if (files.isEmpty())
+                return;
+
+            if (auto* shared = library != nullptr ? library->findTopic (topicId) : nullptr)
+            {
+                shared->lastSent = juce::Time::getCurrentTime();
+                library->saveTopic (*shared);
+                signature = library->computeSignature();
+                showSelection();
+            }
+
+           #if JUCE_IOS || JUCE_MAC
+            // One file per member: a share sheet each, from a list that says whose file it is.
+            if (! isDocument && files.size() > 1 && lastSentMembers.size() == files.size())
+            {
+                shareOnePerMember (files);
+                return;
+            }
+           #endif
+
+           #if JUCE_IOS
+            juce::Array<juce::URL> urls;
+
+            for (auto& f : files)
+                urls.add (juce::URL (f));
+
+            shareBox = juce::ContentSharer::shareFilesScoped (urls, [] (bool, const juce::String&) {}, this);
+           #elif JUCE_MAC
+            showSystemSharePicker (files, *this);
+           #else
+            // Explorer with the file selected (a document: in its folder, with its files): drag them into a mail or WhatsApp.
+            files.getFirst().revealToUser();
+           #endif
+        };
 
         if (hideOverlay)
             hideOverlay();
 
-        if (files.isEmpty())
-            return;
-
-        if (auto* shared = library != nullptr ? library->findTopic (topicId) : nullptr)
-        {
-            shared->lastSent = juce::Time::getCurrentTime();
-            library->saveTopic (*shared);
-            signature = library->computeSignature();
-            showSelection();
-        }
-
-       #if JUCE_IOS || JUCE_MAC
-        // One file per member: a share sheet each, from a list that says whose file it is.
-        if (! isDocument && files.size() > 1 && lastSentMembers.size() == files.size())
-        {
-            shareOnePerMember (files);
-            return;
-        }
-       #endif
-
-       #if JUCE_IOS
-        juce::Array<juce::URL> urls;
-
-        for (auto& f : files)
-            urls.add (juce::URL (f));
-
-        shareBox = juce::ContentSharer::shareFilesScoped (urls, [] (bool, const juce::String&) {}, this);
-       #elif JUCE_MAC
-        showSystemSharePicker (files, *this);
-       #else
-        // Explorer with the file selected (a document: in its folder, with its files): drag them into a mail or WhatsApp.
-        files.getFirst().revealToUser();
-       #endif
+        rest();
     };
     showOverlay ("Share " + quoted (t->title), std::move (panel));
 }
@@ -1312,13 +1318,19 @@ void LibraryPanel::importSharedTopic (const juce::File& file)
     panel->onCancel = [this] { if (hideOverlay) hideOverlay(); };
     panel->onImported = [this] (const juce::String& topicId)
     {
+        // Closing the overlay deletes the panel, and this lambda with it: the rest runs from a copy on the stack.
+        auto rest = [this, id = topicId]
+        {
+            library->rescan();
+            signature = library->computeSignature();
+            refreshAfterRescan();
+            selectTopic (id);
+        };
+
         if (hideOverlay)
             hideOverlay();
 
-        library->rescan();
-        signature = library->computeSignature();
-        refreshAfterRescan();
-        selectTopic (topicId);
+        rest();
     };
     showOverlay ("Import shared topic", std::move (panel));
 }
