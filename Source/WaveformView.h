@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "ChordAnalyzer.h"
+#include "Library.h"
 #include "PlayerProcessor.h"
 
 namespace pv
@@ -45,6 +46,9 @@ public:
     void setChords (std::shared_ptr<const ChordTrack>);
     void setChordTranspose (int semitones);
 
+    /** The song's markers and saved loops (from its topic), drawn as flags with their comments. */
+    void setMarks (std::vector<SongMark>);
+
     std::function<void (double seconds)> onSeek;
     std::function<void (double startSeconds, double endSeconds)> onLoopSelected;   // new loop, enable it
     std::function<void (double startSeconds, double endSeconds)> onLoopEdited;     // edge moved
@@ -70,6 +74,7 @@ private:
     void paintTimeRuler (juce::Graphics&, juce::Rectangle<int> area);
     void paintChordLane (juce::Graphics&, juce::Rectangle<int> area);
     void paintOverview (juce::Graphics&, juce::Rectangle<int> area);
+    void paintMarks (juce::Graphics&, juce::Rectangle<int> area);
     void startPinch();
 
     PlayerProcessor& player;
@@ -82,6 +87,7 @@ private:
 
     juce::Rectangle<int> mainArea, overviewArea;
     double viewStart = 0.0, viewLength = 1.0;
+    std::vector<SongMark> marks;
 
     Gesture gesture = Gesture::none;
     float dragStartX = 0.0f, dragEndX = 0.0f;

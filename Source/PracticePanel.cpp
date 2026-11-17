@@ -243,8 +243,12 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
                                                              &loopButton, &clearLoopButton, &speedSlider, &pitchSlider,
                                                              &zoomOutButton, &zoomInButton, &fitButton, &zoomLoopButton,
                                                              &songVolumeSlider, &speedLabel, &pitchLabel, &songVolumeLabel, &hintLabel,
-                                                             &chordView, &snapButton })
+                                                             &chordView, &snapButton, &marksButton })
         addAndMakeVisible (c);
+
+    marksButton.setTooltip ("Markers and saved loops with a short comment (\"bar 17: watch the fingering\"). "
+                            "They're kept in the song's topic and go along when you share it. On a take: comments at a time.");
+    marksButton.onClick = [this] { showMarksMenu(); };
 
     youTubeTimeline = std::make_unique<YouTubeTimeline> (*this);
     addChildComponent (*youTubeTimeline);
@@ -898,6 +902,7 @@ void PracticePanel::loadSong (const juce::URL& url, std::optional<PracticeSetup>
 
         safeThis->songFile = file;
         safeThis->songOfFile = safeThis->player.getSong();
+        safeThis->refreshMarks();
 
         if (then.has_value())
             safeThis->applySetup (*then);
@@ -909,11 +914,12 @@ void PracticePanel::loadSong (const juce::URL& url, std::optional<PracticeSetup>
     });
 }
 
-void PracticePanel::openTake (const juce::File& takeSongFile, const juce::File& takeFile, const TakeInfo& info)
+void PracticePanel::openTake (const juce::File& takeSongFile, const juce::File& newTakeFile, const TakeInfo& info)
 {
-    takeTitle = takeFile.getFileNameWithoutExtension();
+    takeTitle = newTakeFile.getFileNameWithoutExtension();
+    takeFile = newTakeFile;
 
-    auto loadTake = [safeThis = SafePointer<PracticePanel> (this), takeFile, timeline = info.timeline]
+    auto loadTake = [safeThis = SafePointer<PracticePanel> (this), takeFile = newTakeFile, timeline = info.timeline]
     {
         if (safeThis == nullptr)
             return;
@@ -1015,7 +1021,139 @@ void PracticePanel::renderMix (const juce::File& target, bool share)
 void PracticePanel::closeTake()
 {
     player.setTake (nullptr);
+    takeFile = juce::File();
     updateTakeMode();
+}
+
+//==============================================================================
+void PracticePanel::refreshMarks()
+{
+    std::vector<SongMark> marks;
+
+    if (getMarks && songFile != juce::File() && ! youTubeMode)
+        if (auto found = getMarks (songFile))
+            marks = std::move (*found);
+
+    waveform.setMarks (std::move (marks));
+}
+
+void PracticePanel::showMarksMenu()
+{
+    const auto file = markedFile();
+    const auto take = isTakeMode();
+    juce::PopupMenu menu;
+    std::optional<std::vector<SongMark>> marks;
+
+    if (file != juce::File() && ! youTubeMode && getMarks)
+        marks = getMarks (file);
+
+    if (! marks.has_value())
+    {
+        menu.addItem (youTubeMode ? "Marks are for songs from a topic (not YouTube videos yet)"
+                                  : "Marks are saved in topics: add this song to a topic first", false, false, [] {});
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&marksButton));
+        return;
+    }
+
+    const auto now = take ? player.getTakePosition() : player.getPositionSeconds();
+
+    menu.addSectionHeader (take ? "Comments on the take" : "Marks on this song");
+    menu.addItem ((take ? "Add a comment at " : "Add a marker at ") + formatMarkTime (now) + "...", [this, file, now]
+    {
+        SongMark m;
+        m.id = juce::Uuid().toDashedString();
+        m.fileName = file.getFileName();
+        m.start = now;
+        editMark (file, m, "New marker at " + formatMarkTime (now));
+    });
+
+    if (! take && loopExists())
+    {
+        SongMark loop;
+        loop.id = juce::Uuid().toDashedString();
+        loop.fileName = file.getFileName();
+        loop.start = loopStartSeconds();
+        loop.end = loopEndSeconds();
+        loop.speed = speedSlider.getValue() / 100.0;
+        loop.semitones = pitchSlider.getValue();
+        menu.addItem ("Save this loop (" + loop.describe() + ")...", [this, file, loop] { editMark (file, loop, "Save the loop"); });
+    }
+
+    if (! marks->empty())
+    {
+        menu.addSeparator();
+
+        for (auto& m : *marks)
+            menu.addItem (m.describe(), [this, m] { recallMark (m); });
+
+        juce::PopupMenu edit;
+
+        for (auto& m : *marks)
+        {
+            juce::PopupMenu one;
+            one.addItem ("Edit comment...", [this, file, m] { editMark (file, m, "Edit comment"); });
+            one.addItem ("Remove", [this, file, id = m.id]
+            {
+                if (removeMark)
+                    removeMark (file, id);
+
+                refreshMarks();
+            });
+            edit.addSubMenu (m.describe(), one);
+        }
+
+        menu.addSubMenu ("Edit or remove", edit);
+    }
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&marksButton));
+}
+
+void PracticePanel::editMark (const juce::File& file, SongMark mark, const juce::String& title)
+{
+    auto* window = new juce::AlertWindow (title, "Comment (optional), e.g. \"bar 17: watch the fingering\":",
+                                          juce::MessageBoxIconType::NoIcon, this);
+    window->addTextEditor ("text", mark.text);
+    window->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([safe = SafePointer<PracticePanel> (this), window, file, mark] (int result) mutable
+    {
+        if (safe == nullptr || result != 1)
+            return;
+
+        mark.text = window->getTextEditorContents ("text").trim().substring (0, 300);
+
+        if (mark.added == juce::Time())
+            mark.added = juce::Time::getCurrentTime();
+
+        if (safe->saveMark)
+            safe->saveMark (file, mark);
+
+        safe->refreshMarks();
+    }), true);
+}
+
+void PracticePanel::recallMark (const SongMark& m)
+{
+    if (isTakeMode())
+    {
+        player.seekTake (m.start);
+        return;
+    }
+
+    if (m.isLoop())
+    {
+        setLoop (m.start, m.end, true);
+        pendingLoopStart = -1.0;
+
+        if (m.speed > 0.0)
+            speedSlider.setValue (m.speed * 100.0, juce::sendNotificationSync);
+
+        pitchSlider.setValue (m.semitones, juce::sendNotificationSync);
+        updateLoopButtons();
+    }
+
+    player.seekToSeconds (m.start);
 }
 
 void PracticePanel::updateTakeMode()
@@ -1496,6 +1634,8 @@ void PracticePanel::resized()
     transportRow.removeFromLeft (20);
     auto transport = transportRow.withSizeKeepingCentre (transportRow.getWidth(), 44);
 
+    marksButton.setBounds (transport.removeFromRight (90).reduced (2, 0));
+
     if (takeShown)
     {
         closeTakeButton.setBounds (transport.removeFromRight (110).reduced (2, 0));
@@ -1508,7 +1648,7 @@ void PracticePanel::resized()
     }
 
     clearLoopButton.setBounds (transport.removeFromRight (110).reduced (2, 0));
-    loopButton.setBounds (transport.removeFromRight (220).reduced (2, 0));
+    loopButton.setBounds (transport.removeFromRight (200).reduced (2, 0));
     setBButton.setBounds (transport.removeFromRight (small).reduced (2, 0));
     setAButton.setBounds (transport.removeFromRight (120).reduced (2, 0));
     snapButton.setBounds (transport.removeFromRight (140).reduced (2, 0));

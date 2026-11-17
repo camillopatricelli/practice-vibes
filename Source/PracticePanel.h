@@ -53,6 +53,15 @@ public:
 
     juce::File getSongFile() const                      { return songFile; }   // the loaded song's file, if local
 
+    /** Markers and saved loops on a song or take, kept in its topic. getMarks returns nullopt when the file isn't
+        in a topic (marks can't be saved then). */
+    std::function<std::optional<std::vector<SongMark>> (const juce::File&)> getMarks;
+    std::function<void (const juce::File&, const SongMark&)> saveMark;        // add, or replace by id
+    std::function<void (const juce::File&, const juce::String& markId)> removeMark;
+
+    /** Shows the marks of the song (and the open take) again, e.g. after the topic changed on disk. */
+    void refreshMarks();
+
     /** A song chosen with "Open song..." has loaded (the URL it came from). */
     std::function<void (const juce::URL&)> onSongPicked;
 
@@ -148,6 +157,12 @@ private:
     juce::Label songHeader, songLabel;
     TimeDisplay timeLabel;
     juce::TextButton openButton { "Open audio file" };
+    juce::TextButton marksButton { "Marks" };
+    juce::File takeFile;                        // the open take's audio file
+    void showMarksMenu();
+    void recallMark (const SongMark&);
+    void editMark (const juce::File&, SongMark, const juce::String& title);
+    juce::File markedFile() const               { return isTakeMode() ? takeFile : songFile; }
     WaveformView waveform;
     juce::TextButton zoomOutButton { "-" }, zoomInButton { "+" }, fitButton { "Fit" }, zoomLoopButton { "Zoom to loop" };
     juce::TextButton snapButton;

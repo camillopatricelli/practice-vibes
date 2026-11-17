@@ -159,9 +159,68 @@ void WaveformView::paint (juce::Graphics& g)
         paintWaveform (g, mainArea);
         paintChordLane (g, mainArea);
         paintTimeRuler (g, mainArea.withHeight (rulerHeight));
+        paintMarks (g, mainArea);
     }
 
     paintOverview (g, overviewArea);
+}
+
+void WaveformView::setMarks (std::vector<SongMark> newMarks)
+{
+    marks = std::move (newMarks);
+    repaint();
+}
+
+void WaveformView::paintMarks (juce::Graphics& g, juce::Rectangle<int> area)
+{
+    if (marks.empty())
+        return;
+
+    const auto top = (float) area.getY() + rulerHeight + (chords != nullptr ? chordLaneHeight : 0);
+    const auto bottom = (float) area.getBottom();
+    const auto colour = theme::palette().highlight;
+    g.setFont (theme::textFont (11.0f, "SemiBold"));
+
+    // Each flag gets the first free row (of three) so neighbouring comments don't overlap.
+    std::array<float, 3> rowEnds { -1.0e9f, -1.0e9f, -1.0e9f };
+
+    for (auto& m : marks)
+    {
+        const auto x1 = secondsToX (m.start);
+        const auto x2 = m.isLoop() ? secondsToX (m.end) : x1;
+
+        if (x2 < (float) area.getX() - 2.0f || x1 > (float) area.getRight() + 2.0f)
+            continue;
+
+        g.setColour (colour.withAlpha (0.85f));
+        g.drawLine (x1, top, x1, bottom, 1.5f);
+
+        if (m.isLoop())
+        {
+            g.setColour (colour.withAlpha (0.10f));
+            g.fillRect (juce::Rectangle<float> (x1, top, x2 - x1, bottom - top));
+            g.setColour (colour.withAlpha (0.6f));
+            g.drawLine (x2, top, x2, bottom, 1.0f);
+        }
+
+        auto label = m.text.isNotEmpty() ? m.text : (m.isLoop() ? juce::String ("Loop") : formatMarkTime (m.start));
+
+        if (label.length() > 28)
+            label = label.substring (0, 27).trimEnd() + "...";
+
+        const auto width = juce::jmin (220.0f, juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), label) + 12.0f);
+        size_t row = 0;
+
+        while (row < rowEnds.size() - 1 && rowEnds[row] > x1)
+            ++row;
+
+        rowEnds[row] = x1 + width + 4.0f;
+        const auto flag = juce::Rectangle<float> (x1, top + 4.0f + (float) row * 18.0f, width, 16.0f);
+        g.setColour (colour.withAlpha (0.9f));
+        g.fillRoundedRectangle (flag, 4.0f);
+        g.setColour (theme::onAccent());
+        g.drawText (label, flag.reduced (6.0f, 0.0f), juce::Justification::centredLeft, true);
+    }
 }
 
 void WaveformView::paintWaveform (juce::Graphics& g, juce::Rectangle<int> area)

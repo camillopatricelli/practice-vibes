@@ -293,7 +293,30 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
 
     // Practice log: opening something from a topic makes it the topic you're practising.
     libraryPanel->onLibraryOpened = [this] { libraryOpened(); };
-    libraryPanel->onTopicsChanged = [this] { todayPanel->refresh(); updatePractisingButton(); };
+    libraryPanel->onTopicsChanged = [this] { todayPanel->refresh(); updatePractisingButton(); practicePanel->refreshMarks(); };
+
+    // Song marks (markers, saved loops, comments on takes) live in the file's topic.
+    practicePanel->getMarks = [this] (const juce::File& file) -> std::optional<std::vector<SongMark>>
+    {
+        if (auto* lib = libraryPanel->getLibrary())
+            if (const auto* t = lib->findTopicForFile (file))
+                return t->marksFor (file.getFileName());
+
+        return std::nullopt;
+    };
+    auto editMarks = [this] (const juce::File& file, std::function<void (Topic&)> change)
+    {
+        if (auto* lib = libraryPanel->getLibrary())
+            if (const auto* found = lib->findTopicForFile (file))
+                if (auto* t = lib->findTopic (found->id))
+                {
+                    change (*t);
+                    lib->saveTopic (*t);
+                    libraryPanel->checkForChanges();
+                }
+    };
+    practicePanel->saveMark = [editMarks] (const juce::File& file, const SongMark& m) { editMarks (file, [m] (Topic& t) { t.setMark (m); }); };
+    practicePanel->removeMark = [editMarks] (const juce::File& file, const juce::String& id) { editMarks (file, [id] (Topic& t) { t.removeMark (id); }); };
     libraryPanel->onPractise = [this] (const juce::String& id) { practiseTopic (id); };
     libraryPanel->onShowHistory = [this] (const juce::String& id) { showTopicHistory (id); };
     libraryPanel->onTopicOpened = [this] (const juce::String& id)
@@ -468,6 +491,9 @@ MainComponent::~MainComponent()
     tracker.captureSetup = nullptr;
     libraryPanel->onLibraryOpened = nullptr;
     libraryPanel->onTopicsChanged = nullptr;
+    practicePanel->getMarks = nullptr;
+    practicePanel->saveMark = nullptr;
+    practicePanel->removeMark = nullptr;
     libraryPanel->onTopicOpened = nullptr;
     engine.onToggleTuner = nullptr;
     engine.onSaveState = nullptr;
