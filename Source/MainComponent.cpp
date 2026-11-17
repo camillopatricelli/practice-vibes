@@ -1839,6 +1839,66 @@ void MainComponent::setLogTabShown (bool shown)
         }
 }
 
+namespace
+{
+    /** Desktop without a pairing window of its own (Windows, Linux): explains where the footswitch is paired,
+        with a shortcut to that system page where there is one, instead of a button that seems to do nothing. */
+    struct BluetoothMidiInfo final : juce::Component
+    {
+        BluetoothMidiInfo()
+        {
+            getProperties().set ("overlayWidth", 560);
+            getProperties().set ("overlayHeight", 240);
+
+            header.setText ("Pair a Bluetooth MIDI device", juce::dontSendNotification);
+            theme::styleHeader (header);
+            header.setColour (juce::Label::textColourId, theme::text());
+            addAndMakeVisible (header);
+
+            body.setText (
+                         #if JUCE_WINDOWS
+                          "Windows pairs Bluetooth devices itself. Switch the footswitch on, then add it in "
+                          "Windows Settings > Bluetooth & devices. Once it's paired, it shows up under MIDI inputs "
+                          "in the audio settings.",
+                         #else
+                          "Pair the footswitch in the system's Bluetooth settings. Once it's paired, it shows up "
+                          "under MIDI inputs in the audio settings.",
+                         #endif
+                          juce::dontSendNotification);
+            body.setFont (theme::textFont (16.0f));
+            body.setColour (juce::Label::textColourId, theme::text());
+            body.setJustificationType (juce::Justification::topLeft);
+            body.setMinimumHorizontalScale (1.0f);
+            addAndMakeVisible (body);
+
+           #if JUCE_WINDOWS
+            openButton.setColour (juce::TextButton::buttonColourId, theme::accent());
+            openButton.setColour (juce::TextButton::textColourOffId, theme::onAccent());
+            openButton.onClick = [] { juce::URL ("ms-settings:bluetooth").launchInDefaultBrowser(); };
+            addAndMakeVisible (openButton);
+           #endif
+        }
+
+        void paint (juce::Graphics& g) override
+        {
+            theme::paintCard (g, getLocalBounds().toFloat().reduced (1.0f));
+        }
+
+        void resized() override
+        {
+            auto r = getLocalBounds().reduced (24, 18);
+            header.setBounds (r.removeFromTop (30));
+            r.removeFromTop (8);
+            if (openButton.isVisible())
+                openButton.setBounds (r.removeFromBottom (44).removeFromLeft (240));
+            body.setBounds (r.reduced (0, 4));
+        }
+
+        juce::Label header, body;
+        juce::TextButton openButton { "Open Bluetooth settings" };
+    };
+}
+
 void MainComponent::openBluetoothMidi()
 {
     // iPad: the system's device list in our own overlay card, themed like the rest of the app.
@@ -1848,18 +1908,15 @@ void MainComponent::openBluetoothMidi()
         return;
     }
 
+    // Mac: JUCE's window with the system's device list.
     if (juce::BluetoothMidiDevicePairingDialogue::isAvailable())
+    {
         juce::BluetoothMidiDevicePairingDialogue::open();
-    else
-        juce::Logger::writeToLog ("Bluetooth MIDI pairing is done by the operating system here: pair the footswitch in "
-                                 #if JUCE_WINDOWS
-                                  "Windows Settings > Bluetooth & devices."
-                                 #elif JUCE_MAC
-                                  "Audio MIDI Setup > Window > Show MIDI Studio > Bluetooth."
-                                 #else
-                                  "the system's Bluetooth settings."
-                                 #endif
-                                  );
+        return;
+    }
+
+    // Windows: pairing happens in Windows Settings.
+    showOverlay ("Bluetooth MIDI", std::make_unique<BluetoothMidiInfo>());
 }
 
 void MainComponent::toggleTuner()
