@@ -120,6 +120,7 @@ namespace TopicShare
         juce::StringArray missing;              // left-out files with no copy here: listed as missing until located
         bool titleChanged = false, notesChanged = false, tagsChanged = false, detailsChanged = false;
         int newMarks = 0;                       // markers / loops added or changed
+        bool assignmentChanged = false;
         bool hasSummary = false;                // a practice summary came with it
         int resourceCount = 0, includedFiles = 0;
 

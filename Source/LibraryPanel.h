@@ -48,6 +48,7 @@ public:
     void showStorage();       // overlay: space used, takes / saved loops / caches to remove
     void shareTopic (const juce::String& topicId);   // overlay: choose files, write the .pvtopic, hand it to the system
     void chooseTopicToImport();
+    void editAssignment (const juce::String& topicId);
 
     /** Opens the topic's first song or YouTube video; false if it has none. */
     bool openFirstMedia (const juce::String& topicId);

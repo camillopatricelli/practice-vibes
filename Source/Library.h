@@ -7,6 +7,15 @@
 namespace pv
 {
 
+/** \u201cText\u201d in curly quotes, and " \u00b7 " (a middle dot between spaces). Written as UTF-8 bytes: MSVC here
+    doesn't compile with /utf-8, so \u escapes in narrow literals would not come out as UTF-8. */
+inline juce::String quoted (const juce::String& text)
+{
+    return juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x9c")) + text + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x9d"));
+}
+
+inline juce::String middleDot()     { return juce::String (juce::CharPointer_UTF8 (" \xc2\xb7 ")); }
+
 /** What a resource is, decided from its file extension or URL. Drives the icon and what "Open" does. */
 enum class ResourceKind
 {
@@ -98,6 +107,24 @@ struct PracticeSummary
     static PracticeSummary fromXml (const juce::XmlElement&);
 };
 
+/** What the teacher asks for on a topic until the next lesson. Travels with the topic; shown beside the student's
+    own plan (Topics tab, Today tab), never replacing it. */
+struct Assignment
+{
+    juce::String goal;                  // "Bars 1-16 clean, then the solo"
+    double targetBpm = 0.0;             // 0 = none
+    int minutesPerDay = 0;              // 0 = none
+    juce::Time nextLesson;              // zero = none (a day: time of day ignored)
+
+    bool isEmpty() const noexcept       { return goal.isEmpty() && targetBpm <= 0.0 && minutesPerDay <= 0 && nextLesson == juce::Time(); }
+
+    /** "Bars 1-16 clean · target 96 bpm · 15 min a day · next lesson Thu 20 Nov" */
+    juce::String describe() const;
+
+    void toXml (juce::XmlElement& parent) const;
+    static Assignment fromXml (const juce::XmlElement&);
+};
+
 /** A practice topic: a folder in the library holding topic.xml and the topic's files. */
 struct Topic
 {
@@ -111,6 +138,7 @@ struct Topic
     bool noGuitar = false;      // ear training, theory...: practice time runs on the clock, not the guitar input
     std::vector<Resource> resources;
     std::vector<SongMark> marks;   // markers and saved loops on the topic's songs and takes
+    Assignment assignment;         // from the teacher (travels with the topic)
 
     // Sharing. Never sent along: kept on this user's devices only.
     juce::String student;               // teachers: who the topic is for (a first name or nickname, typed by the teacher)

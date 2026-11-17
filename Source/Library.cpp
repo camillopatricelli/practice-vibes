@@ -338,6 +338,47 @@ juce::String SongMark::describe() const
     return text.isNotEmpty() ? head + "  " + text : head;
 }
 
+juce::String Assignment::describe() const
+{
+    juce::StringArray parts;
+
+    if (goal.isNotEmpty())          parts.add (goal);
+    if (targetBpm > 0.0)            parts.add ("target " + juce::String (juce::roundToInt (targetBpm)) + " bpm");
+    if (minutesPerDay > 0)          parts.add (juce::String (minutesPerDay) + " min a day");
+    if (nextLesson != juce::Time()) parts.add ("next lesson " + nextLesson.formatted ("%a %d %b"));
+
+    return parts.joinIntoString (middleDot());
+}
+
+void Assignment::toXml (juce::XmlElement& parent) const
+{
+    if (isEmpty())
+        return;
+
+    auto* e = parent.createNewChildElement ("ASSIGNMENT");
+
+    if (targetBpm > 0.0)            e->setAttribute ("bpm", juce::String (targetBpm, 1));
+    if (minutesPerDay > 0)          e->setAttribute ("minutes", minutesPerDay);
+    if (nextLesson != juce::Time()) e->setAttribute ("nextLesson", nextLesson.formatted ("%Y-%m-%d"));
+    if (goal.isNotEmpty())          e->addTextElement (goal);
+}
+
+Assignment Assignment::fromXml (const juce::XmlElement& e)
+{
+    Assignment a;
+    a.goal = e.getAllSubText().trim().substring (0, 500);
+    a.targetBpm = juce::jlimit (0.0, 400.0, e.getDoubleAttribute ("bpm"));
+    a.minutesPerDay = juce::jlimit (0, 600, e.getIntAttribute ("minutes"));
+
+    const auto day = juce::StringArray::fromTokens (e.getStringAttribute ("nextLesson"), "-", {});
+
+    if (day.size() == 3 && day[0].getIntValue() > 2000)
+        a.nextLesson = juce::Time (day[0].getIntValue(), juce::jlimit (1, 12, day[1].getIntValue()) - 1,
+                                   juce::jlimit (1, 31, day[2].getIntValue()), 12, 0);
+
+    return a;
+}
+
 juce::String PracticeSummary::describe() const
 {
     if (isEmpty())
@@ -355,14 +396,14 @@ juce::String PracticeSummary::describe() const
          << sessions << (sessions == 1 ? " session)" : " sessions)");
 
     if (firstBpm > 0.0 && lastBpm > 0.0)
-        text << " \u00b7 tempo " << juce::roundToInt (firstBpm) << (std::abs (firstBpm - lastBpm) >= 1.0 ? " -> " + juce::String (juce::roundToInt (lastBpm)) : juce::String()) << " bpm";
+        text << middleDot() << "tempo " << juce::roundToInt (firstBpm) << (std::abs (firstBpm - lastBpm) >= 1.0 ? " -> " + juce::String (juce::roundToInt (lastBpm)) : juce::String()) << " bpm";
 
     if (firstSpeed > 0.0 && lastSpeed > 0.0)
-        text << " \u00b7 song speed " << juce::roundToInt (firstSpeed * 100.0)
+        text << middleDot() << "song speed " << juce::roundToInt (firstSpeed * 100.0)
              << (std::abs (firstSpeed - lastSpeed) >= 0.01 ? " -> " + juce::String (juce::roundToInt (lastSpeed * 100.0)) : juce::String()) << " %";
 
     if (streakDays > 1)
-        text << " \u00b7 " << streakDays << " days in a row";
+        text << middleDot() << streakDays << " days in a row";
 
     return text;
 }
@@ -528,6 +569,9 @@ bool Library::loadTopic (const juce::File& folder, Topic& topic)
         topic.student = xml->getStringAttribute ("student");
         topic.lastSent = juce::Time::fromISO8601 (xml->getStringAttribute ("lastSent"));
         topic.lastReceived = juce::Time::fromISO8601 (xml->getStringAttribute ("lastReceived"));
+
+        if (auto* assignment = xml->getChildByName ("ASSIGNMENT"))
+            topic.assignment = Assignment::fromXml (*assignment);
 
         if (auto* summary = xml->getChildByName ("PRACTICE_SUMMARY"))
             topic.studentSummary = PracticeSummary::fromXml (*summary);
@@ -801,6 +845,7 @@ std::unique_ptr<juce::XmlElement> Library::topicToXml (const Topic& t)
     if (t.lastSent != juce::Time())             xml.setAttribute ("lastSent", t.lastSent.toISO8601 (true));
     if (t.lastReceived != juce::Time())         xml.setAttribute ("lastReceived", t.lastReceived.toISO8601 (true));
     if (! t.studentSummary.isEmpty())           t.studentSummary.toXml (xml);
+    t.assignment.toXml (xml);
 
     for (auto& r : t.resources)
     {

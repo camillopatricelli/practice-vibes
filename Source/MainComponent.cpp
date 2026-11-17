@@ -863,7 +863,7 @@ void MainComponent::offerToShareLesson (const juce::String& topicId)
 
     juce::AlertWindow::showAsync (juce::MessageBoxOptions{}.withIconType (juce::MessageBoxIconType::QuestionIcon)
                                       .withTitle ("Lesson over")
-                                      .withMessage ("Send \u201c" + topic->title + "\u201d to your student?")
+                                      .withMessage ("Send " + quoted (topic->title) + " to your student?")
                                       .withButton ("Share...", 1).withButton ("Not now", 0)
                                       .withAssociatedComponent (this),
                                   [safe = SafePointer<MainComponent> (this), topicId] (int result)

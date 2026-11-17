@@ -49,6 +49,124 @@ namespace
 }
 
 //==============================================================================
+/** Overlay: the teacher's assignment on a topic (goal, target tempo, minutes a day, next lesson). */
+class AssignmentEditor final : public juce::Component
+{
+public:
+    AssignmentEditor (const Assignment& a, std::function<void (Assignment)> onSave, std::function<void()> onCancel)
+        : saved (std::move (onSave)), cancelled (std::move (onCancel))
+    {
+        getProperties().set ("overlayWidth", 560);
+        getProperties().set ("overlayHeight", 380);
+
+        auto label = [this] (juce::Label& l, const juce::String& text)
+        {
+            l.setText (text, juce::dontSendNotification);
+            l.setJustificationType (juce::Justification::centredRight);
+            addAndMakeVisible (l);
+        };
+
+        label (goalLabel, "Goal");
+        label (bpmLabel, "Target tempo");
+        label (minutesLabel, "Minutes a day");
+        label (lessonLabel, "Next lesson");
+
+        goalEditor.setMultiLine (true, true);
+        goalEditor.setReturnKeyStartsNewLine (true);
+        goalEditor.setText (a.goal, false);
+        goalEditor.setTextToShowWhenEmpty ("e.g. Bars 1-16 clean, then the solo", theme::text().withAlpha (0.35f));
+
+        bpmEditor.setInputRestrictions (3, "0123456789");
+        bpmEditor.setText (a.targetBpm > 0.0 ? juce::String (juce::roundToInt (a.targetBpm)) : juce::String(), false);
+        bpmEditor.setTextToShowWhenEmpty ("bpm (optional)", theme::text().withAlpha (0.35f));
+
+        minutesEditor.setInputRestrictions (3, "0123456789");
+        minutesEditor.setText (a.minutesPerDay > 0 ? juce::String (a.minutesPerDay) : juce::String(), false);
+        minutesEditor.setTextToShowWhenEmpty ("optional", theme::text().withAlpha (0.35f));
+
+        for (auto* e : { &goalEditor, &bpmEditor, &minutesEditor })
+        {
+            styleEditor (*e);
+            addAndMakeVisible (*e);
+        }
+
+        // The next 8 weeks, day by day (id = days from today + 2; 1 = none).
+        lessonBox.addItem ("None", 1);
+        const auto now = juce::Time::getCurrentTime();
+        const juce::Time today (now.getYear(), now.getMonth(), now.getDayOfMonth(), 12, 0);
+        int selected = 1;
+
+        for (int d = 0; d < 56; ++d)
+        {
+            const auto day = today + juce::RelativeTime::days (d);
+            lessonBox.addItem (d == 0 ? "Today" : d == 1 ? "Tomorrow" : day.formatted ("%a %d %b"), d + 2);
+
+            if (a.nextLesson != juce::Time() && day.formatted ("%Y-%m-%d") == a.nextLesson.formatted ("%Y-%m-%d"))
+                selected = d + 2;
+        }
+
+        lessonBox.setSelectedId (selected, juce::dontSendNotification);
+        addAndMakeVisible (lessonBox);
+
+        saveButton.setColour (juce::TextButton::buttonColourId, theme::accent());
+        saveButton.onClick = [this]
+        {
+            Assignment result;
+            result.goal = goalEditor.getText().trim().substring (0, 500);
+            result.targetBpm = juce::jlimit (0.0, 400.0, bpmEditor.getText().getDoubleValue());
+            result.minutesPerDay = juce::jlimit (0, 600, minutesEditor.getText().getIntValue());
+
+            if (lessonBox.getSelectedId() >= 2)
+            {
+                const auto now2 = juce::Time::getCurrentTime();
+                result.nextLesson = juce::Time (now2.getYear(), now2.getMonth(), now2.getDayOfMonth(), 12, 0)
+                                    + juce::RelativeTime::days (lessonBox.getSelectedId() - 2);
+            }
+
+            if (saved) saved (result);
+        };
+        clearButton.onClick = [this] { if (saved) saved ({}); };
+        cancelButton.onClick = [this] { if (cancelled) cancelled(); };
+
+        for (auto* b : { &saveButton, &clearButton, &cancelButton })
+            addAndMakeVisible (*b);
+    }
+
+    void paint (juce::Graphics& g) override    { g.fillAll (theme::background()); }
+
+    void resized() override
+    {
+        auto area = getLocalBounds().reduced (14);
+        auto buttons = area.removeFromBottom (40);
+        saveButton.setBounds (buttons.removeFromRight (120).reduced (2, 3));
+        cancelButton.setBounds (buttons.removeFromRight (110).reduced (2, 3));
+        clearButton.setBounds (buttons.removeFromLeft (150).reduced (2, 3));
+        area.removeFromBottom (10);
+
+        auto row = [&area] (juce::Label& l, juce::Component& c, int height)
+        {
+            auto r = area.removeFromTop (height).reduced (0, 4);
+            l.setBounds (r.removeFromLeft (120).withHeight (30));
+            r.removeFromLeft (10);
+            c.setBounds (r);
+        };
+
+        row (goalLabel, goalEditor, 110);
+        row (bpmLabel, bpmEditor, 40);
+        row (minutesLabel, minutesEditor, 40);
+        row (lessonLabel, lessonBox, 40);
+    }
+
+private:
+    std::function<void (Assignment)> saved;
+    std::function<void()> cancelled;
+    juce::Label goalLabel, bpmLabel, minutesLabel, lessonLabel;
+    juce::TextEditor goalEditor, bpmEditor, minutesEditor;
+    juce::ComboBox lessonBox;
+    juce::TextButton saveButton { "Save" }, clearButton { "No assignment" }, cancelButton { "Cancel" };
+};
+
+//==============================================================================
 /** Title, created date, notes and the resource list of one topic. Files can be dropped onto it (desktop). */
 class LibraryPanel::TopicView final : public juce::Component,
                                       public juce::FileDragAndDropTarget
@@ -93,6 +211,14 @@ public:
         studentEditor.onTextChange = [this] { edited(); };
         studentEditor.onFocusLost = [this] { owner.flush(); };
         addChildComponent (studentEditor);
+
+        assignmentLabel.setColour (juce::Label::textColourId, theme::accent());
+        assignmentLabel.setMinimumHorizontalScale (0.6f);
+        addChildComponent (assignmentLabel);
+        assignmentButton.setTooltip ("Goal, target tempo, minutes a day and the next lesson: they go along when you share "
+                                     "the topic, and show on the student's Today tab");
+        assignmentButton.onClick = [this] { owner.editAssignment (topicId); };
+        addChildComponent (assignmentButton);
 
         summaryLabel.setColour (juce::Label::textColourId, theme::good());
         summaryLabel.setMinimumHorizontalScale (0.6f);
@@ -206,6 +332,12 @@ public:
 
         if (! (sameTopic && keepFocusedEditors && studentEditor.hasKeyboardFocus (true)) && studentEditor.getText() != topic.student)
             studentEditor.setText (topic.student, false);
+
+        assignmentButton.setVisible (teacher);
+        assignmentLabel.setVisible (! topic.assignment.isEmpty() || teacher);
+        assignmentLabel.setText (topic.assignment.isEmpty() ? juce::String ("No assignment yet")
+                                                            : "Assignment: " + topic.assignment.describe(), juce::dontSendNotification);
+        assignmentLabel.setTooltip (topic.assignment.describe());
 
         summaryLabel.setVisible (! topic.studentSummary.isEmpty());
         summaryLabel.setText ("Student's practice (sent " + formatDate (topic.studentSummary.made) + "): " + topic.studentSummary.describe(),
@@ -335,6 +467,16 @@ public:
 
         area.removeFromTop (6);
 
+        if (assignmentLabel.isVisible())
+        {
+            auto row = area.removeFromTop (30);
+
+            if (assignmentButton.isVisible())
+                assignmentButton.setBounds (row.removeFromRight (130).reduced (2, 2));
+
+            assignmentLabel.setBounds (row);
+        }
+
         if (summaryLabel.isVisible())
             summaryLabel.setBounds (area.removeFromTop (26));
 
@@ -399,9 +541,9 @@ private:
 
     LibraryPanel& owner;
     juce::TextEditor titleEditor, tagsEditor, descriptionEditor, privateNotesEditor, studentEditor;
-    juce::Label summaryLabel, createdLabel, notesLabel, privateNotesLabel, resourcesLabel, conflictLabel, noResourcesLabel;
+    juce::Label assignmentLabel, summaryLabel, createdLabel, notesLabel, privateNotesLabel, resourcesLabel, conflictLabel, noResourcesLabel;
     juce::TextButton deleteButton { "Delete topic" }, addFilesButton { "Add files..." }, addLinkButton { "Add link..." },
-                     practiseButton { "Practise" }, shareButton { "Share..." }, historyButton { "History" }, conflictButton { "Choose version..." };
+                     practiseButton { "Practise" }, shareButton { "Share..." }, assignmentButton { "Assignment..." }, historyButton { "History" }, conflictButton { "Choose version..." };
     juce::ToggleButton rotationToggle { "In practice rotation" }, noGuitarToggle { "Timed without playing" };
     juce::Viewport viewport;
     juce::Component rowHolder;
@@ -778,7 +920,35 @@ void LibraryPanel::shareTopic (const juce::String& topicId)
         files.getFirst().revealToUser();
        #endif
     };
-    showOverlay ("Share “" + t->title + "”", std::move (panel));
+    showOverlay ("Share " + quoted (t->title), std::move (panel));
+}
+
+void LibraryPanel::editAssignment (const juce::String& topicId)
+{
+    auto* t = library != nullptr ? library->findTopic (topicId) : nullptr;
+
+    if (t == nullptr || ! showOverlay)
+        return;
+
+    flush();
+    showOverlay ("Assignment: " + t->title, std::make_unique<AssignmentEditor> (t->assignment,
+        [this, topicId] (Assignment a)
+        {
+            if (auto* topic = library != nullptr ? library->findTopic (topicId) : nullptr)
+            {
+                topic->assignment = a;
+                library->saveTopic (*topic);
+                signature = library->computeSignature();
+                showSelection();
+
+                if (onTopicsChanged)
+                    onTopicsChanged();
+            }
+
+            if (hideOverlay)
+                hideOverlay();
+        },
+        [this] { if (hideOverlay) hideOverlay(); }));
 }
 
 void LibraryPanel::chooseTopicToImport()

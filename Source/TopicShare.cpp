@@ -477,6 +477,9 @@ juce::String documentHtml (const Topic& topic, const juce::StringArray& attached
     if (sharedAt != juce::Time())
         html << "<p class=\"date\">Shared on " << sharedAt.formatted ("%d %B %Y") << "</p>\n";
 
+    if (! topic.assignment.isEmpty())
+        html << "<h2>Assignment</h2>\n<div class=\"notes\">" << escapeHtml (topic.assignment.describe().replace (middleDot(), "\n")) << "</div>\n";
+
     if (topic.description.trim().isNotEmpty())
         html << "<h2>Notes</h2>\n<div class=\"notes\">" << escapeHtml (topic.description.trim()) << "</div>\n";
 
@@ -693,6 +696,7 @@ namespace
 bool Preview::changesAnything() const
 {
     return ! updatesExisting || titleChanged || notesChanged || tagsChanged || detailsChanged || newMarks > 0 || hasSummary
+        || assignmentChanged
         || ! newResources.isEmpty() || ! updatedFiles.isEmpty() || ! reconnected.isEmpty();
 }
 
@@ -707,7 +711,7 @@ juce::String Preview::summary() const
 
     if (! updatesExisting)
     {
-        text << "New topic “" << title << "”: " << plural (resourceCount, "resource", "resources");
+        text << "New topic " << quoted (title) << ": " << plural (resourceCount, "resource", "resources");
 
         if (includedFiles > 0)
             text << " (" << plural (includedFiles, "file", "files") << " included)";
@@ -716,13 +720,13 @@ juce::String Preview::summary() const
     }
     else if (! changesAnything())
     {
-        text << "You already have “" << existingTitle << "” as it is in this file: nothing to update.";
+        text << "You already have " << quoted (existingTitle) << " as it is in this file: nothing to update.";
     }
     else
     {
         juce::StringArray changes;
 
-        if (titleChanged)                 changes.add ("renamed to “" + title + "”");
+        if (titleChanged)                 changes.add ("renamed to " + quoted (title));
         if (! newResources.isEmpty())     changes.add (plural (newResources.size(), "new resource", "new resources"));
         if (! updatedFiles.isEmpty())     changes.add (plural (updatedFiles.size(), "updated file", "updated files"));
         if (notesChanged)                 changes.add ("notes changed");
@@ -730,9 +734,10 @@ juce::String Preview::summary() const
         if (detailsChanged)               changes.add ("resource details changed");
         if (newMarks > 0)                 changes.add (plural (newMarks, "new marker or loop", "new markers or loops"));
         if (hasSummary)                   changes.add ("a practice summary");
+        if (assignmentChanged)            changes.add ("new assignment");
         if (! reconnected.isEmpty())      changes.add (plural (reconnected.size(), "file connected", "files connected"));
 
-        text << "Updates your topic “" << existingTitle << "”: " << changes.joinIntoString (", ") << ".";
+        text << "Updates your topic " << quoted (existingTitle) << ": " << changes.joinIntoString (", ") << ".";
     }
 
     if (! missing.isEmpty())
@@ -763,6 +768,7 @@ Preview preview (const Library& library, const Package& package, Mode mode, cons
     }
 
     p.hasSummary = ! package.summary.isEmpty();
+    p.assignmentChanged = incoming.assignment.describe() != (target != nullptr ? target->assignment.describe() : juce::String());
 
     for (auto& m : incoming.marks)
     {
@@ -894,6 +900,11 @@ juce::Result apply (Library& library, const Package& package, Mode mode, const L
 
     for (auto& m : incoming.marks)
         target->setMark (m);
+
+    target->assignment = incoming.assignment;
+
+    if (isNew && ! incoming.assignment.isEmpty())
+        target->inRotation = true;   // homework: offered on the Today tab (the receiver can switch it off)
 
     if (! package.summary.isEmpty())
         target->studentSummary = package.summary;

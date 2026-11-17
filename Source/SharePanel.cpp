@@ -396,7 +396,7 @@ void ImportPanel::refresh()
 void ImportPanel::locate (const juce::String& fileName)
 {
     const auto ext = juce::File::createFileWithoutCheckingPath (fileName).getFileExtension();
-    chooser = std::make_unique<juce::FileChooser> ("Where is “" + fileName + "”?", juce::File(),
+    chooser = std::make_unique<juce::FileChooser> ("Where is " + quoted (fileName) + "?", juce::File(),
                                                    ext.isNotEmpty() ? "*" + ext : "*");
 
     chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,

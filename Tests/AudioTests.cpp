@@ -4752,6 +4752,37 @@ static void testTopicShare()
         check (package != nullptr && package->topic.id != topicId && package->topic.marks.size() == 2, "fresh copy: new id, marks kept");
     }
 
+    // Assignment: saved, travels, a new imported topic with one goes into the rotation.
+    {
+        auto* t = teacher.findTopic (topicId);
+        t->assignment.goal = "Bars 1-16 clean";
+        t->assignment.targetBpm = 96;
+        t->assignment.minutesPerDay = 15;
+        t->assignment.nextLesson = juce::Time (2026, 10, 20, 12, 0);   // 20 Nov 2026
+        teacher.saveTopic (*t);
+        teacher.rescan();
+        t = teacher.findTopic (topicId);
+        check (t->assignment.targetBpm == 96 && t->assignment.minutesPerDay == 15
+                   && t->assignment.nextLesson.formatted ("%Y-%m-%d") == "2026-11-20"
+                   && t->assignment.describe() == "Bars 1-16 clean" + middleDot() + "target 96 bpm" + middleDot() + "15 min a day" + middleDot() + "next lesson Fri 20 Nov",
+               "assignment saved: " + t->assignment.describe());
+
+        TopicShare::ExportOptions options;
+        options.asNewTopic = true;
+        TopicShare::write (*t, options, pvtopic);
+        juce::String error, importedId;
+        auto package = TopicShare::open (pvtopic, error);
+
+        if (package == nullptr)
+            return;
+
+        check (TopicShare::preview (student, *package, TopicShare::Mode::update, {}).summary().startsWith ("New topic"), "fresh copy imports as new");
+        TopicShare::apply (student, *package, TopicShare::Mode::update, {}, importedId);
+        student.rescan();
+        auto* s = student.findTopic (importedId);
+        check (s != nullptr && s->assignment.goal == "Bars 1-16 clean" && s->inRotation, "assignment travels; homework goes into the rotation");
+    }
+
     // Document for people without the app: a web page + the chosen files.
     {
         auto* t = teacher.findTopic (topicId);

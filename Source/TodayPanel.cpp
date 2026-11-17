@@ -53,6 +53,7 @@ public:
     }
 
     std::function<void (const juce::String&)> onPractise, onShow, onHistory;
+    juce::String assignmentText;    // the teacher's assignment and today's progress, if the topic has one
 
     void paint (juce::Graphics& g) override
     {
@@ -88,7 +89,12 @@ public:
         g.setColour (theme::text().withAlpha (0.6f));
         auto detail = progressText (summary);
 
-        if (! tags.isEmpty())
+        if (assignmentText.isNotEmpty())
+        {
+            g.setColour (theme::good());
+            detail = assignmentText;
+        }
+        else if (! tags.isEmpty())
             detail << (detail.isNotEmpty() ? "     " : "") << "#" << tags.joinIntoString ("  #");
 
         g.drawText (detail, line, juce::Justification::centredLeft, true);
@@ -472,6 +478,42 @@ void TodayPanel::refresh()
     for (auto& [topic, summary] : rotation)
     {
         auto row = std::make_unique<RotationRow> (*topic, summary, topic->id == tracker.getActiveTopicId());
+
+        if (const auto& a = topic->assignment; ! a.isEmpty())
+        {
+            // "Teacher: 5 / 15 min today · target 96 bpm (last 88) · lesson Thu 20 Nov"
+            juce::StringArray parts;
+
+            if (a.minutesPerDay > 0)
+            {
+                const auto now = juce::Time::getCurrentTime();
+                const juce::Time midnight (now.getYear(), now.getMonth(), now.getDayOfMonth(), 0, 0);
+                double today = 0.0;
+
+                if (log != nullptr)
+                    for (auto* e : log->historyFor (topic->id))
+                        if (e->start >= midnight)
+                            today += e->playedSeconds;
+
+                if (auto* current = tracker.getCurrent(); current != nullptr && current->topicId == topic->id && current->start >= midnight)
+                    today += current->playedSeconds;
+
+                parts.add (juce::String (juce::roundToInt (today / 60.0)) + " / " + juce::String (a.minutesPerDay) + " min today");
+            }
+
+            if (a.targetBpm > 0.0)
+                parts.add ("target " + juce::String (juce::roundToInt (a.targetBpm)) + " bpm"
+                           + (summary.lastBpm > 0.0 ? " (last " + juce::String (juce::roundToInt (summary.lastBpm)) + ")" : juce::String()));
+
+            if (a.nextLesson != juce::Time())
+                parts.add ("lesson " + a.nextLesson.formatted ("%a %d %b"));
+
+            if (parts.isEmpty())
+                parts.add (a.goal);
+
+            row->assignmentText = "Teacher: " + parts.joinIntoString (middleDot());
+            row->setTooltip ("Assignment: " + a.describe());
+        }
         row->onPractise = [this] (const juce::String& id) { if (onPractise) onPractise (id); };
         row->onShow = [this] (const juce::String& id) { if (onShowTopic) onShowTopic (id); };
         row->onHistory = [this] (const juce::String& id) { if (onShowHistory) onShowHistory (id); };
