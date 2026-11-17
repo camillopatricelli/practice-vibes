@@ -23,6 +23,7 @@
 #include "../Source/Stems.h"
 #include "../Source/AacFile.h"
 #include "../Source/Take.h"
+#include "../Source/TopicShare.h"
 #include "../Source/Tuner.h"
 #include "../Source/GainMeterProcessor.h"
 
@@ -4478,6 +4479,214 @@ static void stemsDeveloperRun()
     out.write (stems.data(), stems.size() * sizeof (float));
 }
 
+static void testTopicShare()
+{
+    std::cout << "Topic sharing (.pvtopic)" << std::endl;
+
+    juce::TemporaryFile tempA, tempB, tempOut;
+    const auto rootA = tempA.getFile(), rootB = tempB.getFile(), out = tempOut.getFile();
+    rootA.createDirectory(); rootB.createDirectory(); out.createDirectory();
+
+    auto writeFile = [] (const juce::File& f, int bytes, int seed)
+    {
+        juce::MemoryBlock data ((size_t) bytes);
+        for (int i = 0; i < bytes; ++i)
+            static_cast<char*> (data.getData())[i] = (char) (i * 7 + seed);
+        f.replaceWithData (data.getData(), data.getSize());
+    };
+
+    juce::String topicId;
+    const auto pvtopic = out.getChildFile ("Autumn Leaves.pvtopic");
+
+    // Teacher: a PDF, a song (left out by default), a link, private notes, rotation on.
+    Library teacher (rootA);
+    {
+        auto* t = teacher.createTopic ("Autumn Leaves");
+        topicId = t->id;
+        writeFile (t->folder.getChildFile ("Lead sheet.pdf"), 3000, 1);
+        writeFile (t->folder.getChildFile ("Autumn Leaves.mp3"), 50000, 2);
+        teacher.rescan();
+        t = teacher.findTopic (topicId);
+        t->description = "Bars 1-8, then the solo";
+        t->privateNotes = "Student struggles with the bridge";
+        t->inRotation = true;
+        t->tags = parseTags ("jazz");
+        teacher.addLink (*t, "Chet Baker", "https://www.youtube.com/watch?v=abc");
+        teacher.saveTopic (*t);
+
+        const auto items = TopicShare::listFiles (*t);
+        check (items.size() == 2, "share list: the topic's two files");
+
+        bool pdfIn = false, songOut = false;
+        juce::StringArray included;
+
+        for (auto& item : items)
+        {
+            if (item.fileName == "Lead sheet.pdf") pdfIn = item.include;
+            if (item.fileName == "Autumn Leaves.mp3") songOut = ! item.include && item.isSong;
+            if (item.include) included.add (item.fileName);
+        }
+
+        check (pdfIn && songOut, "default ticks: document in, song out");
+        check (TopicShare::sizeHint (12 * 1024 * 1024).contains ("fits in an email")
+                   && ! TopicShare::sizeHint (40 * 1024 * 1024).contains ("fits"), "size hint: email limit");
+
+        TopicShare::ExportOptions options;
+        options.includedFiles = included;
+        check (TopicShare::write (*t, options, pvtopic).wasOk() && pvtopic.existsAsFile(), "write .pvtopic");
+    }
+
+    {
+        juce::ZipFile zip (pvtopic);
+        check (zip.getEntry ("topic.xml") != nullptr && zip.getEntry ("Lead sheet.pdf") != nullptr
+                   && zip.getEntry ("Autumn Leaves.mp3") == nullptr, "zip holds topic.xml + chosen files only");
+
+        std::unique_ptr<juce::InputStream> in (zip.createStreamForEntry (*zip.getEntry ("topic.xml")));
+        const auto text = in != nullptr ? in->readEntireStreamAsString() : juce::String();
+        check (text.contains (topicId) && ! text.contains ("bridge") && ! text.contains ("rotation"),
+               "shared topic.xml keeps the id, drops private notes and rotation");
+    }
+
+    // Student: has the song already in another topic (same name and size) -> reconnected.
+    Library student (rootB);
+    {
+        auto* other = student.createTopic ("Songs");
+        writeFile (other->folder.getChildFile ("Autumn Leaves.mp3"), 50000, 2);
+        student.rescan();
+
+        juce::String error;
+        auto package = TopicShare::open (pvtopic, error);
+        check (package != nullptr && error.isEmpty(), "open .pvtopic " + error);
+
+        if (package == nullptr)
+            return;
+
+        check (package->topic.id == topicId && package->topic.privateNotes.isEmpty() && package->isIncluded ("Lead sheet.pdf")
+                   && ! package->isIncluded ("Autumn Leaves.mp3"), "package: id, no private notes, which files came");
+
+        const auto p = TopicShare::preview (student, *package, TopicShare::Mode::update, {});
+        check (! p.updatesExisting && p.resourceCount == 3 && p.reconnected.contains ("Autumn Leaves.mp3") && p.missing.isEmpty(),
+               "preview: new topic, song found in the library by name + size");
+
+        juce::String importedId;
+        check (TopicShare::apply (student, *package, TopicShare::Mode::update, {}, importedId).wasOk() && importedId == topicId,
+               "import as new topic keeps the id");
+        student.rescan();
+
+        auto* t = student.findTopic (topicId);
+        check (t != nullptr && t->folder.getChildFile ("Autumn Leaves.mp3").getSize() == 50000
+                   && t->folder.getChildFile ("Lead sheet.pdf").getSize() == 3000 && t->description == "Bars 1-8, then the solo"
+                   && ! t->inRotation && t->resources.size() == 3, "imported: files, notes, link");
+
+        if (t == nullptr)
+            return;
+
+        t->privateNotes = "My own notes";
+        t->inRotation = true;
+        student.saveTopic (*t);
+    }
+
+    // Teacher updates the topic: new PDF, notes changed; re-import updates instead of duplicating.
+    {
+        auto* t = teacher.findTopic (topicId);
+        writeFile (t->folder.getChildFile ("Exercise 2.pdf"), 1200, 3);
+        writeFile (t->folder.getChildFile ("Lead sheet.pdf"), 3100, 4);
+        teacher.rescan();
+        t = teacher.findTopic (topicId);
+        t->description = "Now the whole tune";
+        teacher.saveTopic (*t);
+
+        TopicShare::ExportOptions options;
+        options.includedFiles = { "Lead sheet.pdf", "Exercise 2.pdf" };
+        check (TopicShare::write (*t, options, pvtopic).wasOk(), "write the updated topic");
+
+        juce::String error;
+        auto package = TopicShare::open (pvtopic, error);
+
+        if (package == nullptr)
+            return;
+
+        const auto p = TopicShare::preview (student, *package, TopicShare::Mode::update, {});
+        check (p.updatesExisting && p.newResources.size() == 1 && p.updatedFiles.contains ("Lead sheet.pdf") && p.notesChanged,
+               "preview of an update: 1 new resource, 1 updated file, notes changed");
+        check (p.summary().contains ("Updates your topic"), "update summary text");
+
+        const auto topicsBefore = student.getTopics().size();
+        juce::String importedId;
+        check (TopicShare::apply (student, *package, TopicShare::Mode::update, {}, importedId).wasOk(), "apply update");
+        student.rescan();
+
+        auto* s = student.findTopic (topicId);
+        check (student.getTopics().size() == topicsBefore && s != nullptr && s->description == "Now the whole tune"
+                   && s->privateNotes == "My own notes" && s->inRotation && s->folder.getChildFile ("Lead sheet.pdf").getSize() == 3100
+                   && s->folder.getChildFile ("Exercise 2.pdf").existsAsFile(),
+               "update: same topic, receiver's private notes and rotation kept, files replaced/added");
+
+        const auto again = TopicShare::preview (student, *package, TopicShare::Mode::update, {});
+        check (! again.changesAnything(), "same file twice: nothing to update");
+
+        check (TopicShare::apply (student, *package, TopicShare::Mode::copy, {}, importedId).wasOk() && importedId != topicId,
+               "import as copy: new id");
+        student.rescan();
+        check (student.getTopics().size() == topicsBefore + 1, "copy is a second topic");
+    }
+
+    // A song nobody has: listed as missing; a located file fills it in.
+    {
+        auto* t = teacher.findTopic (topicId);
+        writeFile (t->folder.getChildFile ("Rare song.mp3"), 7000, 5);
+        teacher.rescan();
+        t = teacher.findTopic (topicId);
+
+        TopicShare::ExportOptions options;
+        options.includedFiles = { "Lead sheet.pdf" };
+        TopicShare::write (*t, options, pvtopic);
+
+        juce::String error;
+        auto package = TopicShare::open (pvtopic, error);
+
+        if (package == nullptr)
+            return;
+
+        auto p = TopicShare::preview (student, *package, TopicShare::Mode::update, {});
+        check (p.missing.contains ("Rare song.mp3"), "left-out file nobody has: missing");
+
+        const auto located = out.getChildFile ("my copy.mp3");
+        writeFile (located, 7000, 5);
+        TopicShare::LocatedFiles chosen { { "Rare song.mp3", located } };
+        p = TopicShare::preview (student, *package, TopicShare::Mode::update, chosen);
+        check (p.missing.isEmpty() && p.reconnected.contains ("Rare song.mp3"), "located file connects it");
+
+        juce::String importedId;
+        TopicShare::apply (student, *package, TopicShare::Mode::update, chosen, importedId);
+        student.rescan();
+        check (student.findTopic (topicId)->folder.getChildFile ("Rare song.mp3").getSize() == 7000, "located file copied in");
+    }
+
+    // Hostile zip: names that climb out of the folder are never extracted.
+    {
+        const auto evil = out.getChildFile ("evil.pvtopic");
+        juce::ZipFile::Builder zip;
+        const juce::String xml = "<TOPIC id=\"x\" title=\"Evil\"/>";
+        zip.addEntry (std::make_unique<juce::MemoryInputStream> (xml.toRawUTF8(), xml.getNumBytesAsUTF8(), true), 0, "topic.xml", {});
+        zip.addEntry (std::make_unique<juce::MemoryInputStream> ("bad", 3, true), 0, "../escaped.txt", {});
+        zip.addEntry (std::make_unique<juce::MemoryInputStream> ("bad", 3, true), 0, "sub/inner.txt", {});
+        {
+            juce::FileOutputStream os (evil);
+            zip.writeToStream (os, nullptr);
+        }
+
+        juce::String error;
+        auto package = TopicShare::open (evil, error);
+        check (package != nullptr && ! package->stage.getParentDirectory().getChildFile ("escaped.txt").exists()
+                   && ! package->stage.getChildFile ("sub").exists(), "zip-slip names ignored");
+
+        const auto notTopic = out.getChildFile ("plain.pvtopic");
+        notTopic.replaceWithText ("hello");
+        check (TopicShare::open (notTopic, error) == nullptr && error.isNotEmpty(), "not a topic file: clear error");
+    }
+}
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI juceInit;
@@ -4505,6 +4714,7 @@ int main()
     testTuner();
     testTunings();
     testLibrary();
+    testTopicShare();
     testLinks();
     testPracticeLog();
     testLogCorrections();

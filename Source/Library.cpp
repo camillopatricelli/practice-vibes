@@ -388,6 +388,9 @@ bool Library::loadTopic (const juce::File& folder, Topic& topic)
         if (auto* d = xml->getChildByName ("DESCRIPTION"))
             topic.description = d->getAllSubText();
 
+        if (auto* d = xml->getChildByName ("PRIVATE_NOTES"))
+            topic.privateNotes = d->getAllSubText();
+
         for (auto* e : xml->getChildWithTagNameIterator ("RESOURCE"))
         {
             Resource r;
@@ -581,7 +584,7 @@ juce::File Library::uniqueChild (const juce::File& folder, const juce::String& f
     return file;
 }
 
-Topic* Library::createTopic (const juce::String& title)
+Topic* Library::createTopic (const juce::String& title, const juce::String& topicId)
 {
     auto cleanTitle = title.trim();
 
@@ -599,7 +602,7 @@ Topic* Library::createTopic (const juce::String& title)
         return nullptr;
 
     Topic t;
-    t.id = juce::Uuid().toDashedString();
+    t.id = topicId.isNotEmpty() && findTopic (topicId) == nullptr ? topicId : juce::Uuid().toDashedString();
     t.title = cleanTitle;
     t.created = juce::Time::getCurrentTime();
     t.folder = folder;
@@ -613,9 +616,10 @@ Topic* Library::createTopic (const juce::String& title)
     return findTopic (id);
 }
 
-bool Library::saveTopic (const Topic& t)
+std::unique_ptr<juce::XmlElement> Library::topicToXml (const Topic& t)
 {
-    juce::XmlElement xml ("TOPIC");
+    auto xmlPtr = std::make_unique<juce::XmlElement> ("TOPIC");
+    auto& xml = *xmlPtr;
     xml.setAttribute ("id", t.id);
     xml.setAttribute ("title", t.title);
     xml.setAttribute ("created", t.created.toISO8601 (true));
@@ -630,6 +634,9 @@ bool Library::saveTopic (const Topic& t)
         xml.setAttribute ("noGuitar", true);
 
     xml.createNewChildElement ("DESCRIPTION")->addTextElement (t.description);
+
+    if (t.privateNotes.isNotEmpty())
+        xml.createNewChildElement ("PRIVATE_NOTES")->addTextElement (t.privateNotes);
 
     for (auto& r : t.resources)
     {
@@ -655,8 +662,14 @@ bool Library::saveTopic (const Topic& t)
             e->createNewChildElement ("DESCRIPTION")->addTextElement (r.description);
     }
 
+    return xmlPtr;
+}
+
+bool Library::saveTopic (const Topic& t)
+{
+    const auto xml = topicToXml (t);
     t.folder.createDirectory();
-    return writeTopicFile (t.folder, xml.toString());
+    return writeTopicFile (t.folder, xml->toString());
 }
 
 bool Library::writeTopicFile (const juce::File& folder, const juce::String& text)

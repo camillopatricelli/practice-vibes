@@ -514,6 +514,13 @@ void MainComponent::timerCallback()
     updateRecordButton();
 }
 
+void MainComponent::openSharedTopic (const juce::File& file)
+{
+    closeOverlay();
+    showTab (libraryPanel.get());
+    libraryPanel->importSharedTopic (file);
+}
+
 void MainComponent::showTab (juce::Component* content)
 {
     for (int i = 0; i < tabs.getNumTabs(); ++i)

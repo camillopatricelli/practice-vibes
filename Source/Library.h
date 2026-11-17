@@ -63,7 +63,8 @@ struct Topic
     juce::String id;            // UUID, or "dir:<folder name>" for folders made outside the app
     juce::Time created;
     juce::String title;
-    juce::String description;
+    juce::String description;   // the topic's notes: they travel when the topic is shared
+    juce::String privateNotes;  // "My private notes": never leave the device (stripped from shared topics)
     juce::StringArray tags;
     bool inRotation = false;    // offered on the Today tab ("haven't practised since...")
     bool noGuitar = false;      // ear training, theory...: practice time runs on the clock, not the guitar input
@@ -119,7 +120,8 @@ public:
     /** Every tag used by a topic or resource, sorted, with the first spelling found. */
     juce::StringArray getAllTags() const;
 
-    Topic* createTopic (const juce::String& title);
+    /** New topic folder + topic.xml. topicId: keep this id (a shared topic), unless empty or already used. */
+    Topic* createTopic (const juce::String& title, const juce::String& topicId = {});
     bool saveTopic (const Topic&);
     bool deleteTopic (const juce::String& topicId);
 
@@ -171,8 +173,13 @@ public:
     static constexpr const char* topicFileName = "topic.xml";
     static constexpr const char* topicTempFileName = ".topic.xml.tmp";
 
-private:
+    /** Reads a topic folder (topic.xml + files it doesn't list). Also used on unpacked shared topics. */
     static bool loadTopic (const juce::File& folder, Topic&);
+
+    /** What saveTopic() writes to topic.xml. */
+    static std::unique_ptr<juce::XmlElement> topicToXml (const Topic&);
+
+private:
     static bool writeTopicFile (const juce::File& folder, const juce::String& text);
     void sortTopics();
     juce::File uniqueChild (const juce::File& folder, const juce::String& fileName) const;

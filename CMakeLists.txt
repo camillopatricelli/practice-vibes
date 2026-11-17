@@ -74,11 +74,23 @@ if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         file(GLOB found ${PV_ONNXRUNTIME_DIR}/lib/*)
         message(FATAL_ERROR "ONNX Runtime dylib not found at ${PV_ONNXRUNTIME_LIB}; lib/ holds: ${found}")
     endif()
-    # Finder's "Open With" lists the app for these song files (they arrive in anotherInstanceStarted).
-    set(PV_DOCUMENT_EXTENSIONS wav aif aiff flac mp3 m4a aac ogg)
 else()
     set(PV_MACOS FALSE)
-    set(PV_DOCUMENT_EXTENSIONS "")
+endif()
+
+# Document types (Info.plist, Apple platforms). Shared topics (.pvtopic) open the app with the import preview on
+# macOS and iOS (Mail / WhatsApp / Files "Open in"); macOS also offers "Open With" for song files. Written here
+# instead of DOCUMENT_EXTENSIONS, which can't declare our own file type (UTExportedTypeDeclarations).
+set(PV_TOPIC_UTI io.github.joefrezza.practicevibes.topic)
+set(PV_TOPIC_DOCTYPE "<dict><key>CFBundleTypeName</key><string>Practice Vibes topic</string><key>CFBundleTypeRole</key><string>Editor</string><key>LSHandlerRank</key><string>Owner</string><key>LSItemContentTypes</key><array><string>${PV_TOPIC_UTI}</string></array></dict>")
+set(PV_TOPIC_UTTYPE "<key>UTExportedTypeDeclarations</key><array><dict><key>UTTypeIdentifier</key><string>${PV_TOPIC_UTI}</string><key>UTTypeDescription</key><string>Practice Vibes topic</string><key>UTTypeConformsTo</key><array><string>public.data</string><string>public.content</string></array><key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>pvtopic</string></array><key>public.mime-type</key><array><string>application/x-practicevibes-topic</string></array></dict></dict></array>")
+if(PV_MACOS)
+    set(PV_SONG_DOCTYPE "<dict><key>CFBundleTypeName</key><string>Audio file</string><key>CFBundleTypeRole</key><string>Viewer</string><key>LSHandlerRank</key><string>Alternate</string><key>CFBundleTypeExtensions</key><array><string>wav</string><string>aif</string><string>aiff</string><string>flac</string><string>mp3</string><string>m4a</string><string>aac</string><string>ogg</string></array></dict>")
+    set(PV_PLIST_TO_MERGE "<plist><dict><key>CFBundleDocumentTypes</key><array>${PV_TOPIC_DOCTYPE}${PV_SONG_DOCTYPE}</array>${PV_TOPIC_UTTYPE}</dict></plist>")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(PV_PLIST_TO_MERGE "<plist><dict><key>CFBundleDocumentTypes</key><array>${PV_TOPIC_DOCTYPE}</array>${PV_TOPIC_UTTYPE}<key>LSSupportsOpeningDocumentsInPlace</key><false/></dict></plist>")
+else()
+    set(PV_PLIST_TO_MERGE "")
 endif()
 
 # Treat third-party headers as system headers so our strict warnings don't apply to them.
@@ -119,7 +131,7 @@ juce_add_gui_app(PracticeVibes
     NEEDS_WEB_BROWSER              TRUE
     NEEDS_WEBVIEW2                 ${PV_WEBVIEW2}
     NEEDS_CURL                     FALSE
-    DOCUMENT_EXTENSIONS            ${PV_DOCUMENT_EXTENSIONS})
+    PLIST_TO_MERGE                 "${PV_PLIST_TO_MERGE}")
 
 target_sources(PracticeVibes PRIVATE
     Source/Main.cpp
@@ -165,6 +177,8 @@ target_sources(PracticeVibes PRIVATE
     Source/Stems.cpp
     Source/Take.cpp
     Source/TodayPanel.cpp
+    Source/TopicShare.cpp
+    Source/SharePanel.cpp
     Source/Theme.cpp
     Source/Tuner.cpp
     Source/TunerPanel.cpp
@@ -183,7 +197,8 @@ target_compile_definitions(PracticeVibes PRIVATE
 
 # iPad: exported mixes go out through the share sheet; library folders in cloud drives need folder access (bookmarks).
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    target_sources(PracticeVibes PRIVATE Source/FolderAccess_ios.mm Source/BluetoothMidiView_ios.mm Source/PracticeInput_ios.mm)
+    target_sources(PracticeVibes PRIVATE Source/FolderAccess_ios.mm Source/BluetoothMidiView_ios.mm Source/PracticeInput_ios.mm
+                                         Source/OpenUrl_ios.mm)
     target_compile_definitions(PracticeVibes PRIVATE JUCE_CONTENT_SHARING=1)
 endif()
 
@@ -199,6 +214,7 @@ endif()
 # macOS: VST3 plugins too (AudioUnits are hosted on all Apple platforms via PLUGINHOST_AU).
 if(PV_MACOS)
     target_compile_definitions(PracticeVibes PRIVATE JUCE_PLUGINHOST_VST3=1)
+    target_sources(PracticeVibes PRIVATE Source/SharePicker_mac.mm)
 endif()
 
 # Adds ONNX Runtime's headers to a target and ships the runtime library with it: next to the executable
@@ -298,6 +314,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         Source/Stems.cpp
         Source/Take.cpp
         Source/Theme.cpp
+        Source/TopicShare.cpp
         Source/Tuner.cpp)
 
     pv_use_onnxruntime(PracticeVibesTests)

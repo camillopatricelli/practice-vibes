@@ -3,6 +3,8 @@
 #include "AppLog.h"
 #include "AppPaths.h"
 #include "MainComponent.h"
+#include "SharePicker.h"
+#include "TopicShare.h"
 #include "StoragePanel.h"
 #include "Theme.h"
 #include "WarmLookAndFeel.h"
@@ -112,6 +114,13 @@ public:
         engine->start();
         mainWindow->showMaximised();    // desktop: shown only once the blocking start-up work is done
 
+       #if JUCE_WINDOWS
+        registerTopicFileType();
+       #endif
+       #if JUCE_IOS
+        installOpenUrlHandler ([this] (const juce::File& f) { openSharedTopic (f); });
+       #endif
+
         openSongFrom (commandLine);
     }
 
@@ -150,8 +159,45 @@ public:
     }
 
 private:
+    void openSharedTopic (const juce::File& file)
+    {
+        if (mainWindow != nullptr)
+            if (auto* main = dynamic_cast<MainComponent*> (mainWindow->getContentComponent()))
+                main->openSharedTopic (file);
+    }
+
+   #if JUCE_WINDOWS
+    /** Double-clicking a .pvtopic opens this app (per user, no admin rights): HKCU\Software\Classes. Rewritten only
+        when it points elsewhere (e.g. the app moved), then Explorer is told the associations changed. */
+    static void registerTopicFileType()
+    {
+        const auto exe = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getFullPathName();
+        const juce::String classes = "HKEY_CURRENT_USER\\Software\\Classes\\", progId = "PracticeVibes.Topic";
+        const auto command = "\"" + exe + "\" \"%1\"";
+
+        // A path ending in a backslash means the key's default value.
+        if (juce::WindowsRegistry::getValue (classes + progId + "\\shell\\open\\command\\") == command
+            && juce::WindowsRegistry::getValue (classes + ".pvtopic\\") == progId)
+            return;
+
+        bool ok = juce::WindowsRegistry::setValue (classes + ".pvtopic\\", progId);
+        ok = juce::WindowsRegistry::setValue (classes + ".pvtopic\\Content Type", juce::String ("application/x-practicevibes-topic")) && ok;
+        ok = juce::WindowsRegistry::setValue (classes + progId + "\\", juce::String ("Practice Vibes topic")) && ok;
+        ok = juce::WindowsRegistry::setValue (classes + progId + "\\DefaultIcon\\", "\"" + exe + "\",0") && ok;
+        ok = juce::WindowsRegistry::setValue (classes + progId + "\\shell\\open\\command\\", command) && ok;
+        juce::Logger::writeToLog (juce::String (ok ? "Registered" : "Could not register") + " .pvtopic files for " + exe);
+
+        using ChangeNotify = void (__stdcall*) (long, unsigned int, const void*, const void*);
+        static juce::DynamicLibrary shell ("shell32.dll");
+
+        if (auto notify = (ChangeNotify) shell.getFunction ("SHChangeNotify"))
+            notify (0x08000000 /* SHCNE_ASSOCCHANGED */, 0 /* SHCNF_IDLIST */, nullptr, nullptr);
+    }
+   #endif
+
     /** Opens the first existing absolute file path in a command line in the player (desktop only). The whole line is
-        tried first (an unquoted path with spaces), then each token (JUCE on macOS quotes paths that contain spaces). */
+        tried first (an unquoted path with spaces), then each token (JUCE on macOS quotes paths that contain spaces).
+        A shared topic (.pvtopic) opens the import preview instead. */
     void openSongFrom (const juce::String& commandLine)
     {
        #if ! (JUCE_IOS || JUCE_ANDROID)
@@ -168,6 +214,14 @@ private:
             if (candidate.isNotEmpty() && juce::File::isAbsolutePath (candidate) && juce::File (candidate).existsAsFile())
             {
                 juce::Logger::writeToLog ("Opening " + candidate);
+
+                if (TopicShare::isSharedTopicFile (juce::File (candidate)))
+                {
+                    // After start-up work queued on the message thread (the library is opened by then).
+                    juce::MessageManager::callAsync ([this, file = juce::File (candidate)] { openSharedTopic (file); });
+                    return;
+                }
+
                 engine->player->loadAsync (juce::URL (juce::File (candidate)), {});
                 return;
             }

@@ -3,6 +3,8 @@
 #include "AppPaths.h"
 #include "FolderAccess.h"
 #include "LoopFiles.h"
+#include "SharePanel.h"
+#include "SharePicker.h"
 #include "StoragePanel.h"
 #include "Theme.h"
 #include "WebView.h"
@@ -19,6 +21,12 @@ namespace
     juce::String formatDate (juce::Time t)
     {
         return t == juce::Time() ? juce::String() : t.formatted ("%d %b %Y");
+    }
+
+    /** Desktop: where shared topics are written before they're attached to a mail or a message. */
+    juce::File sharedTopicsFolder()
+    {
+        return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("Practice Vibes").getChildFile ("Shared topics");
     }
 
     /** Files the in-app viewer can show on this platform (others open in their own app on desktop). */
@@ -84,6 +92,10 @@ public:
         practiseButton.setColour (juce::TextButton::buttonColourId, theme::accent());
         addAndMakeVisible (practiseButton);
 
+        shareButton.onClick = [this] { owner.shareTopic (topicId); };
+        shareButton.setTooltip ("Send this topic to a teacher, a student or a bandmate as one .pvtopic file: you choose which files go in");
+        addAndMakeVisible (shareButton);
+
         historyButton.onClick = [this] { if (owner.onShowHistory) owner.onShowHistory (topicId); };
         historyButton.setTooltip ("Tempo, song speed and minutes over the weeks, and every session");
         addAndMakeVisible (historyButton);
@@ -98,6 +110,18 @@ public:
         addAndMakeVisible (noGuitarToggle);
 
         addAndMakeVisible (styleCaption (notesLabel, "Notes"));
+        notesLabel.setTooltip ("These notes travel with the topic when you share it");
+        addAndMakeVisible (styleCaption (privateNotesLabel, "Private notes"));
+        privateNotesLabel.setTooltip ("Only for you: never included when you share the topic");
+        privateNotesEditor.setMultiLine (true, true);
+        privateNotesEditor.setReturnKeyStartsNewLine (true);
+        privateNotesEditor.setScrollbarsShown (true);
+        privateNotesEditor.setFont (juce::FontOptions (15.0f));
+        privateNotesEditor.setTextToShowWhenEmpty ("Only for you: never shared", theme::text().withAlpha (0.35f));
+        styleEditor (privateNotesEditor);
+        privateNotesEditor.onTextChange = [this] { edited(); };
+        privateNotesEditor.onFocusLost = [this] { owner.flush(); };
+        addAndMakeVisible (privateNotesEditor);
         descriptionEditor.setMultiLine (true, true);
         descriptionEditor.setReturnKeyStartsNewLine (true);
         descriptionEditor.setScrollbarsShown (true);
@@ -148,6 +172,9 @@ public:
 
         if (! (sameTopic && keepFocusedEditors && descriptionEditor.hasKeyboardFocus (true)) && descriptionEditor.getText() != topic.description)
             descriptionEditor.setText (topic.description, false);
+
+        if (! (sameTopic && keepFocusedEditors && privateNotesEditor.hasKeyboardFocus (true)) && privateNotesEditor.getText() != topic.privateNotes)
+            privateNotesEditor.setText (topic.privateNotes, false);
 
         if (! (sameTopic && keepFocusedEditors && tagsEditor.hasKeyboardFocus (true)) && parseTags (tagsEditor.getText()) != topic.tags)
             tagsEditor.setText (joinTags (topic.tags), false);
@@ -209,6 +236,7 @@ public:
 
         auto top = area.removeFromTop (44);
         deleteButton.setBounds (top.removeFromRight (120).reduced (2, 4));
+        shareButton.setBounds (top.removeFromRight (90).reduced (2, 4));
         practiseButton.setBounds (top.removeFromRight (100).reduced (2, 4));
         top.removeFromRight (8);
         if (! narrow)
@@ -238,9 +266,28 @@ public:
             tagsEditor.setBounds (tagsRow);
         }
         area.removeFromTop (4);
-        notesLabel.setBounds (area.removeFromTop (26));
         const auto notesHeight = juce::jlimit (110, 360, (int) (area.getHeight() * 0.38f));
-        descriptionEditor.setBounds (area.removeFromTop (notesHeight));
+
+        if (narrow)
+        {
+            // Shared notes on top, private notes under them (smaller).
+            notesLabel.setBounds (area.removeFromTop (26));
+            descriptionEditor.setBounds (area.removeFromTop (notesHeight * 3 / 5));
+            privateNotesLabel.setBounds (area.removeFromTop (26));
+            privateNotesEditor.setBounds (area.removeFromTop (notesHeight * 2 / 5));
+        }
+        else
+        {
+            auto labels = area.removeFromTop (26);
+            auto editors = area.removeFromTop (notesHeight);
+            const auto privateWidth = (int) (labels.getWidth() * 0.36f);
+            privateNotesLabel.setBounds (labels.removeFromRight (privateWidth));
+            privateNotesEditor.setBounds (editors.removeFromRight (privateWidth));
+            labels.removeFromRight (10);
+            editors.removeFromRight (10);
+            notesLabel.setBounds (labels);
+            descriptionEditor.setBounds (editors);
+        }
 
         area.removeFromTop (6);
 
@@ -294,16 +341,17 @@ private:
         {
             t->title = titleEditor.getText().trim();
             t->description = descriptionEditor.getText();
+            t->privateNotes = privateNotesEditor.getText();
             t->tags = parseTags (tagsEditor.getText());
             owner.editedTopic();
         }
     }
 
     LibraryPanel& owner;
-    juce::TextEditor titleEditor, tagsEditor, descriptionEditor;
-    juce::Label createdLabel, notesLabel, resourcesLabel, conflictLabel, noResourcesLabel;
+    juce::TextEditor titleEditor, tagsEditor, descriptionEditor, privateNotesEditor;
+    juce::Label createdLabel, notesLabel, privateNotesLabel, resourcesLabel, conflictLabel, noResourcesLabel;
     juce::TextButton deleteButton { "Delete topic" }, addFilesButton { "Add files..." }, addLinkButton { "Add link..." },
-                     practiseButton { "Practise" }, historyButton { "History" }, conflictButton { "Choose version..." };
+                     practiseButton { "Practise" }, shareButton { "Share..." }, historyButton { "History" }, conflictButton { "Choose version..." };
     juce::ToggleButton rotationToggle { "In practice rotation" }, noGuitarToggle { "Timed without playing" };
     juce::Viewport viewport;
     juce::Component rowHolder;
@@ -604,6 +652,11 @@ void LibraryPanel::showFolderMenu()
     });
     menu.addSeparator();
     menu.addItem ("Storage and clean-up...", [this] { showStorage(); });
+    menu.addSeparator();
+    menu.addItem ("Import a shared topic (.pvtopic)...", [this] { chooseTopicToImport(); });
+   #if ! JUCE_IOS
+    menu.addItem ("Show the shared topics folder", [] { auto f = sharedTopicsFolder(); f.createDirectory(); f.revealToUser(); });
+   #endif
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&folderButton));
 }
@@ -617,6 +670,128 @@ void LibraryPanel::showStorage()
     auto panel = std::make_unique<StoragePanel> (library.get(), LoopFiles::getLoopsFolder(), getAppDataFolder());
     panel->onRemoved = [this] { checkForChanges(); };
     showOverlay ("Storage and clean-up", std::move (panel));
+}
+
+void LibraryPanel::shareTopic (const juce::String& topicId)
+{
+    if (library == nullptr || ! showOverlay)
+        return;
+
+    flush();
+    auto* t = library->findTopic (topicId);
+
+    if (t == nullptr)
+        return;
+
+   #if JUCE_WINDOWS
+    const auto folder = sharedTopicsFolder();
+    const juce::String buttonText = "Save and show in Explorer";
+   #elif JUCE_MAC
+    const auto folder = sharedTopicsFolder();
+    const juce::String buttonText = "Share...";
+   #else
+    const auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("Shared topics");
+    const juce::String buttonText = "Share...";
+   #endif
+
+    auto panel = std::make_unique<SharePanel> (*t, folder, buttonText);
+    panel->onCancel = [this] { if (hideOverlay) hideOverlay(); };
+    panel->onWritten = [this] (const juce::File& file)
+    {
+        if (hideOverlay)
+            hideOverlay();
+
+       #if JUCE_IOS
+        shareBox = juce::ContentSharer::shareFilesScoped ({ juce::URL (file) }, [] (bool, const juce::String&) {}, this);
+       #elif JUCE_MAC
+        showSystemSharePicker (file, *this);
+       #else
+        file.revealToUser();     // Explorer with the file selected: drag it into a mail or WhatsApp
+       #endif
+    };
+    showOverlay ("Share “" + t->title + "”", std::move (panel));
+}
+
+void LibraryPanel::chooseTopicToImport()
+{
+   #if JUCE_IOS
+    const juce::String pattern = "*";      // the iPad picker doesn't know the .pvtopic type by pattern
+   #else
+    const juce::String pattern = juce::String ("*") + TopicShare::extension;
+   #endif
+    fileChooser = std::make_unique<juce::FileChooser> ("Import a shared topic", juce::File(), pattern);
+    fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                              [safeThis = SafePointer<LibraryPanel> (this)] (const juce::FileChooser& fc)
+    {
+        if (safeThis == nullptr || fc.getURLResult().isEmpty())
+            return;
+
+        const auto url = fc.getURLResult();
+
+        if (url.isLocalFile() && url.getLocalFile().existsAsFile())
+        {
+            safeThis->importSharedTopic (url.getLocalFile());
+            return;
+        }
+
+        // iPad: a security-scoped URL; copy it while it can be read.
+        const auto copy = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("import.pvtopic");
+
+        if (std::unique_ptr<juce::InputStream> in { url.createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)) })
+        {
+            copy.deleteFile();
+            juce::FileOutputStream out (copy);
+
+            if (out.openedOk() && out.writeFromInputStream (*in, -1) > 0)
+            {
+                out.flush();
+                safeThis->importSharedTopic (copy);
+                return;
+            }
+        }
+
+        safeThis->showError ("Could not read the chosen file.");
+    });
+}
+
+void LibraryPanel::importSharedTopic (const juce::File& file)
+{
+    if (library == nullptr)
+    {
+        showError ("Choose where your library lives first (Topics tab), then open the shared topic again.");
+        return;
+    }
+
+    if (! showOverlay)
+        return;
+
+    flush();
+    checkForChanges();
+
+    juce::String error;
+    auto package = TopicShare::open (file, error);
+
+    if (package == nullptr)
+    {
+        juce::Logger::writeToLog ("Could not open shared topic " + file.getFileName() + ": " + error);
+        showError (error);
+        return;
+    }
+
+    juce::Logger::writeToLog ("Opening shared topic " + file.getFileName());
+    auto panel = std::make_unique<ImportPanel> ([this] { return library.get(); }, std::move (package));
+    panel->onCancel = [this] { if (hideOverlay) hideOverlay(); };
+    panel->onImported = [this] (const juce::String& topicId)
+    {
+        if (hideOverlay)
+            hideOverlay();
+
+        library->rescan();
+        signature = library->computeSignature();
+        refreshAfterRescan();
+        selectTopic (topicId);
+    };
+    showOverlay ("Import shared topic", std::move (panel));
 }
 
 //==============================================================================

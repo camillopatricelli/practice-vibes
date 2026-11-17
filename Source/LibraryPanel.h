@@ -42,9 +42,14 @@ public:
     /** Re-reads the folder if anything changed on disk (e.g. from another device). */
     void checkForChanges();
     void showStorage();       // overlay: space used, takes / saved loops / caches to remove
+    void shareTopic (const juce::String& topicId);   // overlay: choose files, write the .pvtopic, hand it to the system
+    void chooseTopicToImport();
 
     /** Opens the topic's first song or YouTube video; false if it has none. */
     bool openFirstMedia (const juce::String& topicId);
+
+    /** Opens a .pvtopic (from "Import...", a double-click or the iPad's "Open in"): preview, then import. */
+    void importSharedTopic (const juce::File&);
 
     /** Writes any pending edit to disk (also called when the app quits). */
     void flush();
@@ -109,6 +114,7 @@ private:
     std::unique_ptr<TopicView> topicView;
     std::unique_ptr<InboxView> inboxView;
     std::unique_ptr<juce::FileChooser> fileChooser;
+    juce::ScopedMessageBox shareBox;           // iPad share sheet
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LibraryPanel)
 };

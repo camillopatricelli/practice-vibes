@@ -34,6 +34,9 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
+    /** A .pvtopic opened from outside (double-click, "Open in", command line): Topics tab + import preview. */
+    void openSharedTopic (const juce::File&);
+
 private:
     class LogPanel;
     class Overlay;
