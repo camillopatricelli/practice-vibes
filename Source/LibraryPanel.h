@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Library.h"
+#include "SharePanel.h"
 
 namespace pv
 {
@@ -33,6 +34,9 @@ public:
     std::function<void (const juce::String& topicId)> onTopicOpened;   // one of its resources was opened
     std::function<void (const juce::String& topicId)> onPractise;      // the topic's "Practise" button
     std::function<void (const juce::String& topicId)> onShowHistory;   // the topic's "History" button
+
+    std::function<ShareContext (const juce::String& topicId)> getShareContext;   // name, "I teach", practice summary
+    std::function<bool()> isTeacher;
 
     Library* getLibrary() const noexcept            { return library.get(); }
 

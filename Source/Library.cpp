@@ -275,6 +275,9 @@ bool Topic::matches (const juce::String& searchText) const
 
 bool Topic::matchesTag (const juce::String& tag) const
 {
+    if (tag.startsWith ("@student:"))
+        return student.equalsIgnoreCase (tag.fromFirstOccurrenceOf (":", false, false));
+
     if (tag.isEmpty() || hasTag (tags, tag))
         return true;
 

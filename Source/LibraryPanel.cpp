@@ -82,7 +82,21 @@ public:
         addAndMakeVisible (tagsEditor);
 
         createdLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.55f));
+        createdLabel.setMinimumHorizontalScale (0.7f);
         addAndMakeVisible (createdLabel);
+
+        studentEditor.setTextToShowWhenEmpty ("Student", theme::text().withAlpha (0.35f));
+        studentEditor.setTooltip ("Who this topic is for: a first name or nickname. Groups topics by student (Tags menu). "
+                                  "Stays on your devices: never sent with the topic");
+        studentEditor.setFont (juce::FontOptions (14.0f));
+        styleEditor (studentEditor);
+        studentEditor.onTextChange = [this] { edited(); };
+        studentEditor.onFocusLost = [this] { owner.flush(); };
+        addChildComponent (studentEditor);
+
+        summaryLabel.setColour (juce::Label::textColourId, theme::good());
+        summaryLabel.setMinimumHorizontalScale (0.6f);
+        addChildComponent (summaryLabel);
 
         deleteButton.onClick = [this] { owner.deleteTopic (topicId); };
         addAndMakeVisible (deleteButton);
@@ -179,7 +193,23 @@ public:
         if (! (sameTopic && keepFocusedEditors && tagsEditor.hasKeyboardFocus (true)) && parseTags (tagsEditor.getText()) != topic.tags)
             tagsEditor.setText (joinTags (topic.tags), false);
 
-        createdLabel.setText ("Created " + formatDate (topic.created), juce::dontSendNotification);
+        juce::String dates = "Created " + formatDate (topic.created);
+
+        if (topic.lastSent != juce::Time())     dates << "\nSent " << formatDate (topic.lastSent);
+        if (topic.lastReceived != juce::Time()) dates << (topic.lastSent != juce::Time() ? ", received " : "\nReceived ") << formatDate (topic.lastReceived);
+
+        createdLabel.setText (dates, juce::dontSendNotification);
+        createdLabel.setTooltip (dates.replace ("\n", "  "));
+
+        const bool teacher = owner.isTeacher && owner.isTeacher();
+        studentEditor.setVisible (teacher || topic.student.isNotEmpty());
+
+        if (! (sameTopic && keepFocusedEditors && studentEditor.hasKeyboardFocus (true)) && studentEditor.getText() != topic.student)
+            studentEditor.setText (topic.student, false);
+
+        summaryLabel.setVisible (! topic.studentSummary.isEmpty());
+        summaryLabel.setText ("Student's practice (sent " + formatDate (topic.studentSummary.made) + "): " + topic.studentSummary.describe(),
+                              juce::dontSendNotification);
         rotationToggle.setToggleState (topic.inRotation, juce::dontSendNotification);
         noGuitarToggle.setToggleState (topic.noGuitar, juce::dontSendNotification);
 
@@ -240,7 +270,7 @@ public:
         practiseButton.setBounds (top.removeFromRight (100).reduced (2, 4));
         top.removeFromRight (8);
         if (! narrow)
-            createdLabel.setBounds (top.removeFromRight (150));
+            createdLabel.setBounds (top.removeFromRight (170));
         titleEditor.setBounds (top.reduced (0, 2));
 
         area.removeFromTop (6);
@@ -249,6 +279,13 @@ public:
         {
             auto tagsRow = area.removeFromTop (30);
             createdLabel.setBounds (tagsRow.removeFromRight (150).withTrimmedLeft (8));
+
+            if (studentEditor.isVisible())
+            {
+                studentEditor.setBounds (tagsRow.removeFromLeft (130));
+                tagsRow.removeFromLeft (8);
+            }
+
             tagsEditor.setBounds (tagsRow);
             area.removeFromTop (6);
 
@@ -263,6 +300,13 @@ public:
             historyButton.setBounds (tagsRow.removeFromRight (90).reduced (0, 1));
             rotationToggle.setBounds (tagsRow.removeFromRight (190).withTrimmedLeft (12));
             noGuitarToggle.setBounds (tagsRow.removeFromRight (220).withTrimmedLeft (12));
+
+            if (studentEditor.isVisible())
+            {
+                studentEditor.setBounds (tagsRow.removeFromLeft (140));
+                tagsRow.removeFromLeft (8);
+            }
+
             tagsEditor.setBounds (tagsRow);
         }
         area.removeFromTop (4);
@@ -290,6 +334,9 @@ public:
         }
 
         area.removeFromTop (6);
+
+        if (summaryLabel.isVisible())
+            summaryLabel.setBounds (area.removeFromTop (26));
 
         if (conflictLabel.isVisible())
         {
@@ -342,14 +389,17 @@ private:
             t->title = titleEditor.getText().trim();
             t->description = descriptionEditor.getText();
             t->privateNotes = privateNotesEditor.getText();
+
+            if (studentEditor.isVisible())
+                t->student = studentEditor.getText().trim().substring (0, 60);
             t->tags = parseTags (tagsEditor.getText());
             owner.editedTopic();
         }
     }
 
     LibraryPanel& owner;
-    juce::TextEditor titleEditor, tagsEditor, descriptionEditor, privateNotesEditor;
-    juce::Label createdLabel, notesLabel, privateNotesLabel, resourcesLabel, conflictLabel, noResourcesLabel;
+    juce::TextEditor titleEditor, tagsEditor, descriptionEditor, privateNotesEditor, studentEditor;
+    juce::Label summaryLabel, createdLabel, notesLabel, privateNotesLabel, resourcesLabel, conflictLabel, noResourcesLabel;
     juce::TextButton deleteButton { "Delete topic" }, addFilesButton { "Add files..." }, addLinkButton { "Add link..." },
                      practiseButton { "Practise" }, shareButton { "Share..." }, historyButton { "History" }, conflictButton { "Choose version..." };
     juce::ToggleButton rotationToggle { "In practice rotation" }, noGuitarToggle { "Timed without playing" };
@@ -694,9 +744,9 @@ void LibraryPanel::shareTopic (const juce::String& topicId)
     const juce::String buttonText = "Share...";
    #endif
 
-    auto panel = std::make_unique<SharePanel> (*t, folder, buttonText);
+    auto panel = std::make_unique<SharePanel> (*t, folder, buttonText, getShareContext ? getShareContext (topicId) : ShareContext());
     panel->onCancel = [this] { if (hideOverlay) hideOverlay(); };
-    panel->onWritten = [this] (const juce::Array<juce::File>& files, bool isDocument)
+    panel->onWritten = [this, topicId] (const juce::Array<juce::File>& files, bool isDocument)
     {
         juce::ignoreUnused (isDocument);
 
@@ -705,6 +755,14 @@ void LibraryPanel::shareTopic (const juce::String& topicId)
 
         if (files.isEmpty())
             return;
+
+        if (auto* shared = library != nullptr ? library->findTopic (topicId) : nullptr)
+        {
+            shared->lastSent = juce::Time::getCurrentTime();
+            library->saveTopic (*shared);
+            signature = library->computeSignature();
+            showSelection();
+        }
 
        #if JUCE_IOS
         juce::Array<juce::URL> urls;
@@ -790,7 +848,7 @@ void LibraryPanel::importSharedTopic (const juce::File& file)
     }
 
     juce::Logger::writeToLog ("Opening shared topic " + file.getFileName());
-    auto panel = std::make_unique<ImportPanel> ([this] { return library.get(); }, std::move (package));
+    auto panel = std::make_unique<ImportPanel> ([this] { return library.get(); }, std::move (package), isTeacher && isTeacher());
     panel->onCancel = [this] { if (hideOverlay) hideOverlay(); };
     panel->onImported = [this] (const juce::String& topicId)
     {
@@ -900,7 +958,8 @@ void LibraryPanel::paintListBoxItem (int row, juce::Graphics& g, int width, int 
         g.setColour (theme::text().withAlpha (0.6f));
         g.setFont (juce::FontOptions (12.5f));
         const auto n = (int) t->resources.size();
-        auto info = formatDate (t->created) + (n > 0 ? "   " + juce::String (n) + (n == 1 ? " resource" : " resources") : juce::String());
+        auto info = formatDate (t->created) + (n > 0 ? "   " + juce::String (n) + (n == 1 ? " resource" : " resources") : juce::String())
+                  + (t->student.isNotEmpty() ? "   " + t->student : juce::String());
 
         // When the search or tag filter matched something not shown in this row, say where instead.
         if (const auto why = t->describeMatch (searchBox.getText(), tagFilter); why.isNotEmpty())
@@ -957,12 +1016,45 @@ void LibraryPanel::showTagMenu()
         });
     }
 
+    // Teachers: topics by student.
+    juce::StringArray students;
+
+    for (auto& t : library->getTopics())
+        if (t.student.isNotEmpty() && ! students.contains (t.student, true))
+            students.add (t.student);
+
+    students.sortNatural();
+
+    if (! students.isEmpty())
+    {
+        menu.addSectionHeader ("Students");
+
+        for (auto& name : students)
+        {
+            const auto filter = Topic::studentFilter (name);
+            int count = 0;
+
+            for (auto& t : library->getTopics())
+                if (t.matchesTag (filter))
+                    ++count;
+
+            menu.addItem (name + "  (" + juce::String (count) + ")", true, filter.equalsIgnoreCase (tagFilter), [this, filter]
+            {
+                tagFilter = filter;
+                updateTagButton();
+                rebuildList (selectedId);
+            });
+        }
+    }
+
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&tagsButton));
 }
 
 void LibraryPanel::updateTagButton()
 {
-    tagsButton.setButtonText (tagFilter.isEmpty() ? "Tags" : "Tag: " + tagFilter + "   (change / clear)");
+    tagsButton.setButtonText (tagFilter.isEmpty() ? juce::String ("Tags")
+                              : tagFilter.startsWith ("@student:") ? "Student: " + tagFilter.fromFirstOccurrenceOf (":", false, false) + "   (change / clear)"
+                              : "Tag: " + tagFilter + "   (change / clear)");
     tagsButton.setColour (juce::TextButton::buttonColourId,
                           tagFilter.isEmpty() ? getLookAndFeel().findColour (juce::TextButton::buttonColourId) : theme::accent());
 }

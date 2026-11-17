@@ -6,12 +6,21 @@
 namespace pv
 {
 
+/** Who is sharing, for the Share dialog. */
+struct ShareContext
+{
+    bool teacher = false;                       // "I teach" is on: offers "as a new topic for another student"
+    juce::String senderName;                    // "Your name" as last typed (kept on this device only)
+    PracticeSummary summary;                    // the user's practice on this topic (empty: nothing to offer)
+    std::function<void (const juce::String&)> onNameChanged;
+};
+
 /** Overlay: "Share topic". The sender ticks which files go in (every time), sees the running total against the
     email limit, and writes the .pvtopic. What happens to the file next (Explorer, share sheet) is up to onWritten. */
 class SharePanel final : public juce::Component
 {
 public:
-    SharePanel (const Topic&, juce::File outputFolder, juce::String shareButtonText);
+    SharePanel (const Topic&, juce::File outputFolder, juce::String shareButtonText, ShareContext);
     ~SharePanel() override;
 
     void paint (juce::Graphics&) override;
@@ -37,6 +46,11 @@ private:
     juce::OwnedArray<juce::Label> sizeLabels;
     juce::Component rowHolder;
     juce::Viewport viewport;
+    ShareContext context;
+    juce::Label nameLabel;
+    juce::TextEditor nameEditor;
+    juce::ToggleButton newTopicToggle { "As a new topic: the same lesson for another student (their own copy)" };
+    juce::ToggleButton summaryToggle;
     juce::ToggleButton shrinkToggle { "Make WAV / AIFF files smaller (AAC, 192 kbit/s)" };
     juce::TextButton shareButton, cancelButton { "Cancel" };
     bool writing = false;
@@ -50,7 +64,7 @@ private:
 class ImportPanel final : public juce::Component
 {
 public:
-    ImportPanel (std::function<Library*()> getLibrary, std::unique_ptr<TopicShare::Package>);
+    ImportPanel (std::function<Library*()> getLibrary, std::unique_ptr<TopicShare::Package>, bool teacher);
     ~ImportPanel() override;
 
     void paint (juce::Graphics&) override;
@@ -69,7 +83,9 @@ private:
     TopicShare::LocatedFiles located;
     TopicShare::Preview current;
 
-    juce::Label summaryLabel, missingHeader;
+    bool teacher = false;
+    juce::Label summaryLabel, missingHeader, studentLabel;
+    juce::TextEditor studentEditor;
     juce::TextEditor details;
     juce::OwnedArray<juce::Label> missingLabels;
     juce::OwnedArray<juce::TextButton> locateButtons;

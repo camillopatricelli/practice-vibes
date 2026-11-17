@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "TopicShare.h"
 #include "LibraryPanel.h"
 #include "LinksPanel.h"
 #include "LooperPanel.h"
@@ -295,6 +296,26 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     libraryPanel->onLibraryOpened = [this] { libraryOpened(); };
     libraryPanel->onTopicsChanged = [this] { todayPanel->refresh(); updatePractisingButton(); practicePanel->refreshMarks(); };
 
+    // Sharing: the sender name (this device only), "I teach", and the user's practice on the topic (offered, opt-in).
+    libraryPanel->isTeacher = [this] { return teacherSetting; };
+    libraryPanel->getShareContext = [this] (const juce::String& topicId)
+    {
+        ShareContext context;
+        context.teacher = teacherSetting;
+
+        if (auto ui = juce::parseXML (getUiSettingsFile()))
+            context.senderName = ui->getStringAttribute ("senderName");
+
+        if (practiceLog != nullptr && ! teacherSetting)
+        {
+            tracker.flush();
+            context.summary = TopicShare::makeSummary (*practiceLog, topicId, juce::Time::getCurrentTime());
+        }
+
+        context.onNameChanged = [] (const juce::String& name) { saveUiSetting ("senderName", name); };
+        return context;
+    };
+
     // Song marks (markers, saved loops, comments on takes) live in the file's topic.
     practicePanel->getMarks = [this] (const juce::File& file) -> std::optional<std::vector<SongMark>>
     {
@@ -491,6 +512,8 @@ MainComponent::~MainComponent()
     tracker.captureSetup = nullptr;
     libraryPanel->onLibraryOpened = nullptr;
     libraryPanel->onTopicsChanged = nullptr;
+    libraryPanel->isTeacher = nullptr;
+    libraryPanel->getShareContext = nullptr;
     practicePanel->getMarks = nullptr;
     practicePanel->saveMark = nullptr;
     practicePanel->removeMark = nullptr;
@@ -815,6 +838,7 @@ void MainComponent::setTeaching (bool on)
     if (on)
         tracker.finish();   // your own practice so far is saved and closed; the lesson starts a clean slate
 
+    const auto lessonTopic = tracker.getActiveTopicId();
     teaching = on;
     juce::Logger::writeToLog (on ? "Teaching mode on: practice is not logged" : "Teaching mode off: practice is logged again");
     updateTeachingButton();
@@ -823,6 +847,34 @@ void MainComponent::setTeaching (bool on)
 
     if (todayPanel != nullptr && todayPanel->isShowing())
         todayPanel->refresh();
+
+    // The lesson is over: sending the topic is usually the next thing to do.
+    if (! on && lessonTopic.isNotEmpty())
+        offerToShareLesson (lessonTopic);
+}
+
+void MainComponent::offerToShareLesson (const juce::String& topicId)
+{
+    auto* lib = libraryPanel->getLibrary();
+    const auto* topic = lib != nullptr ? lib->findTopic (topicId) : nullptr;
+
+    if (topic == nullptr)
+        return;
+
+    juce::AlertWindow::showAsync (juce::MessageBoxOptions{}.withIconType (juce::MessageBoxIconType::QuestionIcon)
+                                      .withTitle ("Lesson over")
+                                      .withMessage ("Send \u201c" + topic->title + "\u201d to your student?")
+                                      .withButton ("Share...", 1).withButton ("Not now", 0)
+                                      .withAssociatedComponent (this),
+                                  [safe = SafePointer<MainComponent> (this), topicId] (int result)
+    {
+        if (safe == nullptr || result != 1)
+            return;
+
+        safe->showTab (safe->libraryPanel.get());
+        safe->libraryPanel->selectTopic (topicId);
+        safe->libraryPanel->shareTopic (topicId);
+    });
 }
 
 void MainComponent::setTeacherSetting (bool on)
@@ -1548,6 +1600,7 @@ void MainComponent::startRecording()
     recordingInfo = {};
     recordingInfo.recorded = juce::Time::getCurrentTime();
     recordingInfo.topicId = tracker.getActiveTopicId();
+    recordingDemo = teaching;
 
     if (practicePanel->isYouTubeMode())
     {
@@ -1606,7 +1659,10 @@ void MainComponent::stopRecording (bool waitForFile)
 
     // Only name a song the take actually played along to.
     const auto what = recordingInfo.timeline.usesSong() ? recordingInfo.songName : recordingInfo.youTubeTitle;
-    const auto base = TakeInfo::makeFileName (recordingInfo.recorded, what);
+    auto base = TakeInfo::makeFileName (recordingInfo.recorded, what);
+
+    if (recordingDemo && base.startsWith ("Take "))
+        base = "Demo " + base.substring (5);    // recorded during a lesson: the teacher's demo
     const auto folder = recordingFolder;
     auto uniqueFile = [folder, base] (const juce::String& extension)
     {

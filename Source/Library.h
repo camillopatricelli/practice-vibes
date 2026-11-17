@@ -132,7 +132,10 @@ struct Topic
     /** Search: every word must start a word in the title, tags, notes, or a resource's name, tags or notes. */
     bool matches (const juce::String& searchText) const;
 
-    /** True if the topic or any of its resources carries the tag (empty tag = always). */
+    /** The tag filter value that means "topics for this student" (Topics > Tags menu). */
+    static juce::String studentFilter (const juce::String& student)     { return "@student:" + student; }
+
+    /** True if the topic or any of its resources carries the tag (empty tag = always), or it's the student filter. */
     bool matchesTag (const juce::String& tag) const;
 
     /** Why a matching topic is listed when the reason isn't visible in the list (resource, notes, a resource's tag),

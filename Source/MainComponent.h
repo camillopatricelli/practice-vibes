@@ -120,6 +120,8 @@ private:
                      practisingButton,
                      teachingButton      { "Teaching" };
     bool teaching = false, teacherSetting = false;
+    bool recordingDemo = false;         // the take being recorded started during a lesson: named "Demo ..."
+    void offerToShareLesson (const juce::String& topicId);
 
     // The log outlives the tracker (which writes its last entry when destroyed).
     std::unique_ptr<PracticeLog> practiceLog;

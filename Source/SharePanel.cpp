@@ -17,11 +17,32 @@ namespace
 }
 
 //==============================================================================
-SharePanel::SharePanel (const Topic& t, juce::File folder, juce::String shareButtonText)
-    : topic (t), outputFolder (std::move (folder)), items (TopicShare::listFiles (t)), shareText (shareButtonText), shareButton (shareButtonText)
+SharePanel::SharePanel (const Topic& t, juce::File folder, juce::String shareButtonText, ShareContext ctx)
+    : topic (t), outputFolder (std::move (folder)), items (TopicShare::listFiles (t)), shareText (shareButtonText),
+      context (std::move (ctx)), shareButton (shareButtonText)
 {
-    getProperties().set ("overlayWidth", 640);
-    getProperties().set ("overlayHeight", 600);
+    getProperties().set ("overlayWidth", 680);
+    getProperties().set ("overlayHeight", 680);
+
+    nameLabel.setText ("Your name", juce::dontSendNotification);
+    nameLabel.setJustificationType (juce::Justification::centredRight);
+    addAndMakeVisible (nameLabel);
+    nameEditor.setText (context.senderName, false);
+    nameEditor.setTextToShowWhenEmpty ("Optional: a first name or nickname, shown to the person you send it to",
+                                       theme::text().withAlpha (0.35f));
+    nameEditor.setTooltip ("Kept only on this device and put only in the files you send");
+    styleEditor (nameEditor);
+    addAndMakeVisible (nameEditor);
+
+    newTopicToggle.setTooltip ("Gets a new topic id: importing it never updates the topic you sent to someone else");
+    newTopicToggle.onClick = [this] { updateTotal(); };
+    addChildComponent (newTopicToggle);
+
+    if (! context.summary.isEmpty() && context.summary.sessions > 0)
+        summaryToggle.setButtonText ("Include my practice on this topic: " + context.summary.describe());
+
+    summaryToggle.setTooltip ("Totals only (time per week, tempo, days in a row): no times of day, nothing else from your log");
+    addChildComponent (summaryToggle);
 
     formatLabel.setText ("Send as", juce::dontSendNotification);
     formatLabel.setJustificationType (juce::Justification::centredRight);
@@ -107,6 +128,11 @@ void SharePanel::updateTotal()
             ++leftOut;
     }
 
+    newTopicToggle.setVisible (context.teacher && ! isDocument());
+    summaryToggle.setVisible (! context.teacher && ! isDocument() && ! context.summary.isEmpty() && context.summary.sessions > 0);
+    nameLabel.setVisible (! isDocument());
+    nameEditor.setVisible (! isDocument());
+
     introLabel.setText (isDocument() ? "Choose which files go along with the page. The notes and links are on the page; "
                                        "your private notes and practice log are never included."
                                      : "Choose which files go in. The notes, links and resource details always travel; "
@@ -129,6 +155,14 @@ void SharePanel::share()
 
     TopicShare::ExportOptions options;
     options.shrinkAudio = shrinkToggle.isVisible() && shrinkToggle.getToggleState();
+    options.asNewTopic = newTopicToggle.isVisible() && newTopicToggle.getToggleState();
+    options.senderName = nameEditor.getText().trim().substring (0, 60);
+
+    if (summaryToggle.isVisible() && summaryToggle.getToggleState())
+        options.summary = context.summary;
+
+    if (options.senderName != context.senderName.trim() && context.onNameChanged)
+        context.onNameChanged (options.senderName);
 
     for (size_t i = 0; i < items.size(); ++i)
         if (toggles[(int) i]->getToggleState())
@@ -201,6 +235,20 @@ void SharePanel::resized()
     if (shrinkToggle.isVisible())
         shrinkToggle.setBounds (area.removeFromBottom (32));
 
+    if (summaryToggle.isVisible())
+        summaryToggle.setBounds (area.removeFromBottom (32));
+
+    if (newTopicToggle.isVisible())
+        newTopicToggle.setBounds (area.removeFromBottom (32));
+
+    if (nameEditor.isVisible())
+    {
+        auto row = area.removeFromBottom (38).reduced (0, 4);
+        nameLabel.setBounds (row.removeFromLeft (80));
+        row.removeFromLeft (8);
+        nameEditor.setBounds (row);
+    }
+
     auto formatRow = area.removeFromTop (38).reduced (0, 3);
     formatLabel.setBounds (formatRow.removeFromLeft (70));
     formatRow.removeFromLeft (8);
@@ -224,9 +272,30 @@ void SharePanel::resized()
 }
 
 //==============================================================================
-ImportPanel::ImportPanel (std::function<Library*()> libraryFn, std::unique_ptr<TopicShare::Package> p)
-    : getLibrary (std::move (libraryFn)), package (std::move (p))
+ImportPanel::ImportPanel (std::function<Library*()> libraryFn, std::unique_ptr<TopicShare::Package> p, bool isTeacher)
+    : getLibrary (std::move (libraryFn)), package (std::move (p)), teacher (isTeacher)
 {
+    studentLabel.setText ("Student", juce::dontSendNotification);
+    studentLabel.setJustificationType (juce::Justification::centredRight);
+    addChildComponent (studentLabel);
+    studentEditor.setTextToShowWhenEmpty ("Optional: who this topic is for (a first name or nickname)", theme::text().withAlpha (0.35f));
+    studentEditor.setTooltip ("Groups your topics by student (Tags menu). Stays on your devices: never sent to anyone");
+    styleEditor (studentEditor);
+    addChildComponent (studentEditor);
+
+    if (teacher && package != nullptr)
+    {
+        juce::String initial = package->senderName;
+
+        if (auto* library = getLibrary ? getLibrary() : nullptr)
+            if (auto* existing = library->findTopic (package->topic.id); existing != nullptr && existing->student.isNotEmpty())
+                initial = existing->student;
+
+        studentEditor.setText (initial, false);
+        studentLabel.setVisible (true);
+        studentEditor.setVisible (true);
+    }
+
     getProperties().set ("overlayWidth", 640);
     getProperties().set ("overlayHeight", 520);
 
@@ -280,8 +349,16 @@ void ImportPanel::refresh()
             text << heading << ":\n    " << names.joinIntoString ("\n    ") << "\n\n";
     };
 
+    if (package->senderName.isNotEmpty())
+        text << "From " << package->senderName << ". ";
+
     if (package->sharedAt != juce::Time())
-        text << "Shared on " << package->sharedAt.formatted ("%d %b %Y at %H:%M") << ".\n\n";
+        text << "Shared on " << package->sharedAt.formatted ("%d %b %Y at %H:%M") << ".";
+
+    text << "\n\n";
+
+    if (! package->summary.isEmpty())
+        text << "Practice on this topic: " << package->summary.describe() << "\n\n";
 
     if (! current.updatesExisting && package->topic.description.isNotEmpty())
         text << "Notes:\n" << package->topic.description.trim() << "\n\n";
@@ -364,7 +441,8 @@ void ImportPanel::import (TopicShare::Mode mode)
         return;
 
     juce::String topicId;
-    const auto result = TopicShare::apply (*library, *package, mode, located, topicId);
+    const auto result = TopicShare::apply (*library, *package, mode, located, topicId,
+                                           teacher ? studentEditor.getText() : juce::String());
 
     if (result.failed())
     {
@@ -397,6 +475,15 @@ void ImportPanel::resized()
 
     cancelButton.setBounds (buttons.removeFromRight (110).reduced (2, 3));
     area.removeFromBottom (8);
+
+    if (studentEditor.isVisible())
+    {
+        auto row = area.removeFromBottom (38).reduced (0, 4);
+        studentLabel.setBounds (row.removeFromLeft (70));
+        row.removeFromLeft (8);
+        studentEditor.setBounds (row);
+        area.removeFromBottom (4);
+    }
 
     summaryLabel.setBounds (area.removeFromTop (juce::jmax (48, 22 * (summaryLabel.getText().length() / 60 + 1 + summaryLabel.getText().containsChar ('\n')))));
     area.removeFromTop (6);
