@@ -17,6 +17,24 @@ FetchContent_Declare(signalsmith-stretch    # time-stretch / pitch-shift (MIT)
 
 FetchContent_MakeAvailable(JUCE signalsmith-stretch)
 
+# JUCE patch (Windows start-up time): WASAPI probes every channel count from 36 down to the device's mix format
+# with IsFormatSupported(). Some drivers (seen: Cirrus Logic laptop speakers) take ~25 ms per rejected format,
+# so opening a stereo output took ~3 s, twice at start-up. Probing from 8 channels down keeps 7.1 outputs and
+# multichannel interfaces whose mix format already has 8+ channels. Re-applied on every configure (idempotent).
+set(_pv_wasapi_file "${juce_SOURCE_DIR}/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp")
+file(READ "${_pv_wasapi_file}" _pv_wasapi_src)
+set(_pv_wasapi_old "static constexpr auto maxNumChannelsToQuery = static_cast<int> (AudioChannelSet::maxChannelsOfNamedLayout);")
+set(_pv_wasapi_new "static constexpr auto maxNumChannelsToQuery = 8; // Practice Vibes patch: start-up time")
+string(FIND "${_pv_wasapi_src}" "${_pv_wasapi_new}" _pv_wasapi_done)
+if(_pv_wasapi_done EQUAL -1)
+    string(FIND "${_pv_wasapi_src}" "${_pv_wasapi_old}" _pv_wasapi_found)
+    if(_pv_wasapi_found EQUAL -1)
+        message(FATAL_ERROR "JUCE WASAPI patch no longer applies: check queryMaxNumChannels in ${_pv_wasapi_file}")
+    endif()
+    string(REPLACE "${_pv_wasapi_old}" "${_pv_wasapi_new}" _pv_wasapi_src "${_pv_wasapi_src}")
+    file(WRITE "${_pv_wasapi_file}" "${_pv_wasapi_src}")
+endif()
+
 # Windows: the in-app viewer (documents, YouTube) uses Microsoft's WebView2 (runtime ships with Windows 11).
 # The SDK package (headers + static loader) is downloaded from NuGet into the build folder, where JUCE's
 # FindWebView2 looks for a "*Microsoft.Web.WebView2*" directory.
