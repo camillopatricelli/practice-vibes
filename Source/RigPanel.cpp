@@ -1,5 +1,6 @@
 #include "RigPanel.h"
 #include "FootswitchPanel.h"
+#include "Icons.h"
 #include "Theme.h"
 
 namespace pv
@@ -130,6 +131,18 @@ RigPanel::RigPanel (AppEngine& e)
     chainList.setRowHeight (44);
     chainList.setColour (juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
     addAndMakeVisible (chainList);
+
+    // Icon buttons: five of them share the chain column, too narrow for their words in portrait.
+    editButton.setTooltip ("Open the plugin's window");
+    bypassButton.setTooltip ("Bypass the plugin (on/off)");
+    upButton.setTooltip ("Move the plugin up the chain");
+    downButton.setTooltip ("Move the plugin down the chain");
+    removeButton.setTooltip ("Remove the plugin from the chain");
+    icons::setIcon (editButton, icons::Icon::openWindow, true);
+    icons::setIcon (bypassButton, icons::Icon::power, true);
+    icons::setIcon (upButton, icons::Icon::arrowUp, true);
+    icons::setIcon (downButton, icons::Icon::arrowDown, true);
+    icons::setIcon (removeButton, icons::Icon::trash, true);
 
     editButton.onClick = [this] { openEditor (selectedChainIndex()); };
 

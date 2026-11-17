@@ -64,7 +64,11 @@ private:
     juce::TextEditor noteEditor;
     juce::TextButton stopButton { "Stop" }, pauseButton { "Pause" }, addTimeButton { "+ Add time..." },
                      allHistoryButton { "History" };
-    juce::Rectangle<int> nowCard;
+    juce::Rectangle<int> nowCard, recentCard;
+
+    // Narrow layout (iPad portrait): the rotation list and the last two weeks share the space, one at a time.
+    juce::TextButton recentToggleButton { "Show" };
+    bool recentExpanded = false;
 
     juce::Label rotationHeader, rotationEmpty, recentHeader;
     juce::Viewport rotationViewport, recentViewport;

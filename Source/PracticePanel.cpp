@@ -1240,9 +1240,18 @@ void PracticePanel::updateTrainerControls()
 {
     const auto on = trainerToggle.getToggleState() && trainerToggle.isEnabled();
 
+    // The trainer's settings show only while it's on: room for the chords card and the waveform otherwise.
+    const auto layoutChanged = stepSlider.isVisible() != on;
+
     for (auto* c : std::initializer_list<juce::Component*> { &stepSlider, &intervalSlider, &maxBpmSlider, &unitBox,
                                                              &stepLabel, &everyLabel, &maxLabel })
+    {
         c->setEnabled (on);
+        c->setVisible (on);
+    }
+
+    if (layoutChanged)
+        resized();
 }
 
 bool PracticePanel::keyPressed (const juce::KeyPress& key)
@@ -1451,9 +1460,24 @@ void PracticePanel::resized()
 
     songLabel.setBounds (top.reduced (8, 0));
 
+    // Heights of the cards below the transport row, worked out first: on a short screen (iPad landscape)
+    // the waveform gives up height so the chords card and the whole metronome card stay visible.
+    const auto gap = 16, pad = 14;
+    const auto playbackHeight = 3 * 40 + 30 + 2 * pad;
+    const auto chordsMinHeight = 186, chordsMaxHeight = 230;
+    const auto trainerOn = stepSlider.isVisible();
+    const auto metronomeInnerWidth = (area.getWidth() - gap) / 2 - 2 * pad;
+    const auto trainerNarrow = metronomeInnerWidth < 24 + 52 + 170 + 12 + 52 + 150 + 110;
+    const auto trainerHeight = trainerOn ? (trainerNarrow ? 3 : 2) * 44 : 0;
+    const auto metronomeHeight = 48 + 4 * 40 + 36 + trainerHeight + 2 * pad - 6 + (trainerOn ? 0 : 6);
+    const auto belowNeeded = juce::jmax (playbackHeight + gap + chordsMinHeight, metronomeHeight) + 8;
+
     // Waveform (includes the overview strip at its bottom), or the YouTube video + its timeline.
     // The video stays at least 216 px high: YouTube's embedded player must be at least 200 x 200.
-    auto songArea = area.removeFromTop (juce::jmax (youTubeMode ? 256 : 170, area.getHeight() * 38 / 100)).reduced (0, 4);
+    const auto minSong = youTubeMode ? 256 : 170;
+    const auto songHeight = juce::jlimit (minSong, juce::jmax (minSong, area.getHeight() * 38 / 100),
+                                          area.getHeight() - 66 - belowNeeded);
+    auto songArea = area.removeFromTop (songHeight).reduced (0, 4);
     waveform.setBounds (songArea);
     youTubeTimeline->setBounds (songArea.removeFromBottom (30));
     videoArea = songArea.withTrimmedBottom (4);
@@ -1489,17 +1513,16 @@ void PracticePanel::resized()
     area.removeFromTop (8);
 
     // Two columns of cards: playback + chords | metronome
-    const auto gap = 16, pad = 14;
     auto left = area.removeFromLeft ((area.getWidth() - gap) / 2);
     area.removeFromLeft (gap);
     auto right = area;
 
-    playbackCard = left.removeFromTop (juce::jmin (left.getHeight(), 3 * 40 + 30 + 2 * pad));
+    playbackCard = left.removeFromTop (juce::jmin (left.getHeight(), playbackHeight));
     left.removeFromTop (gap);
     const auto chordArea = left;
     left = playbackCard.reduced (pad);
 
-    metronomeCard = right.withHeight (juce::jmin (right.getHeight(), 48 + 4 * 40 + 36 + 2 * 44 + 2 * pad - 6));
+    metronomeCard = right.withHeight (juce::jmin (right.getHeight(), metronomeHeight));
     right = metronomeCard.reduced (pad, pad - 6);
 
     auto sliderRow = [] (juce::Rectangle<int>& column, juce::Label& label, juce::Component& control, int height = 40)
@@ -1514,7 +1537,7 @@ void PracticePanel::resized()
     sliderRow (left, songVolumeLabel, songVolumeSlider);
     hintLabel.setBounds (left.removeFromTop (30));
     noteLabel.setBounds (hintLabel.getBounds());
-    chordView.setBounds (chordArea.withHeight (juce::jmin (chordArea.getHeight(), 230)));
+    chordView.setBounds (chordArea.withHeight (juce::jmin (chordArea.getHeight(), chordsMaxHeight)));
 
     // Metronome column
     auto metroTop = right.removeFromTop (48);
@@ -1559,21 +1582,31 @@ void PracticePanel::resized()
         followToggle.setBounds (row);
     }
 
+    if (trainerOn)
     {
+        // Add [step] every [interval][unit] / up to [max]; three rows when the card is narrow.
         auto row = right.removeFromTop (44);
         row.removeFromLeft (24);
-        stepLabel.setBounds (row.removeFromLeft (44));
+        stepLabel.setBounds (row.removeFromLeft (52));
         stepSlider.setBounds (row.removeFromLeft (170).reduced (0, 3));
-        row.removeFromLeft (12);
+
+        if (trainerNarrow)
+        {
+            row = right.removeFromTop (44);
+            row.removeFromLeft (24);
+        }
+        else
+        {
+            row.removeFromLeft (12);
+        }
+
         everyLabel.setBounds (row.removeFromLeft (52));
         intervalSlider.setBounds (row.removeFromLeft (150).reduced (0, 3));
         unitBox.setBounds (row.removeFromLeft (110).reduced (6, 6));
-    }
 
-    {
-        auto row = right.removeFromTop (44);
+        row = right.removeFromTop (44);
         row.removeFromLeft (24);
-        maxLabel.setBounds (row.removeFromLeft (44));
+        maxLabel.setBounds (row.removeFromLeft (52));
         maxBpmSlider.setBounds (row.removeFromLeft (170).reduced (0, 3));
     }
 }

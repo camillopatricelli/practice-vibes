@@ -12,7 +12,8 @@ namespace pv::icons
     enum class Icon
     {
         none, back, play, pause, stop, loop, zoomIn, zoomOut, fit, folder, stems,
-        tuner, gear, bluetooth, save, magnet, metronome, record
+        tuner, gear, bluetooth, save, magnet, metronome, record,
+        openWindow, power, arrowUp, arrowDown, trash, mute, clear
     };
 
     /** Draws `icon` fitted into `area` (square, centred). */

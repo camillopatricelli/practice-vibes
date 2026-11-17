@@ -189,7 +189,7 @@ public:
         if (lines.empty())
         {
             g.setColour (theme::text().withAlpha (0.45f));
-            g.setFont (juce::FontOptions (14.0f));
+            g.setFont (theme::textFont (15.5f));
             g.drawFittedText ("Nothing yet. Play, and the time you spend on each topic is recorded here by itself.",
                               getLocalBounds().reduced (4), juce::Justification::topLeft, 3);
             return;
@@ -216,7 +216,7 @@ public:
                     g.setColour (theme::text().withAlpha (0.12f));
                     g.fillRect (r.getX(), r.getBottom() - 1, r.getWidth(), 1);
                     g.setColour (theme::text());
-                    g.setFont (juce::FontOptions (14.5f).withStyle ("Bold"));
+                    g.setFont (theme::textFont (16.0f, "Bold"));
                     g.drawText (l.text, r, juce::Justification::centredLeft, true);
                     g.setColour (theme::text().withAlpha (0.7f));
                     g.drawText (l.detail, r, juce::Justification::centredRight, true);
@@ -224,9 +224,10 @@ public:
 
                 case Line::entry:
                 {
-                    g.setFont (juce::FontOptions (14.0f));
+                    const juce::Font entryFont (theme::textFont (15.5f));
+                    g.setFont (entryFont);
                     const auto detailWidth = juce::jmin (r.getWidth() / 2,
-                                                         juce::roundToInt (juce::GlyphArrangement::getStringWidth (juce::Font (juce::FontOptions (14.0f)), l.detail)) + 8);
+                                                         juce::roundToInt (juce::GlyphArrangement::getStringWidth (entryFont, l.detail)) + 8);
                     g.setColour (theme::text().withAlpha (0.6f));
                     g.drawText (l.detail, r.removeFromRight (detailWidth), juce::Justification::centredRight, true);
                     g.setColour (theme::text().withAlpha (0.9f));
@@ -236,7 +237,7 @@ public:
 
                 case Line::note:
                     g.setColour (theme::highlight().withAlpha (0.8f));
-                    g.setFont (juce::FontOptions (13.0f).withStyle ("Italic"));
+                    g.setFont (theme::textFont (14.5f, "Italic"));
                     g.drawText (l.text, r.withTrimmedLeft (22), juce::Justification::centredLeft, true);
                     break;
             }
@@ -276,7 +277,7 @@ private:
         juce::String entryId;
     };
 
-    static int heightOf (const Line& l)     { return l.kind == Line::day ? 34 : (l.kind == Line::entry ? 24 : 20); }
+    static int heightOf (const Line& l)     { return l.kind == Line::day ? 40 : (l.kind == Line::entry ? 30 : 24); }
 
     juce::String idAt (int y) const
     {
@@ -430,6 +431,10 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
     recentViewport.setViewedComponent (recentView.get(), false);
     recentViewport.setScrollBarsShown (true, false);
     addAndMakeVisible (recentViewport);
+
+    recentToggleButton.setTooltip ("Show the last two weeks in place of the rotation list, or the other way round");
+    recentToggleButton.onClick = [this] { recentExpanded = ! recentExpanded; resized(); repaint(); };
+    addChildComponent (recentToggleButton);
 
     startTimerHz (2);
 }
@@ -707,6 +712,9 @@ void TodayPanel::paint (juce::Graphics& g)
     g.setColour (theme::panel());
     g.fillRoundedRectangle (nowCard.toFloat(), 8.0f);
 
+    if (! recentCard.isEmpty())
+        theme::paintCard (g, recentCard.toFloat(), 14.0f);
+
     if (! diceStrip.isEmpty())
     {
         g.setColour (theme::highlight());
@@ -810,13 +818,6 @@ void TodayPanel::resized()
     card.removeFromTop (8);
     noteEditor.setBounds (card.removeFromTop (34));
 
-    if (! wide)
-    {
-        auto recentPart = left.removeFromBottom (juce::jmax (160, left.getHeight() / 3));
-        right = recentPart;
-        left.removeFromBottom (12);
-    }
-
     auto headerRow = left.removeFromTop (36);
     planButton.setBounds (headerRow.removeFromRight (150).reduced (0, 2));
     headerRow.removeFromRight (6);
@@ -854,6 +855,25 @@ void TodayPanel::resized()
         diceLabel.setBounds (d);
     }
 
+    // Narrow: the last two weeks are either just their header row at the bottom, or take the rotation list's place.
+    recentToggleButton.setVisible (! wide);
+
+    if (! wide)
+    {
+        recentToggleButton.setButtonText (recentExpanded ? "Hide" : "Show");
+
+        if (recentExpanded)
+        {
+            right = left;
+            left = left.withHeight (0);
+        }
+        else
+        {
+            right = left.removeFromBottom (30);
+            left.removeFromBottom (12);
+        }
+    }
+
     rotationViewport.setBounds (left);
     rotationEmpty.setBounds (left.withHeight (juce::jmin (left.getHeight(), 120)));
 
@@ -868,8 +888,20 @@ void TodayPanel::resized()
     addTimeButton.setBounds (recentTop.removeFromRight (110).reduced (0, 2));
     recentTop.removeFromRight (6);
     allHistoryButton.setBounds (recentTop.removeFromRight (84).reduced (0, 2));
+    recentTop.removeFromRight (6);
+
+    if (recentToggleButton.isVisible())
+    {
+        recentToggleButton.setBounds (recentTop.removeFromRight (76).reduced (0, 2));
+        recentTop.removeFromRight (6);
+    }
+
     recentHeader.setBounds (recentTop);
-    recentViewport.setBounds (right);
+
+    // The list sits in a card, clearly apart from the rotation rows above it.
+    right.removeFromTop (6);
+    recentCard = right.getHeight() > 20 ? right : juce::Rectangle<int>();
+    recentViewport.setBounds (recentCard.reduced (theme::listCardPadX + 6, theme::listCardPadY + 2));
     recentView->setSize (juce::jmax (1, recentViewport.getMaximumVisibleWidth()), recentView->getContentHeight());
 }
 

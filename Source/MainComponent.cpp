@@ -12,6 +12,7 @@
 #include "Theme.h"
 #include "WebView.h"
 #include "AppPaths.h"
+#include "BluetoothMidiView.h"
 #include <AppIconData.h>
 
 namespace pv
@@ -179,8 +180,12 @@ private:
         }
         else
         {
-            content->setBounds (contentArea.withSizeKeepingCentre (juce::jmin (720, contentArea.getWidth()),
-                                                                   juce::jmin (640, contentArea.getHeight())));
+            // Dialogs may ask for another size with the overlayWidth / overlayHeight properties.
+            const auto& props = content->getProperties();
+            const int w = props.getWithDefault ("overlayWidth", 720);
+            const int h = props.getWithDefault ("overlayHeight", 640);
+            content->setBounds (contentArea.withSizeKeepingCentre (juce::jmin (w, contentArea.getWidth()),
+                                                                   juce::jmin (h, contentArea.getHeight())));
         }
     }
 
@@ -241,21 +246,7 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
         tracker.flush();
     };
 
-    bluetoothButton.onClick = []
-    {
-        if (juce::BluetoothMidiDevicePairingDialogue::isAvailable())
-            juce::BluetoothMidiDevicePairingDialogue::open();
-        else
-            juce::Logger::writeToLog ("Bluetooth MIDI pairing is done by the operating system here: pair the footswitch in "
-                                     #if JUCE_WINDOWS
-                                      "Windows Settings > Bluetooth & devices."
-                                     #elif JUCE_MAC
-                                      "Audio MIDI Setup > Window > Show MIDI Studio > Bluetooth."
-                                     #else
-                                      "the system's Bluetooth settings."
-                                     #endif
-                                      );
-    };
+    bluetoothButton.onClick = [this] { openBluetoothMidi(); };
 
     saveButton.onClick = [this] { engine.saveState(); };
 
@@ -372,6 +363,14 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     tabs.addTab ("Looper", theme::background(), looperPanel.get(), false);
     tabs.addTab ("Guitar rig", theme::background(), rigPanel.get(), false);
     addAndMakeVisible (tabs);
+
+    // TabbedComponent brings the new panel to front *with* keyboard focus. A panel that doesn't take the focus
+    // itself passes it to its first focusable child: on the Topics and Links tabs that's a text box, and the
+    // iPad keyboard popped up on every visit. Panels keep the focus themselves; text boxes get it when tapped.
+    for (auto* panel : std::initializer_list<juce::Component*> { todayPanel.get(), practicePanel.get(), libraryPanel.get(),
+                                                                linksPanel.get(), looperPanel.get(), rigPanel.get(), logPanel.get() })
+        if (panel != nullptr)
+            panel->setWantsKeyboardFocus (true);
 
     // The Log tab is for troubleshooting: off unless switched on in the audio settings.
     if (auto ui = juce::parseXML (getUiSettingsFile()))
@@ -1566,12 +1565,47 @@ void MainComponent::openAudioSettings()
                                                                           true,    // MIDI inputs
                                                                           false, false, false);
 
-    // The device selector, with the theme and the Log tab switch underneath.
+    // The selector's own "Bluetooth MIDI" button opens JUCE's dialogue: send it to ours instead (async: the
+    // settings overlay, button included, is replaced by the Bluetooth one).
+   #if JUCE_IOS
+    {
+        std::function<void (juce::Component&)> rewire = [&] (juce::Component& c)
+        {
+            for (auto* child : c.getChildren())
+            {
+                if (auto* b = dynamic_cast<juce::TextButton*> (child); b != nullptr && b->getButtonText().containsIgnoreCase ("Bluetooth"))
+                    b->onClick = [safe = juce::Component::SafePointer<MainComponent> (this)]
+                    {
+                        juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->openBluetoothMidi(); });
+                    };
+
+                rewire (*child);
+            }
+        };
+
+        rewire (*selector);
+    }
+   #endif
+
+    // A card: "Display" (theme, Log tab) on top, so the theme menu has room to open downwards,
+    // then "Audio and MIDI" with JUCE's device selector.
     struct Settings final : public juce::Component
     {
         Settings (std::unique_ptr<juce::Component> s, bool logShown, std::function<void (bool)> onLog)
             : selector (std::move (s))
         {
+            getProperties().set ("overlayWidth", 760);
+            getProperties().set ("overlayHeight", 820);
+
+            displayHeader.setText ("Display", juce::dontSendNotification);
+            audioHeader.setText ("Audio and MIDI", juce::dontSendNotification);
+            for (auto* h : { &displayHeader, &audioHeader })
+            {
+                theme::styleHeader (*h);
+                h->setColour (juce::Label::textColourId, theme::text());
+                addAndMakeVisible (*h);
+            }
+
             addAndMakeVisible (*selector);
             logToggle.setToggleState (logShown, juce::dontSendNotification);
             logToggle.setTooltip ("A tab with everything the app writes to its log, for troubleshooting");
@@ -1600,17 +1634,31 @@ void MainComponent::openAudioSettings()
             addAndMakeVisible (themeBox);
         }
 
+        void paint (juce::Graphics& g) override
+        {
+            theme::paintCard (g, getLocalBounds().toFloat().reduced (1.0f));
+        }
+
         void resized() override
         {
-            auto r = getLocalBounds();
-            auto bottom = r.removeFromBottom (40).reduced (8, 4);
-            logToggle.setBounds (bottom.removeFromRight (220));
-            themeLabel.setBounds (bottom.removeFromLeft (120));
-            bottom.removeFromLeft (10);
-            themeBox.setBounds (bottom.removeFromLeft (juce::jmin (320, bottom.getWidth())));
+            auto r = getLocalBounds().reduced (20, 16);
+            displayHeader.setBounds (r.removeFromTop (30));
+            r.removeFromTop (6);
+
+            auto row = r.removeFromTop (40).reduced (0, 4);
+            logToggle.setBounds (row.removeFromRight (juce::jmin (220, row.getWidth() / 3)));
+            row.removeFromRight (12);
+            themeLabel.setBounds (row.removeFromLeft (110));
+            row.removeFromLeft (10);
+            themeBox.setBounds (row.removeFromLeft (juce::jmin (340, row.getWidth())));
+
+            r.removeFromTop (18);
+            audioHeader.setBounds (r.removeFromTop (30));
+            r.removeFromTop (6);
             selector->setBounds (r);
         }
 
+        juce::Label displayHeader, audioHeader;
         std::unique_ptr<juce::Component> selector;
         juce::ToggleButton logToggle { "Show the Log tab" };
         juce::Label themeLabel;
@@ -1653,6 +1701,29 @@ void MainComponent::setLogTabShown (bool shown)
 
             tabs.removeTab (i);
         }
+}
+
+void MainComponent::openBluetoothMidi()
+{
+    // iPad: the system's device list in our own overlay card, themed like the rest of the app.
+    if (auto view = createBluetoothMidiView())
+    {
+        showOverlay ("Bluetooth MIDI", std::move (view));
+        return;
+    }
+
+    if (juce::BluetoothMidiDevicePairingDialogue::isAvailable())
+        juce::BluetoothMidiDevicePairingDialogue::open();
+    else
+        juce::Logger::writeToLog ("Bluetooth MIDI pairing is done by the operating system here: pair the footswitch in "
+                                 #if JUCE_WINDOWS
+                                  "Windows Settings > Bluetooth & devices."
+                                 #elif JUCE_MAC
+                                  "Audio MIDI Setup > Window > Show MIDI Studio > Bluetooth."
+                                 #else
+                                  "the system's Bluetooth settings."
+                                 #endif
+                                  );
 }
 
 void MainComponent::toggleTuner()

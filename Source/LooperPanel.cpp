@@ -767,16 +767,31 @@ void LooperPanel::resized()
     top.removeFromLeft (16);
     lengthLabel.setBounds (top.removeFromLeft (60));
     lengthBox.setBounds (top.removeFromLeft (220).reduced (2, 6));
-    footswitchButton.setBounds (top.removeFromRight (120).reduced (3, 4));
-    clearAllButton.setBounds (top.removeFromRight (100).reduced (3, 4));
-    muteAllButton.setBounds (top.removeFromRight (100).reduced (3, 4));
-    undoButton.setBounds (top.removeFromRight (130).reduced (3, 4));
+
+    // Undo / Mute all / Clear all / Footswitch need 450 px: when the first row can't give them that
+    // (iPad portrait), they get a row of their own instead of being squeezed into unreadable slivers.
+    constexpr int actionsWidth = 130 + 100 + 100 + 120;
+    const bool narrow = top.getWidth() < actionsWidth;
+    auto actions = top;
+
+    if (narrow)
+    {
+        area.removeFromTop (2);
+        actions = area.removeFromTop (44);
+        actions = actions.removeFromRight (juce::jmin (actions.getWidth(), 4 * 150));
+    }
+
+    const int unit = narrow ? actions.getWidth() / 4 : 0;
+    footswitchButton.setBounds (actions.removeFromRight (narrow ? unit : 120).reduced (3, 4));
+    clearAllButton.setBounds (actions.removeFromRight (narrow ? unit : 100).reduced (3, 4));
+    muteAllButton.setBounds (actions.removeFromRight (narrow ? unit : 100).reduced (3, 4));
+    undoButton.setBounds (actions.removeFromRight (narrow ? unit : 130).reduced (3, 4));
 
     area.removeFromTop (4);
     auto metro = area.removeFromTop (44);
     metronomeButton.setBounds (metro.removeFromLeft (170).reduced (2, 4));
-    tempoDisplay.setBounds (metro.removeFromRight (130));
-    beatDots->setBounds (metro.removeFromRight (160).reduced (4, 8));
+    tempoDisplay.setBounds (metro.removeFromRight (narrow ? 110 : 130));
+    beatDots->setBounds (metro.removeFromRight (narrow ? 110 : 160).reduced (4, 8));
     tempoLabel.setBounds (metro.removeFromLeft (70).withTrimmedLeft (12));
     beatsBox.setBounds (metro.removeFromRight (70).reduced (2, 6));
     beatsLabel.setBounds (metro.removeFromRight (110));

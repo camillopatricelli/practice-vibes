@@ -46,6 +46,13 @@ namespace
             case Icon::magnet:    svg (s.stroke, "M6 3v8a6 6 0 0 0 12 0V3M6 7h4M14 7h4"); break;
             case Icon::metronome: svg (s.stroke, "M9 3h6l4 18H5zM12 15l6-9"); break;
             case Icon::record:    circle (s.fill, 12, 12, 5); break;
+            case Icon::openWindow: svg (s.stroke, "M14 4h6v6M20 4l-9 9M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"); break;
+            case Icon::power:     svg (s.stroke, "M12 3v9M17.7 6.3a8 8 0 1 1-11.4 0"); break;
+            case Icon::arrowUp:   svg (s.stroke, "M12 20V4M5 11l7-7 7 7"); break;
+            case Icon::arrowDown: svg (s.stroke, "M12 4v16M5 13l7 7 7-7"); break;
+            case Icon::trash:     svg (s.stroke, "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"); break;
+            case Icon::mute:      svg (s.stroke, "M4 9h4l5-4v14l-5-4H4zM16 9l5 6M21 9l-5 6"); break;
+            case Icon::clear:     svg (s.stroke, "M6 6l12 12M18 6 6 18"); break;
             case Icon::none:      break;
         }
 

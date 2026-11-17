@@ -41,6 +41,7 @@ private:
     bool isLogTabShown() const;
     void setLogTabShown (bool);     // the Log tab is hidden unless switched on in the audio settings
     void toggleTuner();
+    void openBluetoothMidi();
     void showOverlay (const juce::String& title, std::unique_ptr<juce::Component>);
     void closeOverlay();
 

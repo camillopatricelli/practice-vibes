@@ -203,19 +203,40 @@ public:
     {
         auto area = getLocalBounds();
 
+        // Narrow (iPad portrait): the created date and the tags get a row of their own, the switches another,
+        // so the title and the tags box aren't squeezed to a few letters.
+        const bool narrow = getWidth() < 780;
+
         auto top = area.removeFromTop (44);
         deleteButton.setBounds (top.removeFromRight (120).reduced (2, 4));
         practiseButton.setBounds (top.removeFromRight (100).reduced (2, 4));
         top.removeFromRight (8);
-        createdLabel.setBounds (top.removeFromRight (150));
+        if (! narrow)
+            createdLabel.setBounds (top.removeFromRight (150));
         titleEditor.setBounds (top.reduced (0, 2));
 
         area.removeFromTop (6);
-        auto tagsRow = area.removeFromTop (30);
-        historyButton.setBounds (tagsRow.removeFromRight (90).reduced (0, 1));
-        rotationToggle.setBounds (tagsRow.removeFromRight (190).withTrimmedLeft (12));
-        noGuitarToggle.setBounds (tagsRow.removeFromRight (220).withTrimmedLeft (12));
-        tagsEditor.setBounds (tagsRow);
+
+        if (narrow)
+        {
+            auto tagsRow = area.removeFromTop (30);
+            createdLabel.setBounds (tagsRow.removeFromRight (150).withTrimmedLeft (8));
+            tagsEditor.setBounds (tagsRow);
+            area.removeFromTop (6);
+
+            auto toggleRow = area.removeFromTop (30);
+            historyButton.setBounds (toggleRow.removeFromRight (90).reduced (0, 1));
+            noGuitarToggle.setBounds (toggleRow.removeFromLeft (toggleRow.getWidth() / 2));
+            rotationToggle.setBounds (toggleRow);
+        }
+        else
+        {
+            auto tagsRow = area.removeFromTop (30);
+            historyButton.setBounds (tagsRow.removeFromRight (90).reduced (0, 1));
+            rotationToggle.setBounds (tagsRow.removeFromRight (190).withTrimmedLeft (12));
+            noGuitarToggle.setBounds (tagsRow.removeFromRight (220).withTrimmedLeft (12));
+            tagsEditor.setBounds (tagsRow);
+        }
         area.removeFromTop (4);
         notesLabel.setBounds (area.removeFromTop (26));
         const auto notesHeight = juce::jlimit (110, 360, (int) (area.getHeight() * 0.38f));
