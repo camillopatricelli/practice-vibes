@@ -537,8 +537,8 @@ void StemMixer::resized()
         {
             auto r = area.removeFromTop (42).reduced (0, 4);
             row->name.setBounds (r.removeFromLeft (80));
-            row->mute.setBounds (r.removeFromLeft (40).reduced (2, 0));
-            row->solo.setBounds (r.removeFromLeft (40).reduced (2, 0));
+            row->mute.setBounds (r.removeFromLeft (46).reduced (2, 0));
+            row->solo.setBounds (r.removeFromLeft (46).reduced (2, 0));
             r.removeFromLeft (10);
             row->volume.setBounds (r);
         }

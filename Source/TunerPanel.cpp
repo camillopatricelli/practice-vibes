@@ -545,7 +545,7 @@ void TunerPanel::paintStrings (juce::Graphics& g, juce::Rectangle<float>)
         g.setColour (lit && std::abs (away) >= 50.0f ? offColour() : theme::text().withAlpha (0.4f));
         g.setFont (juce::FontOptions (12.0f));
         g.drawText (lit && std::abs (away) >= 50.0f ? semitonesText (away, cell.getWidth() > 150.0f)
-                                                    : "string " + juce::String ((int) strings.size() - i),
+                                                    : tr ("string {number}", juce::String ((int) strings.size() - i)),
                     cell, juce::Justification::centred);
     }
 }

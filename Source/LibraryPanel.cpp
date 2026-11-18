@@ -91,6 +91,9 @@ public:
             addAndMakeVisible (*e);
         }
 
+        bpmEditor.setJustification (juce::Justification::centredLeft);
+        minutesEditor.setJustification (juce::Justification::centredLeft);
+
         // The next 8 weeks, day by day (id = days from today + 2; 1 = none).
         lessonBox.addItem (tr ("None"), 1);
         const auto now = juce::Time::getCurrentTime();

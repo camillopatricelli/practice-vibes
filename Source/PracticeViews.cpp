@@ -104,7 +104,7 @@ public:
             const juce::Font small (juce::FontOptions (12.0f));
             g.setFont (small);
             g.setColour (axisText());
-            const auto note = tag.isNotEmpty() ? "random #" + tag : juce::String ("random");
+            const auto note = tag.isNotEmpty() ? tr ("random #{tag}", tag) : tr ("random");
             g.drawText (note, r.removeFromRight (juce::jmin (r.getWidth() / 2, (int) textWidth (small, note) + 8)),
                         juce::Justification::centredRight, true);
         }
@@ -163,7 +163,7 @@ SessionPlanner::SessionPlanner (CandidatesFn fn, TopicTitleFn titles, PlanList* 
     addAndMakeVisible (planMenuButton);
 
     for (int m : { 15, 20, 30, 45, 60, 75, 90, 120 })
-        timeBox.addItem (juce::String (m) + " minutes", m);
+        timeBox.addItem (trn ("{n} minute", "{n} minutes", m), m);
 
     timeBox.setSelectedId (timeBox.indexOfItemId (minutes) >= 0 ? minutes : 45, juce::dontSendNotification);
     timeBox.onChange = [this] { replan(); };
@@ -700,7 +700,7 @@ public:
         auto best = std::max_element (points.begin(), points.end(), [] (const Point& a, const Point& b) { return a.value < b.value; });
         g.setFont (juce::FontOptions (12.5f).withStyle ("Bold"));
         g.setColour (primaryText());
-        labelPoint (g, points.back(), "now " + format (points.back().value));
+        labelPoint (g, points.back(), tr ("now {value}", format (points.back().value)));
 
         if (best != points.end() - 1 && best->value > points.back().value)
             labelPoint (g, *best, tr ("best {value}", format (best->value)));

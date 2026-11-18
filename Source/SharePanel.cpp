@@ -88,12 +88,9 @@ SharePanel::SharePanel (const Topic& t, juce::File folder, juce::String shareBut
 
     for (auto& item : items)
     {
-        juce::String text = item.title;
-
-        if (item.isTake)
-            text << "  (take)";
-        else if (item.isSong)
-            text << "  (song)";
+        const auto text = item.isTake ? tr ("{title}  (take)", item.title)
+                        : item.isSong ? tr ("{title}  (song)", item.title)
+                                      : item.title;
 
         auto* toggle = toggles.add (new juce::ToggleButton (text));
         toggle->setToggleState (item.include, juce::dontSendNotification);

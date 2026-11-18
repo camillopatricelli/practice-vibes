@@ -50,7 +50,8 @@ struct ChordTrack
 
     /** Chord name, transposed by `semitones`, spelled with flats or sharps to suit the (transposed) key. */
     juce::String chordName (const Chord&, int semitones = 0) const;
-    juce::String keyName (int semitones = 0) const;
+    juce::String keyName (int semitones = 0) const;       // "A major" (English, for logs)
+    juce::String keyRootName (int semitones = 0) const;   // "A" (for UI text built with tr)
 
     juce::String timeSignature() const      { return juce::String (beatsPerBar) + "/" + juce::String (beatUnit); }
 

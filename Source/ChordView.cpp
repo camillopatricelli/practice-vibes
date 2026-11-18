@@ -54,7 +54,9 @@ void ChordView::paint (juce::Graphics& g)
             const auto sep = juce::String ("  ") + juce::String::charToString ((juce::juce_wchar) 0x00b7) + "  ";
             g.setColour (theme::muted());
             g.setFont (theme::textFont (13.0f, "Medium"));
-            g.drawText (tr ("Key {key}", track->keyName (transpose)) + sep + "~" + juce::String (juce::roundToInt (track->bpm)) + " bpm" + sep
+            const auto keyText = track->keyIsMinor ? tr ("{note} minor", track->keyRootName (transpose))
+                                                   : tr ("{note} major", track->keyRootName (transpose));
+            g.drawText (tr ("Key {key}", keyText) + sep + "~" + juce::String (juce::roundToInt (track->bpm)) + " bpm" + sep
                             + track->timeSignatureAt (juce::jmax (0, beatIndex)) + (track->hasMeterChanges() ? " " + tr ("(changes)") : juce::String()),
                         title, juce::Justification::centredRight, true);
         }

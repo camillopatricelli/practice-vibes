@@ -44,18 +44,22 @@ countries: (two-letter language code, e.g. it)
 // Source/ChordView.cpp:50
 "Chords" = "Chords"
 // Source/ChordView.cpp:57
-"Key {key}" = "Key {key}"
+"{note} minor" = "{note} minor"
 // Source/ChordView.cpp:58
+"{note} major" = "{note} major"
+// Source/ChordView.cpp:59
+"Key {key}" = "Key {key}"
+// Source/ChordView.cpp:60
 "(changes)" = "(changes)"
-// Source/ChordView.cpp:67
+// Source/ChordView.cpp:69
 "Chords appear here after you open a song." = "Chords appear here after you open a song."
-// Source/ChordView.cpp:126
+// Source/ChordView.cpp:128
 "NEXT" = "NEXT"
-// Source/ChordView.cpp:136
+// Source/ChordView.cpp:138
 "in {n} beats" = "in {n} beats"
-// Source/ChordView.cpp:136
+// Source/ChordView.cpp:138
 "next beat" = "next beat"
-// Source/ChordView.cpp:183
+// Source/ChordView.cpp:185
 "Detected automatically, may contain mistakes" = "Detected automatically, may contain mistakes"
 // Source/DrumEditor.cpp:36
 "M" = "M"
@@ -339,291 +343,291 @@ countries: (two-letter language code, e.g. it)
 "bpm (optional)" = "bpm (optional)"
 // Source/LibraryPanel.cpp:86
 "optional" = "optional"
-// Source/LibraryPanel.cpp:95
+// Source/LibraryPanel.cpp:98
 "None" = "None"
-// Source/LibraryPanel.cpp:103
+// Source/LibraryPanel.cpp:106
 "Today" = "Today"
-// Source/LibraryPanel.cpp:103
+// Source/LibraryPanel.cpp:106
 "Tomorrow" = "Tomorrow"
-// Source/LibraryPanel.cpp:167
+// Source/LibraryPanel.cpp:170
 "No assignment" = "No assignment"
-// Source/LibraryPanel.cpp:182
+// Source/LibraryPanel.cpp:185
 "A group gets one topic in one go (Share > To). Members are first names or nicknames, separated by commas, as in the Student boxes. Groups stay on your devices: never sent to anyone." = "A group gets one topic in one go (Share > To). Members are first names or nicknames, separated by commas, as in the Student boxes. Groups stay on your devices: never sent to anyone."
-// Source/LibraryPanel.cpp:190
+// Source/LibraryPanel.cpp:193
 "Your students: {names}" = "Your students: {names}"
-// Source/LibraryPanel.cpp:213
+// Source/LibraryPanel.cpp:216
 "Group" = "Group"
-// Source/LibraryPanel.cpp:291
+// Source/LibraryPanel.cpp:294
 "Group name" = "Group name"
-// Source/LibraryPanel.cpp:297
+// Source/LibraryPanel.cpp:300
 "Members, e.g. Anna, Marco, Luca" = "Members, e.g. Anna, Marco, Luca"
-// Source/LibraryPanel.cpp:301
+// Source/LibraryPanel.cpp:304
 "Remove" = "Remove"
-// Source/LibraryPanel.cpp:302
+// Source/LibraryPanel.cpp:305
 "Removes the group (its members' topics stay)" = "Removes the group (its members' topics stay)"
-// Source/LibraryPanel.cpp:323
+// Source/LibraryPanel.cpp:326
 "+ Add group" = "+ Add group"
-// Source/LibraryPanel.cpp:341
+// Source/LibraryPanel.cpp:344
 "Each member has their own file. Tap Share... on a row and send it to that member (their chat, mail or AirDrop), then the next one." = "Each member has their own file. Tap Share... on a row and send it to that member (their chat, mail or AirDrop), then the next one."
-// Source/LibraryPanel.cpp:353
+// Source/LibraryPanel.cpp:356
 "Share..." = "Share..."
-// Source/LibraryPanel.cpp:389
+// Source/LibraryPanel.cpp:392
 "Shared - again?" = "Shared - again?"
-// Source/LibraryPanel.cpp:400
+// Source/LibraryPanel.cpp:403
 "Done" = "Done"
-// Source/LibraryPanel.cpp:412
+// Source/LibraryPanel.cpp:415
 "Topic title" = "Topic title"
-// Source/LibraryPanel.cpp:420
+// Source/LibraryPanel.cpp:423
 "Tags, separated by commas (e.g. technique, jazz, lesson)" = "Tags, separated by commas (e.g. technique, jazz, lesson)"
-// Source/LibraryPanel.cpp:440
+// Source/LibraryPanel.cpp:443
 "Student" = "Student"
-// Source/LibraryPanel.cpp:441
+// Source/LibraryPanel.cpp:444
 "Who this topic is for: a first name or nickname. Groups topics by student (Tags menu). Stays on your devices: never sent with the topic" = "Who this topic is for: a first name or nickname. Groups topics by student (Tags menu). Stays on your devices: never sent with the topic"
-// Source/LibraryPanel.cpp:452
+// Source/LibraryPanel.cpp:455
 "Goal, target tempo, minutes a day and the next lesson: they go along when you share the topic, and show on the student's Today tab" = "Goal, target tempo, minutes a day and the next lesson: they go along when you share the topic, and show on the student's Today tab"
-// Source/LibraryPanel.cpp:470
+// Source/LibraryPanel.cpp:473
 "Make this the topic you're practising, and bring back the song, loop, speed and tempo you used last time" = "Make this the topic you're practising, and bring back the song, loop, speed and tempo you used last time"
-// Source/LibraryPanel.cpp:475
+// Source/LibraryPanel.cpp:478
 "Send this topic to a teacher, a student or a bandmate as one .pvtopic file: you choose which files go in" = "Send this topic to a teacher, a student or a bandmate as one .pvtopic file: you choose which files go in"
-// Source/LibraryPanel.cpp:479
-"Tempo, song speed and minutes over the weeks, and every session" = "Tempo, song speed and minutes over the weeks, and every session"
 // Source/LibraryPanel.cpp:482
+"Tempo, song speed and minutes over the weeks, and every session" = "Tempo, song speed and minutes over the weeks, and every session"
+// Source/LibraryPanel.cpp:485
 "Topics in the rotation are listed on the Today tab, most neglected first" = "Topics in the rotation are listed on the Today tab, most neglected first"
-// Source/LibraryPanel.cpp:486
+// Source/LibraryPanel.cpp:489
 "For ear training, theory...: while you practise this topic the time is counted on the clock (with Pause on the Today tab) instead of from your instrument input" = "For ear training, theory...: while you practise this topic the time is counted on the clock (with Pause on the Today tab) instead of from your instrument input"
-// Source/LibraryPanel.cpp:491
-"Notes" = "Notes"
-// Source/LibraryPanel.cpp:492
-"These notes travel with the topic when you share it" = "These notes travel with the topic when you share it"
-// Source/LibraryPanel.cpp:493
-"Private notes" = "Private notes"
 // Source/LibraryPanel.cpp:494
+"Notes" = "Notes"
+// Source/LibraryPanel.cpp:495
+"These notes travel with the topic when you share it" = "These notes travel with the topic when you share it"
+// Source/LibraryPanel.cpp:496
+"Private notes" = "Private notes"
+// Source/LibraryPanel.cpp:497
 "Only for you: never included when you share the topic" = "Only for you: never included when you share the topic"
-// Source/LibraryPanel.cpp:499
+// Source/LibraryPanel.cpp:502
 "Only for you: never shared" = "Only for you: never shared"
-// Source/LibraryPanel.cpp:508
+// Source/LibraryPanel.cpp:511
 "What to practise, how, lesson notes..." = "What to practise, how, lesson notes..."
-// Source/LibraryPanel.cpp:517
+// Source/LibraryPanel.cpp:520
 "Shows each copy's title and when it was saved; the ones you don't keep go to the bin" = "Shows each copy's title and when it was saved; the ones you don't keep go to the bin"
-// Source/LibraryPanel.cpp:521
+// Source/LibraryPanel.cpp:524
 "Resources" = "Resources"
-// Source/LibraryPanel.cpp:525
+// Source/LibraryPanel.cpp:528
 "Copies documents, images or audio files into this topic's folder" = "Copies documents, images or audio files into this topic's folder"
-// Source/LibraryPanel.cpp:527
+// Source/LibraryPanel.cpp:530
 "Copies documents, images or audio files into this topic's folder (you can also drop files here)" = "Copies documents, images or audio files into this topic's folder (you can also drop files here)"
-// Source/LibraryPanel.cpp:529
+// Source/LibraryPanel.cpp:532
 "YouTube video, Google document or any web page" = "YouTube video, Google document or any web page"
-// Source/LibraryPanel.cpp:533
+// Source/LibraryPanel.cpp:536
 "No resources yet: add documents, audio files or links." = "No resources yet: add documents, audio files or links."
-// Source/LibraryPanel.cpp:561
-"Created {date}" = "Created {date}"
-// Source/LibraryPanel.cpp:563
-"Sent {date}" = "Sent {date}"
 // Source/LibraryPanel.cpp:564
+"Created {date}" = "Created {date}"
+// Source/LibraryPanel.cpp:566
+"Sent {date}" = "Sent {date}"
+// Source/LibraryPanel.cpp:567
 "received {date}" = "received {date}"
-// Source/LibraryPanel.cpp:565
+// Source/LibraryPanel.cpp:568
 "Received {date}" = "Received {date}"
-// Source/LibraryPanel.cpp:578
+// Source/LibraryPanel.cpp:581
 "No assignment yet" = "No assignment yet"
-// Source/LibraryPanel.cpp:579
+// Source/LibraryPanel.cpp:582
 "Assignment: {details}" = "Assignment: {details}"
-// Source/LibraryPanel.cpp:586
+// Source/LibraryPanel.cpp:589
 "In the group {name}" = "In the group {name}"
-// Source/LibraryPanel.cpp:598
+// Source/LibraryPanel.cpp:601
 "Student's practice (sent {date}): {summary}" = "Student's practice (sent {date}): {summary}"
-// Source/LibraryPanel.cpp:605
+// Source/LibraryPanel.cpp:608
 "The cloud sync made an extra copy of this topic's file ({files}). Choose which version to keep.|The cloud sync made extra copies of this topic's file ({files}). Choose which version to keep." = "The cloud sync made an extra copy of this topic's file ({files}). Choose which version to keep.|The cloud sync made extra copies of this topic's file ({files}). Choose which version to keep."
-// Source/LibraryPanel.cpp:804
+// Source/LibraryPanel.cpp:807
 "Add files..." = "Add files..."
-// Source/LibraryPanel.cpp:804
+// Source/LibraryPanel.cpp:807
 "Add link..." = "Add link..."
-// Source/LibraryPanel.cpp:804
+// Source/LibraryPanel.cpp:807
 "Delete topic" = "Delete topic"
-// Source/LibraryPanel.cpp:805
+// Source/LibraryPanel.cpp:808
 "Assignment..." = "Assignment..."
-// Source/LibraryPanel.cpp:805
+// Source/LibraryPanel.cpp:808
 "Choose version..." = "Choose version..."
-// Source/LibraryPanel.cpp:805
+// Source/LibraryPanel.cpp:808
 "History" = "History"
-// Source/LibraryPanel.cpp:805
+// Source/LibraryPanel.cpp:808
 "Practise" = "Practise"
-// Source/LibraryPanel.cpp:806
+// Source/LibraryPanel.cpp:809
 "In practice rotation" = "In practice rotation"
-// Source/LibraryPanel.cpp:806
+// Source/LibraryPanel.cpp:809
 "Timed without playing" = "Timed without playing"
-// Source/LibraryPanel.cpp:820
+// Source/LibraryPanel.cpp:823
 "Inbox" = "Inbox"
-// Source/LibraryPanel.cpp:821
+// Source/LibraryPanel.cpp:824
 "Files placed directly in the library folder (for example from another device). Move each one into a topic." = "Files placed directly in the library folder (for example from another device). Move each one into a topic."
-// Source/LibraryPanel.cpp:840
+// Source/LibraryPanel.cpp:843
 "Move to topic..." = "Move to topic..."
-// Source/LibraryPanel.cpp:915
+// Source/LibraryPanel.cpp:918
 "Open in Safari / app" = "Open in Safari / app"
-// Source/LibraryPanel.cpp:917
+// Source/LibraryPanel.cpp:920
 "Open outside the app" = "Open outside the app"
-// Source/LibraryPanel.cpp:929
+// Source/LibraryPanel.cpp:932
 "Where should Practice Vibes keep your topics?" = "Where should Practice Vibes keep your topics?"
-// Source/LibraryPanel.cpp:931
+// Source/LibraryPanel.cpp:934
 "Keep them on this iPad, or pick a folder in iCloud Drive to share the same topics with your other devices (on a Windows PC: install iCloud for Windows)." = "Keep them on this iPad, or pick a folder in iCloud Drive to share the same topics with your other devices (on a Windows PC: install iCloud for Windows)."
-// Source/LibraryPanel.cpp:933
+// Source/LibraryPanel.cpp:936
 "iCloud Drive is the only cloud drive that can keep topics in sync with an iPad or iPhone." = "iCloud Drive is the only cloud drive that can keep topics in sync with an iPad or iPhone."
-// Source/LibraryPanel.cpp:935
+// Source/LibraryPanel.cpp:938
 "Pick a folder on this computer, or one inside a cloud drive (OneDrive, Google Drive, Dropbox, iCloud Drive) to share the same topics with your other computers." = "Pick a folder on this computer, or one inside a cloud drive (OneDrive, Google Drive, Dropbox, iCloud Drive) to share the same topics with your other computers."
-// Source/LibraryPanel.cpp:937
+// Source/LibraryPanel.cpp:940
 "To share them with an iPad or iPhone too, use iCloud Drive (install iCloud for Windows): it is the only cloud drive iPadOS lets apps use for a whole folder." = "To share them with an iPad or iPhone too, use iCloud Drive (install iCloud for Windows): it is the only cloud drive iPadOS lets apps use for a whole folder."
-// Source/LibraryPanel.cpp:943
+// Source/LibraryPanel.cpp:946
 "Use {folder}" = "Use {folder}"
-// Source/LibraryPanel.cpp:945
+// Source/LibraryPanel.cpp:948
 "Keep them on this iPad" = "Keep them on this iPad"
-// Source/LibraryPanel.cpp:956
+// Source/LibraryPanel.cpp:959
 "Choose a folder in iCloud Drive" = "Choose a folder in iCloud Drive"
-// Source/LibraryPanel.cpp:960
+// Source/LibraryPanel.cpp:963
 "Search topics" = "Search topics"
-// Source/LibraryPanel.cpp:970
+// Source/LibraryPanel.cpp:973
 "Show only topics with a tag (on the topic or one of its resources)" = "Show only topics with a tag (on the topic or one of its resources)"
-// Source/LibraryPanel.cpp:1008
+// Source/LibraryPanel.cpp:1011
 "Library folder: {folder}" = "Library folder: {folder}"
-// Source/LibraryPanel.cpp:1044
+// Source/LibraryPanel.cpp:1047
 "Choose the library folder" = "Choose the library folder"
-// Source/LibraryPanel.cpp:1058
+// Source/LibraryPanel.cpp:1061
 "Practice Vibes can't use that folder. Try another one, or keep the topics on this device." = "Practice Vibes can't use that folder. Try another one, or keep the topics on this device."
-// Source/LibraryPanel.cpp:1075
+// Source/LibraryPanel.cpp:1078
 "Show the folder" = "Show the folder"
-// Source/LibraryPanel.cpp:1076
-"To share topics with an iPad or iPhone, use a folder in iCloud Drive" = "To share topics with an iPad or iPhone, use a folder in iCloud Drive"
 // Source/LibraryPanel.cpp:1079
+"To share topics with an iPad or iPhone, use a folder in iCloud Drive" = "To share topics with an iPad or iPhone, use a folder in iCloud Drive"
+// Source/LibraryPanel.cpp:1082
 "Files app: On My iPad > Practice Vibes > Library" = "Files app: On My iPad > Practice Vibes > Library"
-// Source/LibraryPanel.cpp:1081
+// Source/LibraryPanel.cpp:1084
 "Only iCloud Drive can keep topics in sync with your other devices" = "Only iCloud Drive can keep topics in sync with your other devices"
-// Source/LibraryPanel.cpp:1083
+// Source/LibraryPanel.cpp:1086
 "Use a different folder..." = "Use a different folder..."
-// Source/LibraryPanel.cpp:1088
+// Source/LibraryPanel.cpp:1091
 "Use the folder on this iPad" = "Use the folder on this iPad"
-// Source/LibraryPanel.cpp:1090
+// Source/LibraryPanel.cpp:1093
 "Use the default folder" = "Use the default folder"
-// Source/LibraryPanel.cpp:1097
+// Source/LibraryPanel.cpp:1100
 "Check for changes now" = "Check for changes now"
-// Source/LibraryPanel.cpp:1105
+// Source/LibraryPanel.cpp:1108
 "Storage and clean-up..." = "Storage and clean-up..."
-// Source/LibraryPanel.cpp:1107
+// Source/LibraryPanel.cpp:1110
 "Import a shared topic (.pvtopic)..." = "Import a shared topic (.pvtopic)..."
-// Source/LibraryPanel.cpp:1109
+// Source/LibraryPanel.cpp:1112
 "Show the shared topics folder" = "Show the shared topics folder"
-// Source/LibraryPanel.cpp:1123
+// Source/LibraryPanel.cpp:1126
 "Storage and clean-up" = "Storage and clean-up"
-// Source/LibraryPanel.cpp:1139
+// Source/LibraryPanel.cpp:1142
 "Save and show in Explorer" = "Save and show in Explorer"
-// Source/LibraryPanel.cpp:1221
+// Source/LibraryPanel.cpp:1224
 "Share {title}" = "Share {title}"
-// Source/LibraryPanel.cpp:1232
+// Source/LibraryPanel.cpp:1235
 "Assignment: {title}" = "Assignment: {title}"
-// Source/LibraryPanel.cpp:1259
+// Source/LibraryPanel.cpp:1262
 "Import a shared topic" = "Import a shared topic"
-// Source/LibraryPanel.cpp:1290
+// Source/LibraryPanel.cpp:1293
 "Could not read the chosen file." = "Could not read the chosen file."
-// Source/LibraryPanel.cpp:1298
+// Source/LibraryPanel.cpp:1301
 "Choose where your library lives first (Topics tab), then open the shared topic again." = "Choose where your library lives first (Topics tab), then open the shared topic again."
-// Source/LibraryPanel.cpp:1337
+// Source/LibraryPanel.cpp:1340
 "Import shared topic" = "Import shared topic"
-// Source/LibraryPanel.cpp:1423
+// Source/LibraryPanel.cpp:1426
 "{n} file to sort into topics|{n} files to sort into topics" = "{n} file to sort into topics|{n} files to sort into topics"
-// Source/LibraryPanel.cpp:1431
+// Source/LibraryPanel.cpp:1434
 "(untitled)" = "(untitled)"
-// Source/LibraryPanel.cpp:1435
+// Source/LibraryPanel.cpp:1438
 "{n} resource|{n} resources" = "{n} resource|{n} resources"
-// Source/LibraryPanel.cpp:1469
+// Source/LibraryPanel.cpp:1472
 "All topics" = "All topics"
-// Source/LibraryPanel.cpp:1475
+// Source/LibraryPanel.cpp:1478
 "No tags yet: type them under a topic's title or in a resource's details" = "No tags yet: type them under a topic's title or in a resource's details"
-// Source/LibraryPanel.cpp:1506
+// Source/LibraryPanel.cpp:1509
 "Students" = "Students"
-// Source/LibraryPanel.cpp:1535
+// Source/LibraryPanel.cpp:1538
 "Group: {name}  ({count})" = "Group: {name}  ({count})"
-// Source/LibraryPanel.cpp:1545
-"New group (ensemble)..." = "New group (ensemble)..."
 // Source/LibraryPanel.cpp:1548
+"New group (ensemble)..." = "New group (ensemble)..."
+// Source/LibraryPanel.cpp:1551
 "Edit groups..." = "Edit groups..."
-// Source/LibraryPanel.cpp:1558
-"Tags" = "Tags"
-// Source/LibraryPanel.cpp:1559
-"Student: {name}   (change / clear)" = "Student: {name}   (change / clear)"
-// Source/LibraryPanel.cpp:1560
-"Group: {name}   (change / clear)" = "Group: {name}   (change / clear)"
 // Source/LibraryPanel.cpp:1561
+"Tags" = "Tags"
+// Source/LibraryPanel.cpp:1562
+"Student: {name}   (change / clear)" = "Student: {name}   (change / clear)"
+// Source/LibraryPanel.cpp:1563
+"Group: {name}   (change / clear)" = "Group: {name}   (change / clear)"
+// Source/LibraryPanel.cpp:1564
 "Tag: {tag}   (change / clear)" = "Tag: {tag}   (change / clear)"
-// Source/LibraryPanel.cpp:1601
+// Source/LibraryPanel.cpp:1604
 "Send to each member" = "Send to each member"
-// Source/LibraryPanel.cpp:1619
+// Source/LibraryPanel.cpp:1622
 "Groups" = "Groups"
-// Source/LibraryPanel.cpp:1629
+// Source/LibraryPanel.cpp:1632
 "Could not save the groups." = "Could not save the groups."
-// Source/LibraryPanel.cpp:1698
+// Source/LibraryPanel.cpp:1701
 "No topics yet.\n\nA topic is anything you practise: a technique, a song, a lesson.\nPress \"+ New topic\" to create one, then add notes, documents, audio files and links." = "No topics yet.\n\nA topic is anything you practise: a technique, a song, a lesson.\nPress \"+ New topic\" to create one, then add notes, documents, audio files and links."
-// Source/LibraryPanel.cpp:1700
+// Source/LibraryPanel.cpp:1703
 "Select a topic on the left." = "Select a topic on the left."
-// Source/LibraryPanel.cpp:1859
+// Source/LibraryPanel.cpp:1862
 "Keep which version? The others go to the bin." = "Keep which version? The others go to the bin."
-// Source/LibraryPanel.cpp:1865
+// Source/LibraryPanel.cpp:1868
 "(no title)" = "(no title)"
-// Source/LibraryPanel.cpp:1866
-"date format::%d %b %H:%M:%S" = "%d %b %H:%M:%S"
-// Source/LibraryPanel.cpp:1867
-"\"{title}\", saved {when}, {n} resource (the one shown)|\"{title}\", saved {when}, {n} resources (the one shown)" = "\"{title}\", saved {when}, {n} resource (the one shown)|\"{title}\", saved {when}, {n} resources (the one shown)"
 // Source/LibraryPanel.cpp:1869
+"date format::%d %b %H:%M:%S" = "%d %b %H:%M:%S"
+// Source/LibraryPanel.cpp:1870
+"\"{title}\", saved {when}, {n} resource (the one shown)|\"{title}\", saved {when}, {n} resources (the one shown)" = "\"{title}\", saved {when}, {n} resource (the one shown)|\"{title}\", saved {when}, {n} resources (the one shown)"
+// Source/LibraryPanel.cpp:1872
 "\"{title}\", saved {when}, {n} resource ({file})|\"{title}\", saved {when}, {n} resources ({file})" = "\"{title}\", saved {when}, {n} resource ({file})|\"{title}\", saved {when}, {n} resources ({file})"
-// Source/LibraryPanel.cpp:1886
+// Source/LibraryPanel.cpp:1889
 "Could not tidy up the copies in {folder}" = "Could not tidy up the copies in {folder}"
-// Source/LibraryPanel.cpp:1945
+// Source/LibraryPanel.cpp:1948
 "Could not create a topic folder in {folder}" = "Could not create a topic folder in {folder}"
-// Source/LibraryPanel.cpp:1960
+// Source/LibraryPanel.cpp:1963
 "This can't be undone." = "This can't be undone."
-// Source/LibraryPanel.cpp:1962
+// Source/LibraryPanel.cpp:1965
 "The folder goes to the Recycle Bin." = "The folder goes to the Recycle Bin."
-// Source/LibraryPanel.cpp:1966
+// Source/LibraryPanel.cpp:1969
 "Delete \"{title}\" with its notes and {n} file?|Delete \"{title}\" with its notes and {n} files?" = "Delete \"{title}\" with its notes and {n} file?|Delete \"{title}\" with its notes and {n} files?"
-// Source/LibraryPanel.cpp:1967
+// Source/LibraryPanel.cpp:1970
 "Delete \"{title}\" with its notes?" = "Delete \"{title}\" with its notes?"
-// Source/LibraryPanel.cpp:1977
+// Source/LibraryPanel.cpp:1980
 "Could not delete the topic folder (is a file in it open in another app?)." = "Could not delete the topic folder (is a file in it open in another app?)."
-// Source/LibraryPanel.cpp:1986
+// Source/LibraryPanel.cpp:1989
 "Add files to the topic" = "Add files to the topic"
-// Source/LibraryPanel.cpp:2016
+// Source/LibraryPanel.cpp:2019
 "Could not copy: {files}" = "Could not copy: {files}"
-// Source/LibraryPanel.cpp:2076
+// Source/LibraryPanel.cpp:2079
 "Add link" = "Add link"
-// Source/LibraryPanel.cpp:2076
+// Source/LibraryPanel.cpp:2079
 "Edit resource" = "Edit resource"
-// Source/LibraryPanel.cpp:2103
+// Source/LibraryPanel.cpp:2106
 "Edit title and description..." = "Edit title and description..."
-// Source/LibraryPanel.cpp:2104
+// Source/LibraryPanel.cpp:2107
 "Move up" = "Move up"
-// Source/LibraryPanel.cpp:2105
+// Source/LibraryPanel.cpp:2108
 "Move down" = "Move down"
-// Source/LibraryPanel.cpp:2109
+// Source/LibraryPanel.cpp:2112
 "Show in folder" = "Show in folder"
-// Source/LibraryPanel.cpp:2113
+// Source/LibraryPanel.cpp:2116
 "Open in the browser" = "Open in the browser"
-// Source/LibraryPanel.cpp:2116
+// Source/LibraryPanel.cpp:2119
 "Remove (deletes the file)" = "Remove (deletes the file)"
-// Source/LibraryPanel.cpp:2116
+// Source/LibraryPanel.cpp:2119
 "Remove link" = "Remove link"
-// Source/LibraryPanel.cpp:2125
+// Source/LibraryPanel.cpp:2128
 "Could not remove the file (is it open in another app?)." = "Could not remove the file (is it open in another app?)."
-// Source/LibraryPanel.cpp:2138
+// Source/LibraryPanel.cpp:2141
 "Remove resource" = "Remove resource"
-// Source/LibraryPanel.cpp:2139
+// Source/LibraryPanel.cpp:2142
 "Remove \"{title}\" and delete its file from the topic folder?" = "Remove \"{title}\" and delete its file from the topic folder?"
-// Source/LibraryPanel.cpp:2159
+// Source/LibraryPanel.cpp:2162
 "Could not move {file}" = "Could not move {file}"
-// Source/LibraryPanel.cpp:2166
+// Source/LibraryPanel.cpp:2169
 "New topic named \"{name}\"" = "New topic named \"{name}\""
-// Source/LibraryPanel.cpp:2231
-"This kind of file can't be shown on the iPad." = "This kind of file can't be shown on the iPad."
 // Source/LibraryPanel.cpp:2234
+"This kind of file can't be shown on the iPad." = "This kind of file can't be shown on the iPad."
+// Source/LibraryPanel.cpp:2237
 "No app on this computer opens {file}" = "No app on this computer opens {file}"
-// Source/LibraryPanel.cpp:2241
+// Source/LibraryPanel.cpp:2244
 "OK" = "OK"
-// Source/LibraryPanel.cpp:2241
+// Source/LibraryPanel.cpp:2244
 "Topics" = "Topics"
 // Source/LibraryPanel.h:119
 "Choose a folder..." = "Choose a folder..."
@@ -1323,6 +1327,10 @@ countries: (two-letter language code, e.g. it)
 "Another rotation topic (neglected ones come up more often)" = "Another rotation topic (neglected ones come up more often)"
 // Source/PracticeViews.cpp:81
 "On: in a saved plan this slot picks a rotation topic again every time the plan is used. Off: the plan keeps this topic." = "On: in a saved plan this slot picks a rotation topic again every time the plan is used. Off: the plan keeps this topic."
+// Source/PracticeViews.cpp:107
+"random" = "random"
+// Source/PracticeViews.cpp:107
+"random #{tag}" = "random #{tag}"
 // Source/PracticeViews.cpp:134
 "Random" = "Random"
 // Source/PracticeViews.cpp:134
@@ -1341,6 +1349,8 @@ countries: (two-letter language code, e.g. it)
 "Keep this session as a named plan (stored with the library, so your other devices get it too)" = "Keep this session as a named plan (stored with the library, so your other devices get it too)"
 // Source/PracticeViews.cpp:161
 "Rename, duplicate or delete the saved plan" = "Rename, duplicate or delete the saved plan"
+// Source/PracticeViews.cpp:166
+"{n} minute|{n} minutes" = "{n} minute|{n} minutes"
 // Source/PracticeViews.cpp:172
 "All rotation topics" = "All rotation topics"
 // Source/PracticeViews.cpp:180
@@ -1393,6 +1403,8 @@ countries: (two-letter language code, e.g. it)
 "Delete the plan \"{name}\"? Your practice log is not affected." = "Delete the plan \"{name}\"? Your practice log is not affected."
 // Source/PracticeViews.cpp:666
 "date format::%d %b" = "%d %b"
+// Source/PracticeViews.cpp:703
+"now {value}" = "now {value}"
 // Source/PracticeViews.cpp:706
 "best {value}" = "best {value}"
 // Source/PracticeViews.cpp:820
@@ -1595,89 +1607,93 @@ countries: (two-letter language code, e.g. it)
 "Document for anyone: a web page + the files (no app needed)" = "Document for anyone: a web page + the files (no app needed)"
 // Source/SharePanel.cpp:81
 "Not everyone has the app: the document opens in any browser or phone (and prints to PDF), with the notes, the links under their titles and the list of files" = "Not everyone has the app: the document opens in any browser or phone (and prints to PDF), with the notes, the links under their titles and the list of files"
-// Source/SharePanel.cpp:100
+// Source/SharePanel.cpp:91
+"{title}  (take)" = "{title}  (take)"
+// Source/SharePanel.cpp:92
+"{title}  (song)" = "{title}  (song)"
+// Source/SharePanel.cpp:97
 "Leave commercial recordings out: the receiver connects their own copy (same file name)" = "Leave commercial recordings out: the receiver connects their own copy (same file name)"
-// Source/SharePanel.cpp:116
+// Source/SharePanel.cpp:113
 "This topic has no files: only the notes and links go in." = "This topic has no files: only the notes and links go in."
-// Source/SharePanel.cpp:215
+// Source/SharePanel.cpp:212
 "As a new topic for {group}" = "As a new topic for {group}"
-// Source/SharePanel.cpp:219
+// Source/SharePanel.cpp:216
 "This group has no members yet: add them in Topics > Tags > Edit groups..." = "This group has no members yet: add them in Topics > Tags > Edit groups..."
-// Source/SharePanel.cpp:221
+// Source/SharePanel.cpp:218
 "Each member gets their own new copy." = "Each member gets their own new copy."
-// Source/SharePanel.cpp:221
+// Source/SharePanel.cpp:218
 "Everyone in the group gets a new copy." = "Everyone in the group gets a new copy."
-// Source/SharePanel.cpp:222
+// Source/SharePanel.cpp:219
 "What each member sends back becomes their own topic here." = "What each member sends back becomes their own topic here."
-// Source/SharePanel.cpp:225
+// Source/SharePanel.cpp:222
 "Updates the copies the group got on {date}." = "Updates the copies the group got on {date}."
-// Source/SharePanel.cpp:229
+// Source/SharePanel.cpp:226
 "As a new topic: the same lesson for another student (their own copy)" = "As a new topic: the same lesson for another student (their own copy)"
-// Source/SharePanel.cpp:230
+// Source/SharePanel.cpp:227
 "Your student gets their own copy: what they send back never mixes into this topic." = "Your student gets their own copy: what they send back never mixes into this topic."
-// Source/SharePanel.cpp:231
+// Source/SharePanel.cpp:228
 "Updates their copy of this topic." = "Updates their copy of this topic."
-// Source/SharePanel.cpp:232
+// Source/SharePanel.cpp:229
 "Sends this topic itself: what comes back updates this topic." = "Sends this topic itself: what comes back updates this topic."
-// Source/SharePanel.cpp:240
+// Source/SharePanel.cpp:237
 "Choose which files go along with the page. The notes and links are on the page; your private notes and practice log are never included." = "Choose which files go along with the page. The notes and links are on the page; your private notes and practice log are never included."
-// Source/SharePanel.cpp:242
+// Source/SharePanel.cpp:239
 "Choose which files go in. The notes, links and resource details always travel; your private notes and practice log never do." = "Choose which files go in. The notes, links and resource details always travel; your private notes and practice log never do."
-// Source/SharePanel.cpp:245
+// Source/SharePanel.cpp:242
 "Total: {size}" = "Total: {size}"
-// Source/SharePanel.cpp:249
+// Source/SharePanel.cpp:246
 "The file left out stays listed on the page as not included.|{n} files left out stay listed on the page as not included." = "The file left out stays listed on the page as not included.|{n} files left out stay listed on the page as not included."
-// Source/SharePanel.cpp:251
+// Source/SharePanel.cpp:248
 "The file left out stays listed: the receiver connects their own copy (found by file name), or locates it once.|{n} files left out stay listed: the receiver connects their own copy (found by file name), or locates it once." = "The file left out stays listed: the receiver connects their own copy (found by file name), or locates it once.|{n} files left out stay listed: the receiver connects their own copy (found by file name), or locates it once."
-// Source/SharePanel.cpp:316
+// Source/SharePanel.cpp:313
 "Packing..." = "Packing..."
-// Source/SharePanel.cpp:363
+// Source/SharePanel.cpp:360
 "Could not write the file: {error}" = "Could not write the file: {error}"
-// Source/SharePanel.cpp:453
+// Source/SharePanel.cpp:450
 "Optional: who this topic is for (a first name or nickname)" = "Optional: who this topic is for (a first name or nickname)"
-// Source/SharePanel.cpp:454
+// Source/SharePanel.cpp:451
 "Groups your topics by student (Tags menu). Stays on your devices: never sent to anyone" = "Groups your topics by student (Tags menu). Stays on your devices: never sent to anyone"
-// Source/SharePanel.cpp:475
+// Source/SharePanel.cpp:472
 "Who sent this?" = "Who sent this?"
-// Source/SharePanel.cpp:484
+// Source/SharePanel.cpp:481
 "Choose the member of {group}" = "Choose the member of {group}"
-// Source/SharePanel.cpp:486
+// Source/SharePanel.cpp:483
 "Each member's copy becomes its own topic here (Student = the member, in the group {group})" = "Each member's copy becomes its own topic here (Student = the member, in the group {group})"
-// Source/SharePanel.cpp:517
+// Source/SharePanel.cpp:514
 "Not on this device" = "Not on this device"
-// Source/SharePanel.cpp:527
+// Source/SharePanel.cpp:524
 "Keeps your topic as it is and adds this one as a separate topic" = "Keeps your topic as it is and adds this one as a separate topic"
-// Source/SharePanel.cpp:553
+// Source/SharePanel.cpp:550
 "Sent back by a member of {group}: choose who sent it." = "Sent back by a member of {group}: choose who sent it."
-// Source/SharePanel.cpp:555
+// Source/SharePanel.cpp:552
 "{member}'s copy of the topic sent to {group}." = "{member}'s copy of the topic sent to {group}."
-// Source/SharePanel.cpp:568
+// Source/SharePanel.cpp:565
 "From {name}." = "From {name}."
-// Source/SharePanel.cpp:571
+// Source/SharePanel.cpp:568
 "Shared on {date}." = "Shared on {date}."
-// Source/SharePanel.cpp:571
+// Source/SharePanel.cpp:568
 "date format::%d %b %Y at %H:%M" = "%d %b %Y at %H:%M"
-// Source/SharePanel.cpp:576
+// Source/SharePanel.cpp:573
 "Practice on this topic: {summary}" = "Practice on this topic: {summary}"
-// Source/SharePanel.cpp:579
+// Source/SharePanel.cpp:576
 "Notes:" = "Notes:"
-// Source/SharePanel.cpp:581
+// Source/SharePanel.cpp:578
 "New resources" = "New resources"
-// Source/SharePanel.cpp:582
+// Source/SharePanel.cpp:579
 "Updated files" = "Updated files"
-// Source/SharePanel.cpp:583
+// Source/SharePanel.cpp:580
 "Found on this device" = "Found on this device"
-// Source/SharePanel.cpp:586
+// Source/SharePanel.cpp:583
 "Apply update" = "Apply update"
-// Source/SharePanel.cpp:586
+// Source/SharePanel.cpp:583
 "Import" = "Import"
-// Source/SharePanel.cpp:600
+// Source/SharePanel.cpp:597
 "Locate..." = "Locate..."
-// Source/SharePanel.cpp:601
+// Source/SharePanel.cpp:598
 "Point to your copy of {file}: it is copied into the topic" = "Point to your copy of {file}: it is copied into the topic"
-// Source/SharePanel.cpp:614
+// Source/SharePanel.cpp:611
 "Where is {file}?" = "Where is {file}?"
-// Source/SharePanel.cpp:663
+// Source/SharePanel.cpp:660
 "Could not import the topic: {error}" = "Could not import the topic: {error}"
 // Source/SharePanel.h:66
 "Make WAV / AIFF files smaller (AAC, 192 kbit/s)" = "Make WAV / AIFF files smaller (AAC, 192 kbit/s)"
@@ -2111,6 +2127,8 @@ countries: (two-letter language code, e.g. it)
 "not heard" = "not heard"
 // Source/TunerPanel.cpp:490
 "sharp" = "sharp"
+// Source/TunerPanel.cpp:548
+"string {number}" = "string {number}"
 // Source/TunerPanel.h:65
 "Single string" = "Single string"
 // Source/TunerPanel.h:65

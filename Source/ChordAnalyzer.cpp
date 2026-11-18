@@ -126,7 +126,12 @@ juce::String ChordTrack::chordName (const Chord& chord, int semitones) const
 
 juce::String ChordTrack::keyName (int semitones) const
 {
-    return noteName (keyRoot + semitones, keyUsesFlats (keyRoot + semitones, keyIsMinor)) + (keyIsMinor ? " minor" : " major");
+    return keyRootName (semitones) + (keyIsMinor ? " minor" : " major");
+}
+
+juce::String ChordTrack::keyRootName (int semitones) const
+{
+    return noteName (keyRoot + semitones, keyUsesFlats (keyRoot + semitones, keyIsMinor));
 }
 
 //==============================================================================
