@@ -10,6 +10,10 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
+# The CI run number is the build number shown in About and in the log (no commit hash in the app).
+env:
+  PV_BUILD_NUMBER: ${{ github.run_number }}
+
 jobs:
   windows:
     runs-on: windows-latest
@@ -20,7 +24,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Configure
-        run: cmake --preset windows
+        run: cmake --preset windows -DPV_BUILD_NUMBER=${{ env.PV_BUILD_NUMBER }}
 
       - name: Build
         run: cmake --build --preset windows-release
@@ -30,12 +34,21 @@ jobs:
 
       - name: Package
         shell: pwsh
-        run: Compress-Archive -Path "build/windows/PracticeVibes_artefacts/Release/*" -DestinationPath PracticeVibes-windows.zip
+        run: |
+          $dir = "build/windows/PracticeVibes_artefacts/Release"
+          Copy-Item LICENSE "$dir/LICENSE.txt"
+          Copy-Item THIRD_PARTY_NOTICES.md "$dir/THIRD_PARTY_NOTICES.md"
+          # Only the app and its notices go out: no debug symbols or linker leftovers.
+          $unwanted = Get-ChildItem $dir -Recurse -File -Include *.pdb, *.ilk, *.exp, *.lib, *.obj
+          if ($unwanted) { $unwanted | ForEach-Object { Write-Error "Unexpected file in the package: $($_.Name)" }; exit 1 }
+          Get-ChildItem $dir -Recurse -File | ForEach-Object { $_.Name }
+          Compress-Archive -Path "$dir/*" -DestinationPath PracticeVibes-windows.zip
 
       - uses: actions/upload-artifact@v4
         with:
           name: PracticeVibes-windows
           path: PracticeVibes-windows.zip
+          retention-days: 3
 
   ios:
     runs-on: macos-latest
@@ -43,7 +56,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure
-        run: cmake --preset ios
+        run: cmake --preset ios -DPV_BUILD_NUMBER=${{ env.PV_BUILD_NUMBER }}
 
       # Built unsigned, then ad-hoc signed with the entitlements when packaged: SideStore signs the app with
       # the user's own Apple ID on install.
@@ -79,6 +92,7 @@ jobs:
         with:
           name: PracticeVibes-ios
           path: PracticeVibes.ipa
+          retention-days: 3
 
   macos:
     runs-on: macos-latest
@@ -87,7 +101,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure
-        run: cmake --preset macos
+        run: cmake --preset macos -DPV_BUILD_NUMBER=${{ env.PV_BUILD_NUMBER }}
 
       # Universal (arm64 + x86_64). Built unsigned, then ad-hoc signed as a whole once the bundle is complete.
       - name: Build
@@ -113,6 +127,9 @@ jobs:
           cp -R "$APP" dmg/
           ln -s /Applications dmg/Applications
           cp "Resources/macOS/READ ME FIRST.txt" dmg/
+          cp LICENSE dmg/LICENSE.txt
+          cp THIRD_PARTY_NOTICES.md dmg/
+          if find dmg -name '*.dSYM' | grep -q .; then echo "Unexpected debug symbols in the dmg"; exit 1; fi
 
           # hdiutil sometimes fails with "Resource busy" on CI runners: retry a few times.
           for attempt in 1 2 3 4 5; do
@@ -126,10 +143,12 @@ jobs:
         with:
           name: PracticeVibes-macos
           path: PracticeVibes-macos.dmg
+          retention-days: 3
 
-  # Every push to main refreshes a "latest-build" pre-release, so the .ipa can be
-  # downloaded straight from Safari on the iPad.
-  # The macOS build is optional here: if it fails, the Windows and iPad builds are still published.
+  # Every push to main refreshes the "latest-build" pre-release in place, so the .ipa can be downloaded straight
+  # from Safari on the iPad. The tag moves to the new commit and the files of this run replace the old ones.
+  # The macOS build is optional here: if it fails, the Windows and iPad builds are still published and the
+  # previous .dmg stays (the notes say so).
   publish:
     if: >-
       always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -143,22 +162,25 @@ jobs:
         with:
           merge-multiple: true
 
-      - name: Replace the latest-build pre-release
+      - name: Update the latest-build pre-release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           FILES="PracticeVibes.ipa PracticeVibes-windows.zip"
-          NOTES="Automatic build of commit ${GITHUB_SHA::7}. Not a stable release."
+          NOTES="Automatic test build ${PV_BUILD_NUMBER} (shown in the app under About). Not a stable release.
+          Free software under the GNU AGPLv3: the source of this build is this tag."
           if [ -f PracticeVibes-macos.dmg ]; then
             FILES="$FILES PracticeVibes-macos.dmg"
           else
-            NOTES="$NOTES (No macOS build this time: the macOS job failed.)"
+            NOTES="$NOTES
+          The macOS file is from an earlier build: the macOS job failed this time."
           fi
-          gh release delete latest-build --cleanup-tag --yes || true
-          gh release create latest-build \
-            --prerelease \
-            --target "$GITHUB_SHA" \
-            --title "Latest build" \
-            --notes "$NOTES" \
-            $FILES
+
+          if gh release view latest-build > /dev/null 2>&1; then
+            gh api --method PATCH "repos/$GH_REPO/git/refs/tags/latest-build" -f sha="$GITHUB_SHA" -F force=true > /dev/null
+            gh release edit latest-build --prerelease --title "Latest build" --notes "$NOTES"
+            gh release upload latest-build $FILES --clobber
+          else
+            gh release create latest-build --prerelease --target "$GITHUB_SHA" --title "Latest build" --notes "$NOTES" $FILES
+          fi
