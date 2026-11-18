@@ -3,17 +3,23 @@
 [🇬🇧 English](README.md) | 🇮🇹 Italiano
 
 Un'app per esercitarsi, per chitarristi, bassisti e altri musicisti, su **iPad, Windows e macOS**.
-Software libero con licenza [GNU AGPLv3](LICENSE): gratis, senza account, senza pubblicità, senza tracciamento.
+Software open source con licenza [GNU AGPLv3](LICENSE): gratis, senza account, senza pubblicità, senza tracciamento.
 
 Riunisce in un posto solo quello per cui di solito servono diverse app: un lettore che rallenta i brani e li mette in
 loop, il riconoscimento degli accordi, un metronomo, un looper con drum machine, un accordatore, i tuoi plugin di
-effetti, una pedaliera MIDI e uno spazio per le tue lezioni e i tuoi appunti. E tiene il conto di quanto suoni davvero.
+effetti, una pedaliera MIDI e uno spazio per le tue lezioni e i tuoi appunti. E tiene il conto di quanto tempo suoni davvero.
 
 > **Stato: in pieno sviluppo.** I download qui sotto sono build di prova automatiche, non versioni stabili. Aspettati
 > qualche imperfezione, e per favore [segnala quello che trovi](../../issues).
 
-<!-- Screenshot da aggiungere (vedi la lista degli screenshot): scheda Oggi, scheda Studio con accordi e loop, Looper
-     con batteria, Accordatore, Argomenti, Rig con plugin. -->
+| | |
+|---|---|
+| ![Scheda Oggi](docs/screens/it/today.png)<br>Oggi: cosa studiare adesso, e cosa hai fatto. | ![Scheda Studio](docs/screens/it/practice-player.png)<br>Rallenta, metti in loop il passaggio difficile, guarda gli accordi. |
+| ![Looper con batteria](docs/screens/it/looper-drums.png)<br>Un looper agganciato al tempo, con drum machine. | ![Accordatore](docs/screens/it/tuner.png)<br>Accordatore: ago o strobo, qualsiasi accordatura. |
+| ![Argomenti](docs/screens/it/topics.png)<br>Lezioni, brani e documenti in un unico posto. | ![Rig](docs/screens/it/rig.png)<br>I tuoi plugin di effetti. |
+
+**Manuale:** [guida utente](manual/it/guide/README.md) · [funzionalità](manual/it/FEATURES.md) ·
+[cosa collegare](manual/it/AUDIO-SETUP.md) · [come usarlo](manual/it/WORKFLOW.md) (chi studia, insegnanti, musicisti).
 
 ## Per chi è
 
@@ -35,7 +41,7 @@ effetti, una pedaliera MIDI e uno spazio per le tue lezioni e i tuoi appunti. E 
   machine** integrata (kit acustico o elettronico, editor a step).
 - **Accordatore**: ago o strobo, accordature per chitarra e basso, tutte le corde in una pennata.
 - **Diario di studio**: conta solo i minuti in cui suoni davvero (audio o tastiera MIDI), con cronologia, rotazione e
-  piani di sessione. Niente serie da mantenere, niente notifiche.
+  piani di sessione. Niente diari da mantenere (lo fa la app per te!), niente notifiche.
 - **Argomenti**: le tue lezioni con appunti, tag, brani, PDF e link, in una cartella che scegli tu (mettila in iCloud
   Drive o in un'altra cartella cloud per usarla su tutti i tuoi dispositivi). Condividi un argomento come un unico file.
 - **Rig**: i tuoi plugin di effetti e strumenti (AUv3 su iPad, VST3 su Windows, Audio Unit e VST3 su macOS).
@@ -111,7 +117,7 @@ delle icone di [Lucide](https://lucide.dev), i font Outfit e DM Sans e i campion
 L'elenco completo con le licenze è in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) e nell'app, in Informazioni >
 Licenze open source.
 
-Practice Vibes è fatto da un chitarrista, Camillo Patricelli, con il *vibe coding*: l'idea, il design, le decisioni e
+Practice Vibes è stato creato da un **pessimo chitarrista**, Cam Patricelli, frustrato dalle perdite di tempo durante lo studio, con il *vibe coding*: l'idea, il design, le decisioni e
 i test sono suoi; il codice è scritto da [Claude](https://www.anthropic.com/claude) (l'IA di Anthropic) tramite
 [Claude Code](https://claude.com/claude-code). Il nome è un omaggio a questo modo di lavorare.
 

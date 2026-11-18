@@ -10,12 +10,12 @@ namespace pv
 
 namespace
 {
-    // Public details approved by the owner (2026-11-18). The guide isn't published yet: until it is, "User guide"
-    // opens the README on GitHub.
+    // Public details approved by the owner (2026-11-18). The user guide lives in manual/ in the repo (EN and IT).
     constexpr const char* developerName = "Camillo Patricelli";
     constexpr const char* contactAddress = "practicevibes.app@gmail.com";
     constexpr const char* repositoryUrl = "https://github.com/camillopatricelli/practice-vibes";
-    constexpr const char* guideUrl = "https://github.com/camillopatricelli/practice-vibes#readme";
+    constexpr const char* guideUrlEnglish = "https://github.com/camillopatricelli/practice-vibes/blob/main/manual/guide/README.md";
+    constexpr const char* guideUrlItalian = "https://github.com/camillopatricelli/practice-vibes/blob/main/manual/it/guide/README.md";
     constexpr const char* privacyUrl = "https://github.com/camillopatricelli/practice-vibes/blob/main/PRIVACY.md";
     constexpr const char* licenceUrl = "https://github.com/camillopatricelli/practice-vibes/blob/main/LICENSE";
 
@@ -64,7 +64,7 @@ AboutPanel::AboutPanel (std::function<juce::String()> info)
     for (auto* c : std::initializer_list<juce::Component*> { &title, &version, &platform, &developer, &contact, &licenceNote, &credit })
         addAndMakeVisible (c);
 
-    const auto link = [this] (juce::TextButton& b, const juce::String& text, const char* url)
+    const auto link = [this] (juce::TextButton& b, const juce::String& text, const juce::String& url)
     {
         b.setButtonText (text);
         b.setTooltip (url);
@@ -72,7 +72,7 @@ AboutPanel::AboutPanel (std::function<juce::String()> info)
         addAndMakeVisible (b);
     };
 
-    link (guideButton, tr ("User guide"), guideUrl);
+    link (guideButton, tr ("User guide"), i18n::currentLanguage() == "it" ? guideUrlItalian : guideUrlEnglish);
     link (privacyButton, tr ("Privacy"), privacyUrl);
     link (licenceButton, tr ("Licence"), licenceUrl);
     link (sourceButton, tr ("Source code"), repositoryUrl);

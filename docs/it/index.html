@@ -51,6 +51,10 @@
   .card .btn { margin-top: 12px; font-size: 15px; padding: 8px 14px; }
   .features { columns: 2 260px; column-gap: 32px; padding-left: 18px; margin: 0; }
   .features li { margin: 0 0 8px; break-inside: avoid; }
+  .shots { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin: 0; }
+  .shots figure { margin: 0; }
+  .shots img { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); }
+  .shots figcaption { font-size: 15px; color: var(--muted); margin-top: 8px; }
   footer { padding: 30px 0 50px; color: var(--muted); font-size: 15px; border-top: 1px solid var(--line); }
   footer p { margin: 0 0 8px; }
 </style>
@@ -64,8 +68,8 @@
 
   <main>
     <div class="hero">
-      <h1>Tutto quello che ti serve per studiare, in un'app sola.</h1>
-      <p class="lead">Rallenta i brani e mettili in loop, guarda gli accordi, suona con metronomo, looper e batteria,
+      <h1>Tutto quello che ti serve per studiare, in una sola app.</h1>
+      <p class="lead">Rallenta i brani e mettili in loop, guarda gli accordi, suona con metronomo, registrati, looper e batteria,
         accordati, usa i tuoi plugin di effetti. E lascia che l'app tenga il conto di quanto suoni davvero.</p>
       <ul class="tags">
         <li>iPad</li><li>Windows</li><li>macOS</li><li>Gratis, senza account</li><li>Niente pubblicità né tracciamento</li><li>Open source (AGPLv3)</li>
@@ -75,7 +79,18 @@
         Windows è la versione più provata, l'iPad è in prova e la versione per Mac non è ancora stata provata su un Mac vero.</p>
     </div>
 
-    <!-- Qui andranno gli screenshot quando ci saranno (vedi la lista degli screenshot). -->
+    <section aria-label="Schermate">
+      <div class="shots">
+        <figure><a href="../screens/it/today.png"><img src="../screens/it/today.png" width="1862" height="1006" alt="Oggi: cosa studiare adesso, e cosa hai fatto." loading="lazy"></a>
+          <figcaption>Oggi: cosa studiare adesso, e cosa hai fatto.</figcaption></figure>
+        <figure><a href="../screens/it/practice-player.png"><img src="../screens/it/practice-player.png" width="1862" height="1006" alt="Rallenta, metti in loop il passaggio difficile, guarda gli accordi." loading="lazy"></a>
+          <figcaption>Rallenta, metti in loop il passaggio difficile, guarda gli accordi.</figcaption></figure>
+        <figure><a href="../screens/it/looper-drums.png"><img src="../screens/it/looper-drums.png" width="1862" height="1006" alt="Un looper agganciato al tempo, con drum machine." loading="lazy"></a>
+          <figcaption>Un looper agganciato al tempo, con drum machine.</figcaption></figure>
+        <figure><a href="../screens/it/history.png"><img src="../screens/it/history.png" width="1862" height="1006" alt="Guarda velocità e tempo salire, settimana dopo settimana." loading="lazy"></a>
+          <figcaption>Guarda velocità e tempo salire, settimana dopo settimana.</figcaption></figure>
+      </div>
+    </section>
 
     <section>
       <h2>Per chi è</h2>
@@ -88,11 +103,11 @@
         <div class="card">
           <h3>Insegnanti</h3>
           <p>Manda una lezione come unico file: note, brani, link e un compito con un tempo da raggiungere. Gli allievi
-            lo vedono nella schermata Oggi e possono rimandarti i loro take e un riepilogo del loro studio.</p>
+            lo vedono nella schermata Oggi e possono rimandarti le loro take e un riepilogo del loro studio.</p>
         </div>
         <div class="card">
-          <h3>Musicisti che vogliono un solo strumento</h3>
-          <p>Looper con drum machine, accordatore, separazione degli stem, il tuo rig di plugin e un footswitch MIDI,
+          <h3>Musicisti che vogliono una sola app</h3>
+          <p>Looper con drum machine, registratore, accordatore, separazione degli stem, il tuo rig di plugin e un footswitch MIDI,
             configurati una volta e sempre pronti.</p>
         </div>
       </div>
@@ -138,7 +153,7 @@
         </div>
       </div>
       <p>Tutti i file e le note della build: <a href="https://github.com/camillopatricelli/practice-vibes/releases/tag/latest-build">ultima build su GitHub</a> (pagina in inglese).
-        Le istruzioni di installazione passo passo sono nel <a href="https://github.com/camillopatricelli/practice-vibes/blob/main/README.it.md#download">README</a>; una guida completa è in arrivo.</p>
+        Le istruzioni di installazione passo passo sono nel <a href="https://github.com/camillopatricelli/practice-vibes/blob/main/README.it.md#download">README</a>; per tutto il resto c'è la <a href="https://github.com/camillopatricelli/practice-vibes/blob/main/manual/it/guide/README.md">guida utente</a>.</p>
     </section>
 
     <section>
@@ -147,7 +162,7 @@
         Niente prezzo, niente account, niente pubblicità, niente acquisti in-app. L'app non invia nulla su di te: la tua
         libreria e il tuo diario di studio restano sui tuoi dispositivi, o nella tua cartella cloud se ne scegli una.
         I dettagli sono nell'<a href="https://github.com/camillopatricelli/practice-vibes/blob/main/PRIVACY.md">informativa sulla privacy</a> (in inglese).</p>
-      <p>Idea, design e test di Camillo Patricelli; codice scritto con Claude Code (l'IA di Anthropic). Realizzato con JUCE.</p>
+      <p>Idea, design e test di Cam Patricelli; codice scritto con Claude Code (l'IA di Anthropic). Realizzato con JUCE.</p>
     </section>
   </main>
 

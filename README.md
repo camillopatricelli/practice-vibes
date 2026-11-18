@@ -12,8 +12,14 @@ and a place for your lessons and practice notes. It also keeps track of how much
 > **Status: in active development.** The downloads below are automatic test builds, not stable releases. Expect rough
 > edges, and please [report what you find](../../issues).
 
-<!-- Screenshots to add (see the screenshot list): Today tab, Practice tab with chords and loop, Looper with drums,
-     Tuner, Topics, Rig with plugins. -->
+| | |
+|---|---|
+| ![Today tab](docs/screens/en/today.png)<br>Today: what to practise next, and what you've done. | ![Practice tab](docs/screens/en/practice-player.png)<br>Slow it down, loop the hard part, see the chords. |
+| ![Looper with drums](docs/screens/en/looper-drums.png)<br>A looper locked to the beat, with a drum machine. | ![Tuner](docs/screens/en/tuner.png)<br>Tuner: needle or strobe, any tuning. |
+| ![Topics](docs/screens/en/topics.png)<br>Your lessons, songs and documents in one place. | ![Rig](docs/screens/en/rig.png)<br>Your own effect plugins. |
+
+**Manual:** [user guide](manual/guide/README.md) · [features](manual/FEATURES.md) · [what to plug in](manual/AUDIO-SETUP.md) ·
+[ways to use it](manual/WORKFLOW.md) (students, teachers, musicians).
 
 ## Who it's for
 
@@ -120,7 +126,7 @@ It is built on [JUCE](https://juce.com) (used under its AGPLv3 option),
 The full list with licences is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and in the app under
 About > Open source licences.
 
-Practice Vibes is made by a guitarist, Camillo Patricelli, by *vibe coding*: the idea, the design, the decisions and
+Practice Vibes is made by a **terrible guitarist**, Cam Patricelli, frustrated by the time wasted during practice sessions, by *vibe coding*: the idea, the design, the decisions and
 the testing are his; the code is written by [Claude](https://www.anthropic.com/claude) (Anthropic's AI) through
 [Claude Code](https://claude.com/claude-code). The name is a nod to that process.
 

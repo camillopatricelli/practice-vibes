@@ -51,6 +51,10 @@
   .card .btn { margin-top: 12px; font-size: 15px; padding: 8px 14px; }
   .features { columns: 2 260px; column-gap: 32px; padding-left: 18px; margin: 0; }
   .features li { margin: 0 0 8px; break-inside: avoid; }
+  .shots { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin: 0; }
+  .shots figure { margin: 0; }
+  .shots img { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); }
+  .shots figcaption { font-size: 15px; color: var(--muted); margin-top: 8px; }
   footer { padding: 30px 0 50px; color: var(--muted); font-size: 15px; border-top: 1px solid var(--line); }
   footer p { margin: 0 0 8px; }
 </style>
@@ -65,7 +69,7 @@
   <main>
     <div class="hero">
       <h1>Everything you need to practise, in one app.</h1>
-      <p class="lead">Slow down and loop songs, see the chords, play with a metronome, a looper and drums, tune up,
+      <p class="lead">Slow down and loop songs, see the chords, play with a metronome, a looper and drums, record your playing, tune up,
         use your own effect plugins. And let the app keep track of how much you really play.</p>
       <ul class="tags">
         <li>iPad</li><li>Windows</li><li>macOS</li><li>Free, no account</li><li>No ads, no tracking</li><li>Open source (AGPLv3)</li>
@@ -75,7 +79,18 @@
         Windows is the most tested, the iPad is in testing, and the Mac version hasn't been tried on a real Mac yet.</p>
     </div>
 
-    <!-- Screenshots go here once they exist (see the screenshot list). -->
+    <section aria-label="Screenshots">
+      <div class="shots">
+        <figure><a href="screens/en/today.png"><img src="screens/en/today.png" width="1862" height="1006" alt="Today: what to practise next, and what you've done." loading="lazy"></a>
+          <figcaption>Today: what to practise next, and what you've done.</figcaption></figure>
+        <figure><a href="screens/en/practice-player.png"><img src="screens/en/practice-player.png" width="1862" height="1006" alt="Slow it down, loop the hard part, see the chords." loading="lazy"></a>
+          <figcaption>Slow it down, loop the hard part, see the chords.</figcaption></figure>
+        <figure><a href="screens/en/looper-drums.png"><img src="screens/en/looper-drums.png" width="1862" height="1006" alt="A looper locked to the beat, with a drum machine." loading="lazy"></a>
+          <figcaption>A looper locked to the beat, with a drum machine.</figcaption></figure>
+        <figure><a href="screens/en/history.png"><img src="screens/en/history.png" width="1862" height="1006" alt="Watch your speed and tempo climb, week by week." loading="lazy"></a>
+          <figcaption>Watch your speed and tempo climb, week by week.</figcaption></figure>
+      </div>
+    </section>
 
     <section>
       <h2>Who it's for</h2>
@@ -138,7 +153,7 @@
         </div>
       </div>
       <p>All files and build notes: <a href="https://github.com/camillopatricelli/practice-vibes/releases/tag/latest-build">latest build on GitHub</a>.
-        Step-by-step install instructions are in the <a href="https://github.com/camillopatricelli/practice-vibes#download">README</a>; a full user guide is coming.</p>
+        Step-by-step install instructions are in the <a href="https://github.com/camillopatricelli/practice-vibes#download">README</a>; the <a href="https://github.com/camillopatricelli/practice-vibes/blob/main/manual/guide/README.md">user guide</a> covers everything else.</p>
     </section>
 
     <section>
@@ -147,7 +162,7 @@
         No price, no account, no ads, no in-app purchases. The app sends nothing about you anywhere: your library and
         practice log stay on your devices, or in your own cloud folder if you choose one. Details in the
         <a href="https://github.com/camillopatricelli/practice-vibes/blob/main/PRIVACY.md">privacy statement</a>.</p>
-      <p>Idea, design and testing by Camillo Patricelli; code written with Claude Code (Anthropic's AI). Built with JUCE.</p>
+      <p>Idea, design and testing by Cam Patricelli; code written with Claude Code (Anthropic's AI). Built with JUCE.</p>
     </section>
   </main>
 
