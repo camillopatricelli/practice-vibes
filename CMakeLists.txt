@@ -47,35 +47,53 @@ if(WIN32)
     FetchContent_MakeAvailable(webview2)
     set(JUCE_WEBVIEW2_PACKAGE_LOCATION ${CMAKE_BINARY_DIR}/nuget)
     set(PV_WEBVIEW2 TRUE)
-
-    # Stem separation runs the Demucs network with ONNX Runtime (MIT). Only its headers are used at build time;
-    # onnxruntime.dll is copied next to the app and loaded on first use.
-    set(PV_ONNXRUNTIME_VERSION 1.20.1)
-    FetchContent_Declare(onnxruntime
-        URL https://github.com/microsoft/onnxruntime/releases/download/v${PV_ONNXRUNTIME_VERSION}/onnxruntime-win-x64-${PV_ONNXRUNTIME_VERSION}.zip)
-    FetchContent_MakeAvailable(onnxruntime)
-    set(PV_ONNXRUNTIME_DIR ${onnxruntime_SOURCE_DIR})
-    set(PV_ONNXRUNTIME_LIB ${PV_ONNXRUNTIME_DIR}/lib/onnxruntime.dll)
 else()
     set(PV_WEBVIEW2 FALSE)
 endif()
 
-# macOS desktop (not iOS): the same ONNX Runtime as a universal (arm64 + x86_64) dylib, bundled in
-# Contents/Frameworks and loaded with dlopen on first use.
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(PV_MACOS TRUE)
-    set(PV_ONNXRUNTIME_VERSION 1.20.1)
-    FetchContent_Declare(onnxruntime
-        URL https://github.com/microsoft/onnxruntime/releases/download/v${PV_ONNXRUNTIME_VERSION}/onnxruntime-osx-universal2-${PV_ONNXRUNTIME_VERSION}.tgz)
-    FetchContent_MakeAvailable(onnxruntime)
-    set(PV_ONNXRUNTIME_DIR ${onnxruntime_SOURCE_DIR})
-    set(PV_ONNXRUNTIME_LIB ${PV_ONNXRUNTIME_DIR}/lib/libonnxruntime.${PV_ONNXRUNTIME_VERSION}.dylib)
-    if(NOT EXISTS ${PV_ONNXRUNTIME_LIB})
-        file(GLOB found ${PV_ONNXRUNTIME_DIR}/lib/*)
-        message(FATAL_ERROR "ONNX Runtime dylib not found at ${PV_ONNXRUNTIME_LIB}; lib/ holds: ${found}")
-    endif()
 else()
     set(PV_MACOS FALSE)
+endif()
+
+# Stem separation runs the Demucs network with ONNX Runtime (MIT), Windows and macOS desktop only. Only its headers
+# are used at build time; the runtime library ships with the app and is loaded on first use (Windows: onnxruntime.dll
+# next to the exe; macOS: a universal arm64 + x86_64 libonnxruntime.dylib in Contents/Frameworks).
+# Source: Microsoft's official NuGet package (same binaries as the GitHub release archives, which stopped being
+# downloadable). The hash pins the exact file.
+if(WIN32 OR PV_MACOS)
+    set(PV_ONNXRUNTIME_VERSION 1.20.1)
+    FetchContent_Declare(onnxruntime
+        URL           https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/${PV_ONNXRUNTIME_VERSION}/microsoft.ml.onnxruntime.${PV_ONNXRUNTIME_VERSION}.nupkg
+        URL_HASH      SHA256=9c32108e9a1c78b090a95c2a219f244dd5f067d4caf68fb0f967103f3f20839c
+        DOWNLOAD_NAME onnxruntime-${PV_ONNXRUNTIME_VERSION}.zip)
+    FetchContent_MakeAvailable(onnxruntime)
+    set(PV_ONNXRUNTIME_DIR ${onnxruntime_SOURCE_DIR})
+    set(PV_ONNXRUNTIME_INCLUDE_DIR ${PV_ONNXRUNTIME_DIR}/build/native/include)
+
+    if(WIN32)
+        set(PV_ONNXRUNTIME_LIB ${PV_ONNXRUNTIME_DIR}/runtimes/win-x64/native/onnxruntime.dll)
+    else()
+        # The package has one dylib per architecture: join them into a universal one.
+        set(PV_ONNXRUNTIME_LIB ${CMAKE_BINARY_DIR}/onnxruntime-universal/libonnxruntime.dylib)
+        if(NOT EXISTS ${PV_ONNXRUNTIME_LIB})
+            file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/onnxruntime-universal)
+            execute_process(
+                COMMAND lipo -create
+                    ${PV_ONNXRUNTIME_DIR}/runtimes/osx-arm64/native/libonnxruntime.dylib
+                    ${PV_ONNXRUNTIME_DIR}/runtimes/osx-x64/native/libonnxruntime.dylib
+                    -output ${PV_ONNXRUNTIME_LIB}
+                RESULT_VARIABLE lipo_result)
+            if(NOT lipo_result EQUAL 0)
+                message(FATAL_ERROR "lipo could not build the universal ONNX Runtime dylib (${lipo_result})")
+            endif()
+        endif()
+    endif()
+
+    if(NOT EXISTS ${PV_ONNXRUNTIME_LIB} OR NOT EXISTS ${PV_ONNXRUNTIME_INCLUDE_DIR}/onnxruntime_cxx_api.h)
+        message(FATAL_ERROR "ONNX Runtime files missing under ${PV_ONNXRUNTIME_DIR}")
+    endif()
 endif()
 
 # Document types (Info.plist, Apple platforms). Shared topics (.pvtopic) open the app with the import preview on
@@ -223,7 +241,7 @@ endif()
 # (Windows, console tools) or in the app bundle's Contents/Frameworks (macOS app; licences in Contents/Resources).
 function(pv_use_onnxruntime target)
     if(PV_ONNXRUNTIME_DIR)
-        target_include_directories(${target} SYSTEM PRIVATE ${PV_ONNXRUNTIME_DIR}/include)
+        target_include_directories(${target} SYSTEM PRIVATE ${PV_ONNXRUNTIME_INCLUDE_DIR})
         target_compile_definitions(${target} PRIVATE PV_HAS_ONNX=1)
 
         get_filename_component(library_name ${PV_ONNXRUNTIME_LIB} NAME)
