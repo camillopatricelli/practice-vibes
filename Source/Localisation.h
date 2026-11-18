@@ -49,7 +49,7 @@ namespace detail
         return s;
     }
 
-    /** Languages that have a translation file: embedded ones (none yet) + <app data>/languages/<code>.txt. */
+    /** Translation files a translator is trying out: <app data>/languages/<code>.txt. */
     inline juce::File userLanguageFolder (const juce::File& appData) { return appData.getChildFile ("languages"); }
 
     inline juce::String lookUp (const juce::String& key, const juce::String& fallback)
@@ -186,67 +186,16 @@ inline juce::String deviceLanguage()
     return code.upToFirstOccurrenceOf ("-", false, false).upToFirstOccurrenceOf ("_", false, false).substring (0, 2);
 }
 
-/** The translation file text for a language, or empty when there's none. Embedded files come later (BinaryData);
-    a file in <app data>/languages/<code>.txt wins, so a translator can try a translation without a new build. */
-inline juce::String translationFileFor (const juce::String& code, const juce::File& appData)
-{
-    const auto userFile = detail::userLanguageFolder (appData).getChildFile (code + ".txt");
+/** The translation file text for a language, or empty when there's none. A file in <app data>/languages/<code>.txt
+    wins over the built-in one (Resources/Languages, embedded), so a translator can try changes without a new build. */
+juce::String translationFileFor (const juce::String& code, const juce::File& appData);
 
-    if (userFile.existsAsFile())
-        return userFile.loadFileAsString();
-
-    return {};
-}
-
-/** Languages the user can pick, as code + name in that language. English and the test language always. */
-inline juce::StringPairArray availableLanguages (const juce::File& appData)
-{
-    juce::StringPairArray list;
-    list.set ("en", "English");
-
-    for (const auto& f : detail::userLanguageFolder (appData).findChildFiles (juce::File::findFiles, false, "*.txt"))
-    {
-        const auto code = f.getFileNameWithoutExtension().toLowerCase();
-
-        if (code == "template" || code == "en")
-            continue;
-
-        juce::LocalisedStrings strings (f.loadFileAsString(), false);
-        list.set (code, strings.getLanguageName().isNotEmpty() ? strings.getLanguageName() : code);
-    }
-
-    list.set (pseudoCode, "Test: long accented text");
-    return list;
-}
+/** Languages the user can pick, as code + name in that language: English, the built-in translations, files in
+    <app data>/languages, and the test language. (Localisation.cpp, which the app and the tests compile.) */
+juce::StringPairArray availableLanguages (const juce::File& appData);
 
 /** Call once at start-up, before any component exists. choice = ui.xml "language" (empty = the device language). */
-inline void initialise (const juce::String& choice, const juce::File& appData)
-{
-    auto& s = detail::state();
-    const auto forced = juce::SystemStats::getEnvironmentVariable ("PV_LANGUAGE", {});     // developers: try a language without touching ui.xml
-    const auto wanted = forced.isNotEmpty() ? forced : choice.isNotEmpty() ? choice : deviceLanguage();
-
-    s.pseudo = wanted == pseudoCode;
-    s.code = "en";
-    juce::LocalisedStrings::setCurrentMappings (nullptr);
-
-    if (s.pseudo)
-    {
-        s.code = pseudoCode;
-        return;
-    }
-
-    if (wanted == "en" || wanted.isEmpty())
-        return;
-
-    const auto text = translationFileFor (wanted, appData);
-
-    if (text.isEmpty())
-        return;     // no translation for the device language: English
-
-    juce::LocalisedStrings::setCurrentMappings (new juce::LocalisedStrings (text, false));
-    s.code = wanted;
-}
+void initialise (const juce::String& choice, const juce::File& appData);
 
 /** For tests: switch without files. mappings may be null (English). */
 inline void setLanguageForTests (const juce::String& code, juce::LocalisedStrings* mappings)

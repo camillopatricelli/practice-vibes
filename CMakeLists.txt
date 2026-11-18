@@ -153,6 +153,7 @@ target_sources(PracticeVibes PRIVATE
     Source/LibraryPanel.cpp
     Source/Links.cpp
     Source/LinksPanel.cpp
+    Source/Localisation.cpp
     Source/LoopFiles.cpp
     Source/Looper.cpp
     Source/LooperPanel.cpp
@@ -269,6 +270,14 @@ juce_add_binary_data(PracticeVibesFonts
     NAMESPACE   FontData
     SOURCES     ${PV_FONTS})
 
+# Built-in translations: Resources/Languages/<code>.txt (template.txt is the translators' starting point, not a language).
+file(GLOB PV_LANGUAGES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Resources/Languages/*.txt)
+list(FILTER PV_LANGUAGES EXCLUDE REGEX "/template\\.txt$")
+juce_add_binary_data(PracticeVibesLanguages
+    HEADER_NAME LanguageData.h
+    NAMESPACE   LanguageData
+    SOURCES     ${PV_LANGUAGES})
+
 target_link_libraries(PracticeVibes
     PRIVATE
         juce::juce_audio_utils
@@ -278,6 +287,7 @@ target_link_libraries(PracticeVibes
         PracticeVibesIcons
         PracticeVibesDrumKit
         PracticeVibesFonts
+        PracticeVibesLanguages
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -299,6 +309,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     Source/Footswitch.cpp
         Source/Library.cpp
         Source/Links.cpp
+        Source/Localisation.cpp
         Source/LoopFiles.cpp
         Source/Looper.cpp
         Source/MediaFoundationAudio.cpp
@@ -333,6 +344,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
             juce::juce_dsp
             signalsmith-stretch
             PracticeVibesDrumKit
+            PracticeVibesLanguages
         PUBLIC
             juce::juce_recommended_config_flags
             juce::juce_recommended_warning_flags)

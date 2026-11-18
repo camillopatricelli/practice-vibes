@@ -4989,6 +4989,22 @@ static void testLocalisation()
     check (trn ("{n} take", "{n} takes", 2).contains ("2"), "pseudo plural: " + trn ("{n} take", "{n} takes", 2));
     check (i18n::date (day, "%d %b").startsWith ("17 ["), "pseudo date: " + i18n::date (day, "%d %b"));
 
+    // Built-in Italian (Resources/Languages/it.txt): listed and loaded without any file in the app data folder.
+    {
+        juce::TemporaryFile emptyAppData;
+        const auto appData = emptyAppData.getFile();
+        const auto languages = i18n::availableLanguages (appData);
+        check (languages["it"] == "Italiano", "built-in Italian listed as \"Italiano\" (got \"" + languages["it"] + "\")");
+        check (languages.getAllKeys().indexOf ("template") < 0, "template.txt is not a language");
+
+        i18n::initialise ("it", appData);
+        check (i18n::currentLanguage() == "it", "built-in Italian loads");
+        check (tr ("Start metronome") == "Avvia metronomo", "built-in Italian: " + tr ("Start metronome"));
+        check (trn ("{n} bar", "{n} bars", 3) == "3 battute", "built-in Italian plural: " + trn ("{n} bar", "{n} bars", 3));
+        check (i18n::date (day, "%a %d %b") == "mar 17 nov", "built-in Italian date: " + i18n::date (day, "%a %d %b"));
+        i18n::initialise ("en", appData);
+    }
+
     i18n::setLanguageForTests ("en", nullptr);
 }
 
