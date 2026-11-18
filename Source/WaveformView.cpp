@@ -1,5 +1,6 @@
 #include "WaveformView.h"
 #include "Theme.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -147,7 +148,7 @@ void WaveformView::paint (juce::Graphics& g)
     {
         g.setColour (theme::text().withAlpha (0.5f));
         g.setFont (juce::FontOptions (18.0f));
-        g.drawText ("Open an audio file to start", mainArea, juce::Justification::centred);
+        g.drawText (tr ("Open an audio file to start"), mainArea, juce::Justification::centred);
         return;
     }
 
@@ -203,7 +204,7 @@ void WaveformView::paintMarks (juce::Graphics& g, juce::Rectangle<int> area)
             g.drawLine (x2, top, x2, bottom, 1.0f);
         }
 
-        auto label = m.text.isNotEmpty() ? m.text : (m.isLoop() ? juce::String ("Loop") : formatMarkTime (m.start));
+        auto label = m.text.isNotEmpty() ? m.text : (m.isLoop() ? tr ("Loop") : formatMarkTime (m.start));
 
         if (label.length() > 28)
             label = label.substring (0, 27).trimEnd() + "...";

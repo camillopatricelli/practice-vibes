@@ -3,6 +3,7 @@
 #include "Take.h"
 #include "AppPaths.h"
 #include "Theme.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -77,7 +78,7 @@ std::vector<StorageItem> StorageScan::listTakes (const Library& library)
             StorageItem item;
             item.file = f;
             item.title = f.getFileNameWithoutExtension();
-            item.detail = "Inbox";
+            item.detail = tr ("Inbox");
             takes.push_back (item);
         }
 
@@ -129,7 +130,7 @@ StorageReport StorageScan::run (const juce::File& libraryRoot, std::vector<Stora
             item.title = item.file.getFileName();
             item.bytes = folderBytes (item.file);
             item.when = item.file.getLastModificationTime();
-            item.detail = "Last changed " + item.when.formatted ("%d %b %Y, %H:%M");
+            item.detail = tr ("Last changed {date}", i18n::date (item.when, "%d %b %Y, %H:%M"));
             report.loopBytes += item.bytes;
             loops.push_back (item);
         }
@@ -171,8 +172,8 @@ StorageReport StorageScan::run (const juce::File& libraryRoot, std::vector<Stora
 
                 item.title = title;
                 const auto where = parent.getParentDirectory();
-                item.detail = (where == libraryRoot ? juce::String ("Inbox") : where == appDataFolder ? juce::String ("not in the library") : where.getFileName())
-                              + "  -  " + (Stems::isComplete (item.file) ? "separated " + item.when.formatted ("%d %b %Y") : juce::String ("incomplete"));
+                item.detail = (where == libraryRoot ? tr ("Inbox") : where == appDataFolder ? tr ("not in the library") : where.getFileName())
+                              + "  -  " + (Stems::isComplete (item.file) ? tr ("separated {date}", i18n::date (item.when, "%d %b %Y")) : tr ("incomplete"));
                 report.stemBytes += item.bytes;
                 stems.push_back (item);
             }
@@ -192,10 +193,10 @@ StorageReport StorageScan::run (const juce::File& libraryRoot, std::vector<Stora
         StorageItem item;
         item.kind = StorageItem::Kind::webCache;
         item.file = webCache;
-        item.title = "Web viewer cache";
+        item.title = tr ("Web viewer cache");
         item.detail = clearWebCacheMarker (appDataFolder).existsAsFile()
-                          ? juce::String ("will be cleared the next time the app starts")
-                          : juce::String ("YouTube and documents viewer; cleared the next time the app starts");
+                          ? tr ("will be cleared the next time the app starts")
+                          : tr ("YouTube and documents viewer; cleared the next time the app starts");
         item.bytes = report.webCacheBytes;
         item.when = juce::Time::getCurrentTime();
         report.items.push_back (item);
@@ -212,10 +213,10 @@ juce::String StorageScan::formatBytes (juce::int64 bytes)
     if (bytes < (juce::int64) 1024 * 1024 * 1024)
     {
         const auto mb = (double) bytes / (1024.0 * 1024.0);
-        return (mb < 10.0 ? juce::String (mb, 1) : juce::String (juce::roundToInt (mb))) + " MB";
+        return (mb < 10.0 ? i18n::decimal (mb, 1) : juce::String (juce::roundToInt (mb))) + " MB";
     }
 
-    return juce::String ((double) bytes / (1024.0 * 1024.0 * 1024.0), 2) + " GB";
+    return i18n::decimal ((double) bytes / (1024.0 * 1024.0 * 1024.0), 2) + " GB";
 }
 
 juce::File StorageScan::clearWebCacheMarker (const juce::File& appDataFolder)
@@ -283,9 +284,9 @@ private:
         if (index < 0)
         {
             const auto kind = (StorageItem::Kind) (-1 - index);
-            const auto* text = kind == StorageItem::Kind::take ? "Takes"
-                             : kind == StorageItem::Kind::loops ? "Saved loops"
-                             : kind == StorageItem::Kind::stems ? "Stems (they can be made again)" : "Caches";
+            const auto text = kind == StorageItem::Kind::take ? tr ("Takes")
+                            : kind == StorageItem::Kind::loops ? tr ("Saved loops")
+                            : kind == StorageItem::Kind::stems ? tr ("Stems (they can be made again)") : tr ("Caches");
             g.setColour (theme::text().withAlpha (0.9f));
             g.setFont (theme::headerFont());
             g.drawText (text, r.withTrimmedTop (14), juce::Justification::centredLeft, true);
@@ -348,21 +349,21 @@ StoragePanel::StoragePanel (Library* lib, juce::File loops, juce::File appData)
     totalsLabel.setFont (juce::FontOptions (16.0f));
     totalsLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.92f));
     totalsLabel.setJustificationType (juce::Justification::topLeft);
-    totalsLabel.setText ("Adding up the space used...", juce::dontSendNotification);
+    totalsLabel.setText (tr ("Adding up the space used..."), juce::dontSendNotification);
     addAndMakeVisible (totalsLabel);
 
-    selectBox.setTextWhenNothingSelected ("Quick select...");
-    selectBox.addItem ("Takes older than a week", 1);
-    selectBox.addItem ("Takes older than a month", 2);
-    selectBox.addItem ("Takes older than 3 months", 3);
-    selectBox.addItem ("All takes", 4);
+    selectBox.setTextWhenNothingSelected (tr ("Quick select..."));
+    selectBox.addItem (tr ("Takes older than a week"), 1);
+    selectBox.addItem (tr ("Takes older than a month"), 2);
+    selectBox.addItem (tr ("Takes older than 3 months"), 3);
+    selectBox.addItem (tr ("All takes"), 4);
     selectBox.addSeparator();
-    selectBox.addItem ("Saved loops older than a month", 5);
-    selectBox.addItem ("All saved loops", 6);
+    selectBox.addItem (tr ("Saved loops older than a month"), 5);
+    selectBox.addItem (tr ("All saved loops"), 6);
     selectBox.addSeparator();
-    selectBox.addItem ("All stems", 8);
+    selectBox.addItem (tr ("All stems"), 8);
     selectBox.addSeparator();
-    selectBox.addItem ("Nothing", 7);
+    selectBox.addItem (tr ("Nothing"), 7);
     selectBox.onChange = [this]
     {
         const auto id = selectBox.getSelectedId();
@@ -399,7 +400,7 @@ StoragePanel::StoragePanel (Library* lib, juce::File loops, juce::File appData)
     removeButton.onClick = [this] { removeSelected(); };
     addAndMakeVisible (removeButton);
 
-    emptyLabel.setText ("Nothing to clean up: no takes, saved loops, stems or caches.", juce::dontSendNotification);
+    emptyLabel.setText (tr ("Nothing to clean up: no takes, saved loops, stems or caches."), juce::dontSendNotification);
     emptyLabel.setJustificationType (juce::Justification::centred);
     emptyLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.55f));
     addChildComponent (emptyLabel);
@@ -442,14 +443,13 @@ void StoragePanel::scanned (StorageReport newReport)
     juce::StringArray lines;
 
     if (library != nullptr)
-        lines.add ("Library: " + StorageScan::formatBytes (report.libraryBytes) + "   (takes "
-                   + StorageScan::formatBytes (report.takeBytes) + ", stems " + StorageScan::formatBytes (report.stemBytes) + ", practice log "
-                   + StorageScan::formatBytes (report.practiceLogBytes) + ", the rest are your songs and documents)");
+        lines.add (tr ("Library: {total}   (takes {takes}, stems {stems}, practice log {log}, the rest are your songs and documents)",
+                       StorageScan::formatBytes (report.libraryBytes), StorageScan::formatBytes (report.takeBytes),
+                       StorageScan::formatBytes (report.stemBytes), StorageScan::formatBytes (report.practiceLogBytes)));
 
-    lines.add ("Saved loops: " + StorageScan::formatBytes (report.loopBytes)
-               + "      App data: " + StorageScan::formatBytes (report.appDataBytes)
-               + (report.webCacheBytes > 0 ? "   (web viewer cache " + StorageScan::formatBytes (report.webCacheBytes) + ")" : juce::String()));
-    lines.add ("Your songs and documents are never offered for removal. Tap items below to select them.");
+    lines.add (tr ("Saved loops: {loops}      App data: {appData}", StorageScan::formatBytes (report.loopBytes), StorageScan::formatBytes (report.appDataBytes))
+               + (report.webCacheBytes > 0 ? "   " + tr ("(web viewer cache {size})", StorageScan::formatBytes (report.webCacheBytes)) : juce::String()));
+    lines.add (tr ("Your songs and documents are never offered for removal. Tap items below to select them."));
 
     totalsLabel.setText (lines.joinIntoString ("\n"), juce::dontSendNotification);
     emptyLabel.setVisible (report.items.empty());
@@ -469,8 +469,8 @@ void StoragePanel::updateSummary()
             bytes += report.items[i].bytes;
         }
 
-    selectionLabel.setText (count == 0 ? juce::String ("Nothing selected")
-                                       : juce::String (count) + " selected, " + StorageScan::formatBytes (bytes),
+    selectionLabel.setText (count == 0 ? tr ("Nothing selected")
+                                       : tr ("{count} selected, {size}", count, StorageScan::formatBytes (bytes)),
                             juce::dontSendNotification);
     removeButton.setEnabled (count > 0);
 }
@@ -486,17 +486,17 @@ void StoragePanel::removeSelected()
         return;
 
    #if JUCE_IOS
-    const juce::String where = "They are deleted for good (there's no bin on the iPad).";
+    const juce::String where = tr ("They are deleted for good (there's no bin on the iPad).");
    #else
-    const juce::String where = "They go to the Recycle Bin.";
+    const juce::String where = tr ("They go to the Recycle Bin.");
    #endif
 
     const auto options = juce::MessageBoxOptions()
                              .withIconType (juce::MessageBoxIconType::QuestionIcon)
-                             .withTitle ("Remove " + juce::String (count) + (count == 1 ? " item?" : " items?"))
+                             .withTitle (trn ("Remove {n} item?", "Remove {n} items?", count))
                              .withMessage (where)
-                             .withButton ("Remove", 1)
-                             .withButton ("Cancel", 0)
+                             .withButton (tr ("Remove"), 1)
+                             .withButton (tr ("Cancel"), 0)
                              .withAssociatedComponent (this);
     std::weak_ptr<bool> weakAlive = alive;
 

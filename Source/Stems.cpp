@@ -1,6 +1,7 @@
 #include "Stems.h"
 #include "AacFile.h"
 #include "AppPaths.h"
+#include "Localisation.h"
 
 #include <juce_dsp/juce_dsp.h>
 
@@ -18,8 +19,9 @@ namespace Stems
 
     juce::String displayName (int index)
     {
-        static const char* const names[] { "Drums", "Bass", "Other", "Vocals", "Guitar", "Piano" };
-        return juce::isPositiveAndBelow (index, count) ? names[index] : "";
+        static const char* const names[] { i18n::key ("Drums"), i18n::key ("Bass"), i18n::key ("Other"),
+                                           i18n::key ("Vocals"), i18n::key ("Guitar"), i18n::key ("Piano") };
+        return juce::isPositiveAndBelow (index, count) ? tr (names[index]) : juce::String();
     }
 
     juce::File folderFor (const juce::File& song, const juce::File& libraryRoot)

@@ -1,5 +1,6 @@
 #include "TunerPanel.h"
 #include "Theme.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -42,7 +43,7 @@ TunerPanel::TunerPanel (AppEngine& e)
         repaint();
     };
     referenceLabel.setText ("A4 = " + juce::String ((int) tuner.referenceA4) + " Hz", juce::dontSendNotification);
-    referenceLabel.setTooltip ("Reference pitch. Double-click the slider for 440 Hz.");
+    referenceLabel.setTooltip (tr ("Reference pitch. Double-click the slider for 440 Hz."));
     addAndMakeVisible (referenceSlider);
     addAndMakeVisible (referenceLabel);
 
@@ -55,10 +56,10 @@ TunerPanel::TunerPanel (AppEngine& e)
     };
     addAndMakeVisible (muteToggle);
 
-    tuningLabel.setText ("Tuning", juce::dontSendNotification);
+    tuningLabel.setText (tr ("Tuning"), juce::dontSendNotification);
     addAndMakeVisible (tuningLabel);
 
-    tuningCombo.setTooltip ("Click a string below to change its note (makes a custom tuning).");
+    tuningCombo.setTooltip (tr ("Click a string below to change its note (makes a custom tuning)."));
     tuningCombo.onChange = [this]
     {
         const auto& presets = tuningPresets (tuner.instrument);
@@ -73,11 +74,11 @@ TunerPanel::TunerPanel (AppEngine& e)
     addAndMakeVisible (tuningCombo);
     fillTuningCombo();
 
-    instrumentLabel.setText ("Instrument", juce::dontSendNotification);
+    instrumentLabel.setText (tr ("Instrument"), juce::dontSendNotification);
     addAndMakeVisible (instrumentLabel);
-    guitarButton.setTooltip ("Six-string guitar tunings");
-    bassButton.setTooltip ("Bass tunings, 4, 5 or 6 strings");
-    otherButton.setTooltip ("Any other instrument or voice: a plain chromatic tuner, no strings");
+    guitarButton.setTooltip (tr ("Six-string guitar tunings"));
+    bassButton.setTooltip (tr ("Bass tunings, 4, 5 or 6 strings"));
+    otherButton.setTooltip (tr ("Any other instrument or voice: a plain chromatic tuner, no strings"));
 
     const std::pair<juce::TextButton*, TunerInstrument> instrumentButtons[] {
         { &guitarButton, TunerInstrument::guitar }, { &bassButton, TunerInstrument::bass }, { &otherButton, TunerInstrument::other } };
@@ -120,9 +121,9 @@ TunerPanel::TunerPanel (AppEngine& e)
 
     setUpPair (singleButton, strumButton, 1, tuner.strumMode);
     setUpPair (needleButton, strobeButton, 2, tuner.strobe);
-    singleButton.setTooltip ("Tune one string at a time");
-    strumButton.setTooltip ("Strum all open strings once and see every string at the same time");
-    strobeButton.setTooltip ("A band that drifts while out of tune and stands still when in tune: finest for the last cent");
+    singleButton.setTooltip (tr ("Tune one string at a time"));
+    strumButton.setTooltip (tr ("Strum all open strings once and see every string at the same time"));
+    strobeButton.setTooltip (tr ("A band that drifts while out of tune and stands still when in tune: finest for the last cent"));
 
     for (auto* b : { &singleButton, &strumButton, &needleButton, &strobeButton })
         b->onClick = [this]
@@ -188,9 +189,9 @@ void TunerPanel::fillTuningCombo()
     tuningCombo.clear (juce::dontSendNotification);
 
     for (int i = 0; i < (int) presets.size(); ++i)
-        tuningCombo.addItem (presets[(size_t) i].name, i + 1);
+        tuningCombo.addItem (tr (presets[(size_t) i].name), i + 1);
 
-    tuningCombo.addItem ("Custom", (int) presets.size() + 1);
+    tuningCombo.addItem (tr ("Custom"), (int) presets.size() + 1);
     tuningCombo.setItemEnabled ((int) presets.size() + 1, false);
     updateTuningCombo();
 }
@@ -231,7 +232,7 @@ void TunerPanel::showStringMenu (int index)
 
     const auto current = strings[(size_t) index];
     juce::PopupMenu menu;
-    menu.addSectionHeader ("String " + juce::String ((int) strings.size() - index));
+    menu.addSectionHeader (tr ("String {n}", (int) strings.size() - index));
 
     for (int n = current + 7; n >= current - 7; --n)
         if (n >= Tuner::minStringNote (tuner.instrument) && n <= Tuner::maxStringNote (tuner.instrument))
@@ -276,9 +277,9 @@ void TunerPanel::timerCallback()
         if (strum && strumStrings != tuner.strings())
             strum.reset();
 
-        hintLabel.setText (tuner.isStrumPending() ? "Listening..."
-                           : strum ? "Strum again to check again"
-                                   : "Strum all open strings once and let them ring",
+        hintLabel.setText (tuner.isStrumPending() ? tr ("Listening...")
+                           : strum ? tr ("Strum again to check again")
+                                   : tr ("Strum all open strings once and let them ring"),
                            juce::dontSendNotification);
         repaint (noteArea.getUnion (meterArea).getUnion (stringsArea));
         return;
@@ -306,9 +307,9 @@ void TunerPanel::timerCallback()
     }
     else
     {
-        const juce::String what = tuner.strings().empty() ? "Play a single note" : "Play a single string";
-        hintLabel.setText (inputLevel < PitchDetector::minLevel ? what + " (no input signal)"
-                                                                : what + " and let it ring",
+        const auto single = tuner.strings().empty();
+        hintLabel.setText (inputLevel < PitchDetector::minLevel ? (single ? tr ("Play a single note (no input signal)") : tr ("Play a single string (no input signal)"))
+                                                                : (single ? tr ("Play a single note and let it ring") : tr ("Play a single string and let it ring")),
                            juce::dontSendNotification);
     }
 
@@ -486,7 +487,7 @@ void TunerPanel::paintStrum (juce::Graphics& g, juce::Rectangle<float> area)
                     top.removeFromTop (top.getHeight() * 0.65f), juce::Justification::centredBottom);
         g.setFont (juce::FontOptions (13.0f));
         g.setColour (theme::text().withAlpha (0.55f));
-        g.drawText (! strum ? "" : ! reading.heard ? "not heard" : inTune ? "in tune" : reading.cents < 0.0f ? "flat" : "sharp",
+        g.drawText (! strum ? juce::String() : ! reading.heard ? tr ("not heard") : inTune ? tr ("in tune") : reading.cents < 0.0f ? tr ("flat") : tr ("sharp"),
                     top, juce::Justification::centred);
 
         // Vertical scale, sharp up: -50..+50 cents.

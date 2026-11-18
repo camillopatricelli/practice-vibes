@@ -1,4 +1,5 @@
 #include "DrumPattern.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -230,20 +231,20 @@ bool DrumPattern::sameNotes (const DrumPattern& other) const noexcept
 const std::vector<DrumPattern>& DrumPatterns::builtIn()
 {
     static const std::vector<DrumPattern> patterns {
-        make ("Kick on the beat", 4, 2, 0.5, {
+        make (i18n::key ("Kick on the beat"), 4, 2, 0.5, {
             { 'K', "X. x. x. x." } }),
 
-        make ("Basic beat", 4, 2, 0.5, {
+        make (i18n::key ("Basic beat"), 4, 2, 0.5, {
             { 'H', "x. x. x. x." },
             { 'S', ".. X. .. X." },
             { 'K', "X. .. X. .." } }),
 
-        make ("Rock", 4, 2, 0.5, {
+        make (i18n::key ("Rock"), 4, 2, 0.5, {
             { 'H', "xx xx xx xx" },
             { 'S', ".. X. .. X." },
             { 'K', "X. .. Xx .." } }),
 
-        make ("Rock with a fill (2 bars)", 4, 4, 0.5, {
+        make (i18n::key ("Rock with a fill (2 bars)"), 4, 4, 0.5, {
             { 'C', "X... .... .... ....|.... .... .... ...." },
             { 'H', "..x. x.x. x.x. x.x.|x.x. x.x. x.x. ...." },
             { 'T', ".... .... .... ....|.... .... .... XxX." },
@@ -251,48 +252,48 @@ const std::vector<DrumPattern>& DrumPatterns::builtIn()
             { 'S', ".... X... .... X...|.... X... .... ...." },
             { 'K', "X... .... X.X. ....|X... .... X.X. ...." } }),
 
-        make ("Four on the floor", 4, 4, 0.5, {
+        make (i18n::key ("Four on the floor"), 4, 4, 0.5, {
             { 'O', "..x. ..x. ..x. ..x." },
             { 'H', "x... x... x... x..." },
             { 'S', ".... X... .... X..." },
             { 'K', "X... X... X... X..." } }),
 
-        make ("Funk", 4, 4, 0.5, {
+        make (i18n::key ("Funk"), 4, 4, 0.5, {
             { 'H', "Xxxx Xxxx Xxxx Xxxx" },
             { 'S', ".... X..g .g.. X..g" },
             { 'K', "X.x. .... ..x. .x.." } }),
 
-        make ("Shuffle", 4, 3, 0.5, {
+        make (i18n::key ("Shuffle"), 4, 3, 0.5, {
             { 'H', "x.x x.x x.x x.x" },
             { 'S', "... X.. ... X.." },
             { 'K', "X.. ... X.x ..." } }),
 
-        make ("Slow blues (12/8 feel)", 4, 3, 0.5, {
+        make (i18n::key ("Slow blues (12/8 feel)"), 4, 3, 0.5, {
             { 'H', "Xxx Xxx Xxx Xxx" },
             { 'S', "... X.. ... X.." },
             { 'K', "X.. ..x X.. ..." } }),
 
-        make ("Jazz swing", 4, 3, 0.5, {
+        make (i18n::key ("Jazz swing"), 4, 3, 0.5, {
             { 'R', "X.. x.x X.. x.x" },
             { 'H', "... x.. ... x.." },
             { 'K', "g.. g.. g.. g.." } }),
 
-        make ("Reggae one drop", 4, 4, 0.5, {
+        make (i18n::key ("Reggae one drop"), 4, 4, 0.5, {
             { 'H', "x.x. x.x. x.x. x.x." },
             { 'S', ".... .... X... ...." },
             { 'K', ".... .... X... ...." } }),
 
-        make ("Bossa nova (2 bars)", 4, 2, 0.5, {
+        make (i18n::key ("Bossa nova (2 bars)"), 4, 2, 0.5, {
             { 'H', "xx xx xx xx|xx xx xx xx" },
             { 'S', "x. .x .. x.|.. x. .x .." },
             { 'K', "X. .x X. .x|X. .x X. .x" } }),
 
-        make ("Waltz (3/4)", 3, 2, 0.5, {
+        make (i18n::key ("Waltz (3/4)"), 3, 2, 0.5, {
             { 'H', "x. x. x." },
             { 'S', ".. x. x." },
             { 'K', "X. .. .." } }),
 
-        make ("Ballad (6/8)", 2, 3, 0.5, {
+        make (i18n::key ("Ballad (6/8)"), 2, 3, 0.5, {
             { 'H', "xxx xxx" },
             { 'S', "... X.." },
             { 'K', "X.. ..x" } }),
@@ -344,13 +345,13 @@ juce::Result DrumPatterns::saveUserPattern (const DrumPattern& pattern)
     const auto folder = getUserFolder();
 
     if (! folder.createDirectory())
-        return juce::Result::fail ("Can't create " + folder.getFullPathName());
+        return juce::Result::fail (tr ("Can't create {folder}", folder.getFullPathName()));
 
     auto copy = pattern;
     copy.builtIn = false;
 
     if (! copy.toXml()->writeTo (fileFor (pattern.name)))
-        return juce::Result::fail ("Can't write " + fileFor (pattern.name).getFullPathName());
+        return juce::Result::fail (tr ("Can't write {file}", fileFor (pattern.name).getFullPathName()));
 
     return juce::Result::ok();
 }

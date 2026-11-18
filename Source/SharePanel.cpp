@@ -2,6 +2,7 @@
 #include "ResourceWidgets.h"
 #include "StoragePanel.h"
 #include "Theme.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -24,61 +25,61 @@ SharePanel::SharePanel (const Topic& t, juce::File folder, juce::String shareBut
     getProperties().set ("overlayWidth", 680);
     getProperties().set ("overlayHeight", context.teacher ? 760 : 680);
 
-    nameLabel.setText ("Your name", juce::dontSendNotification);
+    nameLabel.setText (tr ("Your name"), juce::dontSendNotification);
     nameLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (nameLabel);
     nameEditor.setText (context.senderName, false);
-    nameEditor.setTextToShowWhenEmpty ("Optional: a first name or nickname, shown to the person you send it to",
+    nameEditor.setTextToShowWhenEmpty (tr ("Optional: a first name or nickname, shown to the person you send it to"),
                                        theme::text().withAlpha (0.35f));
-    nameEditor.setTooltip ("Kept only on this device and put only in the files you send");
+    nameEditor.setTooltip (tr ("Kept only on this device and put only in the files you send"));
     styleEditor (nameEditor);
     addAndMakeVisible (nameEditor);
 
-    newTopicToggle.setTooltip ("Gets a new topic id: importing it never updates the topic you sent to someone else");
+    newTopicToggle.setTooltip (tr ("Gets a new topic id: importing it never updates the topic you sent to someone else"));
     newTopicToggle.onClick = [this] { updateTotal(); };
     addChildComponent (newTopicToggle);
     styleInfo (newTopicHint, 0.6f);
     addChildComponent (newTopicHint);
 
     // Teachers: one student, or a group (an ensemble) in one go.
-    toLabel.setText ("To", juce::dontSendNotification);
+    toLabel.setText (tr ("To"), juce::dontSendNotification);
     toLabel.setJustificationType (juce::Justification::centredRight);
     addChildComponent (toLabel);
-    toBox.addItem (topic.student.isNotEmpty() ? topic.student + " (this topic's student)" : juce::String ("One person"), 1);
+    toBox.addItem (topic.student.isNotEmpty() ? tr ("{name} (this topic's student)", topic.student) : tr ("One person"), 1);
 
     for (size_t i = 0; i < context.groups.groups.size(); ++i)
     {
         const auto& g = context.groups.groups[i];
-        toBox.addItem ("Group: " + g.name + " (" + juce::String (g.members.size()) + (g.members.size() == 1 ? " member)" : " members)"),
+        toBox.addItem (trn ("Group: {name} ({n} member)", "Group: {name} ({n} members)", g.members.size(), g.name),
                        100 + (int) i);
     }
 
     toBox.setSelectedId (1, juce::dontSendNotification);
-    toBox.setTooltip ("Groups: Topics > Tags > Edit groups...");
+    toBox.setTooltip (tr ("Groups: Topics > Tags > Edit groups..."));
     toBox.onChange = [this] { updateNewTopicDefault(); updateTotal(); resized(); };
     addChildComponent (toBox);
 
-    groupModeBox.addItem ("One file for the whole group: send it once to the group chat or a mail to all", 1);
-    groupModeBox.addItem ("One file per member: each member gets their own file", 2);
+    groupModeBox.addItem (tr ("One file for the whole group: send it once to the group chat or a mail to all"), 1);
+    groupModeBox.addItem (tr ("One file per member: each member gets their own file"), 2);
     groupModeBox.setSelectedId (1, juce::dontSendNotification);
     groupModeBox.onChange = [this] { updateNewTopicDefault(); updateTotal(); };
     addChildComponent (groupModeBox);
     updateNewTopicDefault();
 
     if (! context.summary.isEmpty() && context.summary.sessions > 0)
-        summaryToggle.setButtonText ("Include my practice on this topic: " + context.summary.describe());
+        summaryToggle.setButtonText (tr ("Include my practice on this topic: {summary}", context.summary.describe()));
 
-    summaryToggle.setTooltip ("Totals only (time per week, tempo, days in a row): no times of day, nothing else from your log");
+    summaryToggle.setTooltip (tr ("Totals only (time per week, tempo, days in a row): no times of day, nothing else from your log"));
     addChildComponent (summaryToggle);
 
-    formatLabel.setText ("Send as", juce::dontSendNotification);
+    formatLabel.setText (tr ("Send as"), juce::dontSendNotification);
     formatLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (formatLabel);
-    formatBox.addItem ("Practice Vibes topic (.pvtopic): opens in the app, updates the topic", 1);
-    formatBox.addItem ("Document for anyone: a web page + the files (no app needed)", 2);
+    formatBox.addItem (tr ("Practice Vibes topic (.pvtopic): opens in the app, updates the topic"), 1);
+    formatBox.addItem (tr ("Document for anyone: a web page + the files (no app needed)"), 2);
     formatBox.setSelectedId (1, juce::dontSendNotification);
-    formatBox.setTooltip ("Not everyone has the app: the document opens in any browser or phone (and prints to PDF), "
-                          "with the notes, the links under their titles and the list of files");
+    formatBox.setTooltip (tr ("Not everyone has the app: the document opens in any browser or phone (and prints to PDF), "
+                          "with the notes, the links under their titles and the list of files"));
     formatBox.onChange = [this] { updateTotal(); resized(); };
     addAndMakeVisible (formatBox);
 
@@ -96,7 +97,7 @@ SharePanel::SharePanel (const Topic& t, juce::File folder, juce::String shareBut
 
         auto* toggle = toggles.add (new juce::ToggleButton (text));
         toggle->setToggleState (item.include, juce::dontSendNotification);
-        toggle->setTooltip (item.isSong ? "Leave commercial recordings out: the receiver connects their own copy (same file name)"
+        toggle->setTooltip (item.isSong ? tr ("Leave commercial recordings out: the receiver connects their own copy (same file name)")
                                         : item.fileName);
         toggle->onClick = [this] { updateTotal(); };
         rowHolder.addAndMakeVisible (toggle);
@@ -112,7 +113,7 @@ SharePanel::SharePanel (const Topic& t, juce::File folder, juce::String shareBut
     viewport.setScrollBarsShown (true, false);
     addAndMakeVisible (viewport);
 
-    noFilesLabel.setText ("This topic has no files: only the notes and links go in.", juce::dontSendNotification);
+    noFilesLabel.setText (tr ("This topic has no files: only the notes and links go in."), juce::dontSendNotification);
     styleInfo (noFilesLabel, 0.5f);
     addChildComponent (noFilesLabel);
     noFilesLabel.setVisible (items.empty());
@@ -211,24 +212,24 @@ void SharePanel::updateTotal()
 
     if (group != nullptr)
     {
-        newTopicToggle.setButtonText ("As a new topic for " + group->name);
+        newTopicToggle.setButtonText (tr ("As a new topic for {group}", group->name));
         const auto* previous = previousGroupSend();
 
         if (group->members.isEmpty())
-            newTopicHint.setText ("This group has no members yet: add them in Topics > Tags > Edit groups...", juce::dontSendNotification);
+            newTopicHint.setText (tr ("This group has no members yet: add them in Topics > Tags > Edit groups..."), juce::dontSendNotification);
         else if (newTopicToggle.getToggleState() || previous == nullptr)
-            newTopicHint.setText (juce::String (onePerMember() ? "Each member gets their own new copy." : "Everyone in the group gets a new copy.")
-                                      + " What each member sends back becomes their own topic here.",
+            newTopicHint.setText ((onePerMember() ? tr ("Each member gets their own new copy.") : tr ("Everyone in the group gets a new copy."))
+                                      + " " + tr ("What each member sends back becomes their own topic here."),
                                   juce::dontSendNotification);
         else
-            newTopicHint.setText ("Updates the copies the group got on " + previous->sent.formatted ("%d %b") + ".", juce::dontSendNotification);
+            newTopicHint.setText (tr ("Updates the copies the group got on {date}.", i18n::date (previous->sent, "%d %b")), juce::dontSendNotification);
     }
     else
     {
-        newTopicToggle.setButtonText ("As a new topic: the same lesson for another student (their own copy)");
-        newTopicHint.setText (newTopicToggle.getToggleState() ? juce::String ("Your student gets their own copy: what they send back never mixes into this topic.")
-                              : topic.student.isNotEmpty() || topic.lastReceived != juce::Time() ? juce::String ("Updates their copy of this topic.")
-                              : juce::String ("Sends this topic itself: what comes back updates this topic."),
+        newTopicToggle.setButtonText (tr ("As a new topic: the same lesson for another student (their own copy)"));
+        newTopicHint.setText (newTopicToggle.getToggleState() ? tr ("Your student gets their own copy: what they send back never mixes into this topic.")
+                              : topic.student.isNotEmpty() || topic.lastReceived != juce::Time() ? tr ("Updates their copy of this topic.")
+                              : tr ("Sends this topic itself: what comes back updates this topic."),
                               juce::dontSendNotification);
     }
 
@@ -236,18 +237,19 @@ void SharePanel::updateTotal()
     nameLabel.setVisible (! isDocument());
     nameEditor.setVisible (! isDocument());
 
-    introLabel.setText (isDocument() ? "Choose which files go along with the page. The notes and links are on the page; "
-                                       "your private notes and practice log are never included."
-                                     : "Choose which files go in. The notes, links and resource details always travel; "
-                                       "your private notes and practice log never do.",
+    introLabel.setText (isDocument() ? tr ("Choose which files go along with the page. The notes and links are on the page; "
+                                           "your private notes and practice log are never included.")
+                                     : tr ("Choose which files go in. The notes, links and resource details always travel; "
+                                           "your private notes and practice log never do."),
                         juce::dontSendNotification);
-    totalLabel.setText ("Total: " + TopicShare::sizeHint (total), juce::dontSendNotification);
+    totalLabel.setText (tr ("Total: {size}", TopicShare::sizeHint (total)), juce::dontSendNotification);
     totalLabel.setColour (juce::Label::textColourId, total <= TopicShare::emailLimitBytes ? theme::text().withAlpha (0.9f) : theme::highlight());
 
     leftOutLabel.setText (leftOut == 0 ? juce::String()
-                                       : (leftOut == 1 ? juce::String ("The file left out stays") : juce::String (leftOut) + " files left out stay")
-                                             + (isDocument() ? juce::String (" listed on the page as not included.")
-                                                             : juce::String (" listed: the receiver connects their own copy (found by file name), or locates it once.")),
+                                       : isDocument() ? trn ("The file left out stays listed on the page as not included.",
+                                                             "{n} files left out stay listed on the page as not included.", leftOut)
+                                                      : trn ("The file left out stays listed: the receiver connects their own copy (found by file name), or locates it once.",
+                                                             "{n} files left out stay listed: the receiver connects their own copy (found by file name), or locates it once.", leftOut),
                           juce::dontSendNotification);
 }
 
@@ -311,7 +313,7 @@ void SharePanel::share()
 
     writing = true;
     shareButton.setEnabled (false);
-    shareButton.setButtonText ("Packing...");
+    shareButton.setButtonText (tr ("Packing..."));
 
     juce::Thread::launch ([safeThis = juce::WeakReference<SharePanel> (this), topicCopy = topic, options, jobs, groupSends, document,
                            folder = outputFolder]
@@ -358,7 +360,7 @@ void SharePanel::share()
 
             if (result.failed())
             {
-                safeThis->totalLabel.setText ("Could not write the file: " + result.getErrorMessage(), juce::dontSendNotification);
+                safeThis->totalLabel.setText (tr ("Could not write the file: {error}", result.getErrorMessage()), juce::dontSendNotification);
                 return;
             }
 
@@ -445,11 +447,11 @@ void SharePanel::resized()
 ImportPanel::ImportPanel (std::function<Library*()> libraryFn, std::unique_ptr<TopicShare::Package> p, bool isTeacher)
     : getLibrary (std::move (libraryFn)), package (std::move (p)), teacher (isTeacher)
 {
-    studentLabel.setText ("Student", juce::dontSendNotification);
+    studentLabel.setText (tr ("Student"), juce::dontSendNotification);
     studentLabel.setJustificationType (juce::Justification::centredRight);
     addChildComponent (studentLabel);
-    studentEditor.setTextToShowWhenEmpty ("Optional: who this topic is for (a first name or nickname)", theme::text().withAlpha (0.35f));
-    studentEditor.setTooltip ("Groups your topics by student (Tags menu). Stays on your devices: never sent to anyone");
+    studentEditor.setTextToShowWhenEmpty (tr ("Optional: who this topic is for (a first name or nickname)"), theme::text().withAlpha (0.35f));
+    studentEditor.setTooltip (tr ("Groups your topics by student (Tags menu). Stays on your devices: never sent to anyone"));
     styleEditor (studentEditor);
     addChildComponent (studentEditor);
 
@@ -470,7 +472,7 @@ ImportPanel::ImportPanel (std::function<Library*()> libraryFn, std::unique_ptr<T
 
     if (groupSend.has_value())
     {
-        memberLabel.setText ("Who sent this?", juce::dontSendNotification);
+        memberLabel.setText (tr ("Who sent this?"), juce::dontSendNotification);
         memberLabel.setJustificationType (juce::Justification::centredRight);
         addAndMakeVisible (memberLabel);
 
@@ -479,9 +481,9 @@ ImportPanel::ImportPanel (std::function<Library*()> libraryFn, std::unique_ptr<T
 
         const auto member = groupSend->member.isNotEmpty() ? group.findMember (groupSend->member) : group.findMember (package->senderName);
         memberBox.setSelectedId (group.members.indexOf (member) + 1, juce::dontSendNotification);
-        memberBox.setTextWhenNothingSelected ("Choose the member of " + group.name);
+        memberBox.setTextWhenNothingSelected (tr ("Choose the member of {group}", group.name));
         memberBox.setEnabled (groupSend->member.isEmpty());     // a file made for one member: it's theirs
-        memberBox.setTooltip ("Each member's copy becomes its own topic here (Student = the member, in the group " + group.name + ")");
+        memberBox.setTooltip (tr ("Each member's copy becomes its own topic here (Student = the member, in the group {group})", group.name));
         memberBox.onChange = [this] { refresh(); };
         addAndMakeVisible (memberBox);
     }
@@ -512,7 +514,7 @@ ImportPanel::ImportPanel (std::function<Library*()> libraryFn, std::unique_ptr<T
     styleEditor (details);
     addAndMakeVisible (details);
 
-    styleCaption (missingHeader, "Not on this device");
+    styleCaption (missingHeader, tr ("Not on this device"));
     addChildComponent (missingHeader);
     missingViewport.setViewedComponent (&missingHolder, false);
     missingViewport.setScrollBarsShown (true, false);
@@ -522,7 +524,7 @@ ImportPanel::ImportPanel (std::function<Library*()> libraryFn, std::unique_ptr<T
     applyButton.onClick = [this] { import (TopicShare::Mode::update); };
     addAndMakeVisible (applyButton);
 
-    copyButton.setTooltip ("Keeps your topic as it is and adds this one as a separate topic");
+    copyButton.setTooltip (tr ("Keeps your topic as it is and adds this one as a separate topic"));
     copyButton.onClick = [this] { import (TopicShare::Mode::copy); };
     addChildComponent (copyButton);
 
@@ -543,16 +545,14 @@ void ImportPanel::refresh()
 
     const auto as = importAs();
     current = TopicShare::preview (*library, *package, TopicShare::Mode::update, located, as);
-    auto summaryText = current.summary();
+    auto summaryText = current.summary (groupSend.has_value() ? as.student : juce::String());
 
     if (groupSend.has_value())
     {
         if (as.student.isEmpty())
-            summaryText = "Sent back by a member of " + group.name + ": choose who sent it.";
+            summaryText = tr ("Sent back by a member of {group}: choose who sent it.", group.name);
         else if (! current.updatesExisting)
-            summaryText = as.student + "'s copy of the topic sent to " + group.name + ". " + summaryText;
-        else
-            summaryText = summaryText.replace ("Updates your topic", "Updates " + as.student + "'s copy");
+            summaryText = tr ("{member}'s copy of the topic sent to {group}.", as.student, group.name) + " " + summaryText;
     }
 
     summaryLabel.setText (summaryText, juce::dontSendNotification);
@@ -565,28 +565,28 @@ void ImportPanel::refresh()
     };
 
     if (package->senderName.isNotEmpty())
-        text << "From " << package->senderName << ". ";
+        text << tr ("From {name}.", package->senderName) << " ";
 
     if (package->sharedAt != juce::Time())
-        text << "Shared on " << package->sharedAt.formatted ("%d %b %Y at %H:%M") << ".";
+        text << tr ("Shared on {date}.", i18n::date (package->sharedAt, "%d %b %Y at %H:%M"));
 
     text << "\n\n";
 
     if (! package->summary.isEmpty())
-        text << "Practice on this topic: " << package->summary.describe() << "\n\n";
+        text << tr ("Practice on this topic: {summary}", package->summary.describe()) << "\n\n";
 
     if (! current.updatesExisting && package->topic.description.isNotEmpty())
-        text << "Notes:\n" << package->topic.description.trim() << "\n\n";
+        text << tr ("Notes:") << "\n" << package->topic.description.trim() << "\n\n";
 
-    listLine (current.updatesExisting ? "New resources" : "Resources", current.newResources);
-    listLine ("Updated files", current.updatedFiles);
-    listLine ("Found on this device", current.reconnected);
+    listLine (current.updatesExisting ? tr ("New resources") : tr ("Resources"), current.newResources);
+    listLine (tr ("Updated files"), current.updatedFiles);
+    listLine (tr ("Found on this device"), current.reconnected);
     details.setText (text.trim(), false);
 
-    applyButton.setButtonText (current.updatesExisting ? "Apply update" : "Import");
+    applyButton.setButtonText (current.updatesExisting ? tr ("Apply update") : tr ("Import"));
     applyButton.setEnabled (current.changesAnything() && ! (groupSend.has_value() && as.student.isEmpty()));
     copyButton.setVisible (current.updatesExisting);
-    cancelButton.setButtonText (current.changesAnything() ? "Cancel" : "Close");
+    cancelButton.setButtonText (current.changesAnything() ? tr ("Cancel") : tr ("Close"));
 
     missingLabels.clear();
     locateButtons.clear();
@@ -597,8 +597,8 @@ void ImportPanel::refresh()
         label->setColour (juce::Label::textColourId, theme::text().withAlpha (0.8f));
         missingHolder.addAndMakeVisible (label);
 
-        auto* button = locateButtons.add (new juce::TextButton ("Locate..."));
-        button->setTooltip ("Point to your copy of " + name + ": it is copied into the topic");
+        auto* button = locateButtons.add (new juce::TextButton (tr ("Locate...")));
+        button->setTooltip (tr ("Point to your copy of {file}: it is copied into the topic", name));
         button->onClick = [this, name] { locate (name); };
         missingHolder.addAndMakeVisible (button);
     }
@@ -611,7 +611,7 @@ void ImportPanel::refresh()
 void ImportPanel::locate (const juce::String& fileName)
 {
     const auto ext = juce::File::createFileWithoutCheckingPath (fileName).getFileExtension();
-    chooser = std::make_unique<juce::FileChooser> ("Where is " + quoted (fileName) + "?", juce::File(),
+    chooser = std::make_unique<juce::FileChooser> (tr ("Where is {file}?", quoted (fileName)), juce::File(),
                                                    ext.isNotEmpty() ? "*" + ext : "*");
 
     chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
@@ -660,7 +660,7 @@ void ImportPanel::import (TopicShare::Mode mode)
 
     if (result.failed())
     {
-        summaryLabel.setText ("Could not import the topic: " + result.getErrorMessage(), juce::dontSendNotification);
+        summaryLabel.setText (tr ("Could not import the topic: {error}", result.getErrorMessage()), juce::dontSendNotification);
         juce::Logger::writeToLog ("Topic import failed: " + result.getErrorMessage());
         return;
     }

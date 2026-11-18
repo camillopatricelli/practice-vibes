@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Library.h"
+#include "Localisation.h"
 
 namespace juce { class WebBrowserComponent; }
 
@@ -87,7 +88,7 @@ private:
     double pendingRate = 1.0, pendingVolume = 1.0;
     juce::uint32 lastRateSend = 0;
 
-    juce::TextButton playButton { "Play" }, expandButton { "Expand" }, closeButton { "X" };
+    juce::TextButton playButton { tr ("Play") }, expandButton { tr ("Expand") }, closeButton { tr ("X") };
     juce::ComponentDragger dragger;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (YouTubePlayer)

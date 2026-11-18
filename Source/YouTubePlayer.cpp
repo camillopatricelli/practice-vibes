@@ -1,6 +1,7 @@
 #include "YouTubePlayer.h"
 #include "Theme.h"
 #include "WebView.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -65,8 +66,8 @@ YouTubePlayer::YouTubePlayer()
     playButton.onClick = [this] { togglePlay(); };
     expandButton.onClick = [this] { if (onExpand) onExpand(); };
     closeButton.onClick = [this] { if (onClose) onClose(); };
-    expandButton.setTooltip ("Back to the Practice tab");
-    closeButton.setTooltip ("Close the video");
+    expandButton.setTooltip (tr ("Back to the Practice tab"));
+    closeButton.setTooltip (tr ("Close the video"));
 
     for (auto* b : { &playButton, &expandButton, &closeButton })
         addChildComponent (b);
@@ -236,7 +237,7 @@ void YouTubePlayer::handleMessage (const juce::var& message)
 
     if (compact)
     {
-        playButton.setButtonText (state.playing ? "Pause" : "Play");
+        playButton.setButtonText (state.playing ? tr ("Pause") : tr ("Play"));
         repaint();
     }
 
@@ -249,13 +250,13 @@ juce::String YouTubePlayer::getErrorText() const
     switch (state.errorCode)
     {
         case 0:   return {};
-        case 2:   return "This doesn't look like a valid YouTube video link.";
-        case 5:   return "The player couldn't play this video.";
-        case 100: return "This video was removed or is private.";
+        case 2:   return tr ("This doesn't look like a valid YouTube video link.");
+        case 5:   return tr ("The player couldn't play this video.");
+        case 100: return tr ("This video was removed or is private.");
         case 101:
-        case 150: return "The owner of this video doesn't allow playing it in other apps.";
-        case 153: return "YouTube refused the player (missing page origin).";
-        default:  return "YouTube player error " + juce::String (state.errorCode) + ".";
+        case 150: return tr ("The owner of this video doesn't allow playing it in other apps.");
+        case 153: return tr ("YouTube refused the player (missing page origin).");
+        default:  return tr ("YouTube player error {code}.", state.errorCode);
     }
 }
 
@@ -267,7 +268,7 @@ void YouTubePlayer::setCompact (bool shouldBeCompact)
     for (auto* b : { &playButton, &expandButton, &closeButton })
         b->setVisible (compact);
 
-    playButton.setButtonText (state.playing ? "Pause" : "Play");
+    playButton.setButtonText (state.playing ? tr ("Pause") : tr ("Play"));
     resized();
     repaint();
 }

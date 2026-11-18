@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Library.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -72,7 +73,7 @@ private:
 
     juce::Label totalsLabel, selectionLabel, emptyLabel;
     juce::ComboBox selectBox;
-    juce::TextButton removeButton { "Remove selected" };
+    juce::TextButton removeButton { tr ("Remove selected") };
     std::unique_ptr<List> list;
     std::shared_ptr<bool> alive = std::make_shared<bool> (true);
 };

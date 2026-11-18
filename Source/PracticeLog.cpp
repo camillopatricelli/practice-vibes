@@ -1,5 +1,6 @@
 #include "PracticeLog.h"
 #include "AppPaths.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -892,31 +893,31 @@ juce::String formatPracticeDuration (double seconds)
     const auto minutes = juce::roundToInt (seconds / 60.0);
 
     if (seconds < 1.0)
-        return "0 min";
+        return tr ("{minutes} min", 0);
 
     if (seconds < 30.0)
-        return "< 1 min";
+        return tr ("< 1 min");
 
     if (minutes < 60)
-        return juce::String (minutes) + " min";
+        return tr ("{minutes} min", minutes);
 
     const auto m = minutes % 60;
-    return juce::String (minutes / 60) + " h " + (m < 10 ? "0" : "") + juce::String (m) + " min";
+    return tr ("{hours} h {minutes} min", minutes / 60, juce::String (m).paddedLeft ('0', 2));
 }
 
 juce::String formatPracticeAgo (juce::Time when, juce::Time now)
 {
     if (when == juce::Time())
-        return "never";
+        return tr ("never");
 
     const auto days = juce::roundToInt ((startOfDay (now) - startOfDay (when)).inDays());
 
-    if (days <= 0)   return "today";
-    if (days == 1)   return "yesterday";
-    if (days < 14)   return juce::String (days) + " days ago";
-    if (days < 60)   return juce::String (days / 7) + " weeks ago";
+    if (days <= 0)   return tr ("today");
+    if (days == 1)   return tr ("yesterday");
+    if (days < 14)   return trn ("{n} day ago", "{n} days ago", days);
+    if (days < 60)   return trn ("{n} week ago", "{n} weeks ago", days / 7);
 
-    return juce::String (days / 30) + " months ago";
+    return trn ("{n} month ago", "{n} months ago", days / 30);
 }
 
 } // namespace pv

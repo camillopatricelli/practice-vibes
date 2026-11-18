@@ -1,13 +1,14 @@
 #include "LinksPanel.h"
 #include "ResourceWidgets.h"
 #include "WebView.h"
+#include "Localisation.h"
 
 namespace pv
 {
 
 LinksPanel::LinksPanel()
 {
-    searchBox.setTextToShowWhenEmpty ("Search links", theme::text().withAlpha (0.4f));
+    searchBox.setTextToShowWhenEmpty (tr ("Search links"), theme::text().withAlpha (0.4f));
     searchBox.setFont (juce::FontOptions (15.0f));
     searchBox.setJustification (juce::Justification::centredLeft);
     styleEditor (searchBox);
@@ -70,8 +71,8 @@ void LinksPanel::rebuild()
 
     if (! hasLibrary)
     {
-        emptyLabel.setText ("Links are kept in your library folder, so all your devices share them.\n"
-                            "Choose the library folder first.", juce::dontSendNotification);
+        emptyLabel.setText (tr ("Links are kept in your library folder, so all your devices share them.\n"
+                            "Choose the library folder first."), juce::dontSendNotification);
         emptyLabel.setVisible (true);
         resized();
         return;
@@ -92,10 +93,10 @@ void LinksPanel::rebuild()
     }
 
     if (links->getLinks().empty())
-        emptyLabel.setText ("No links yet.\nAdd the websites you keep coming back to: a page that explains the circle "
-                            "of fifths, a scale finder, a chord dictionary...", juce::dontSendNotification);
+        emptyLabel.setText (tr ("No links yet.\nAdd the websites you keep coming back to: a page that explains the circle "
+                            "of fifths, a scale finder, a chord dictionary..."), juce::dontSendNotification);
     else if (rows.empty())
-        emptyLabel.setText ("No links match.", juce::dontSendNotification);
+        emptyLabel.setText (tr ("No links match."), juce::dontSendNotification);
 
     emptyLabel.setVisible (rows.empty());
     resized();
@@ -226,7 +227,7 @@ void LinksPanel::edit (const juce::String& id)
         self->rebuild();
     };
 
-    showOverlay (id.isEmpty() ? "New link" : "Edit link", std::move (editor));
+    showOverlay (id.isEmpty() ? tr ("New link") : tr ("Edit link"), std::move (editor));
 }
 
 void LinksPanel::showMenu (const juce::String& id, juce::Component& anchor)
@@ -257,19 +258,19 @@ void LinksPanel::showMenu (const juce::String& id, juce::Component& anchor)
     };
 
     juce::PopupMenu menu;
-    menu.addItem ("Edit...", [this, id] { edit (id); });
-    menu.addItem (canMove ? "Move up" : "Move up (clear the search / tag first)", canMove && index > 0, false, [move] { move (-1); });
-    menu.addItem (canMove ? "Move down" : "Move down (clear the search / tag first)", canMove && index < count - 1, false, [move] { move (1); });
-    menu.addItem ("Copy the address", [url] { juce::SystemClipboard::copyTextToClipboard (url); });
+    menu.addItem (tr ("Edit..."), [this, id] { edit (id); });
+    menu.addItem (canMove ? tr ("Move up") : tr ("Move up (clear the search / tag first)"), canMove && index > 0, false, [move] { move (-1); });
+    menu.addItem (canMove ? tr ("Move down") : tr ("Move down (clear the search / tag first)"), canMove && index < count - 1, false, [move] { move (1); });
+    menu.addItem (tr ("Copy the address"), [url] { juce::SystemClipboard::copyTextToClipboard (url); });
 
     if (kindOf (*it) == ResourceKind::youtube)
-        menu.addItem ("Open in the browser", [url] { juce::URL (url).launchInDefaultBrowser(); });
+        menu.addItem (tr ("Open in the browser"), [url] { juce::URL (url).launchInDefaultBrowser(); });
 
     menu.addSeparator();
-    menu.addItem ("Remove link", [this, id, title]
+    menu.addItem (tr ("Remove link"), [this, id, title]
     {
-        auto options = confirmBox (juce::MessageBoxIconType::QuestionIcon, "Remove link",
-                                   "Remove \"" + title + "\" from your links?", "Remove", this);
+        auto options = confirmBox (juce::MessageBoxIconType::QuestionIcon, tr ("Remove link"),
+                                   tr ("Remove \"{title}\" from your links?", title), tr ("Remove"), this);
         juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<LinksPanel> (this), id] (int result)
         {
             if (result == 1 && safe != nullptr && safe->links != nullptr)
@@ -290,13 +291,13 @@ void LinksPanel::showTagMenu()
         return;
 
     juce::PopupMenu menu;
-    menu.addItem ("All links", true, tagFilter.isEmpty(), [this] { tagFilter = {}; updateTagButton(); rebuild(); });
+    menu.addItem (tr ("All links"), true, tagFilter.isEmpty(), [this] { tagFilter = {}; updateTagButton(); rebuild(); });
     menu.addSeparator();
 
     const auto tags = links->getAllTags();
 
     if (tags.isEmpty())
-        menu.addItem ("No tags yet: add them when you edit a link", false, false, [] {});
+        menu.addItem (tr ("No tags yet: add them when you edit a link"), false, false, [] {});
 
     for (auto& tag : tags)
     {
@@ -319,7 +320,7 @@ void LinksPanel::showTagMenu()
 
 void LinksPanel::updateTagButton()
 {
-    tagsButton.setButtonText (tagFilter.isEmpty() ? "Tags" : "Tag: " + tagFilter + "   (change / clear)");
+    tagsButton.setButtonText (tagFilter.isEmpty() ? tr ("Tags") : tr ("Tag: {tag}   (change / clear)", tagFilter));
     tagsButton.setColour (juce::TextButton::buttonColourId,
                           tagFilter.isEmpty() ? getLookAndFeel().findColour (juce::TextButton::buttonColourId) : theme::accent());
 }

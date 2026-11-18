@@ -4,6 +4,7 @@
 #include "Library.h"
 #include "PracticeLog.h"
 #include "PracticePlanner.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -62,12 +63,12 @@ private:
     juce::Label titleLabel, totalsLabel;
     juce::Label nowTitle, nowStatus;
     juce::TextEditor noteEditor;
-    juce::TextButton stopButton { "Stop" }, pauseButton { "Pause" }, addTimeButton { "+ Add time..." },
-                     allHistoryButton { "History" };
+    juce::TextButton stopButton { tr ("Stop") }, pauseButton { tr ("Pause") }, addTimeButton { tr ("+ Add time...") },
+                     allHistoryButton { tr ("History") };
     juce::Rectangle<int> nowCard, recentCard;
 
     // Narrow layout (iPad portrait): the rotation list and the last two weeks share the space, one at a time.
-    juce::TextButton recentToggleButton { "Show" };
+    juce::TextButton recentToggleButton { tr ("Show") };
     bool recentExpanded = false;
 
     juce::Label rotationHeader, rotationEmpty, recentHeader;
@@ -77,17 +78,17 @@ private:
     std::unique_ptr<RecentView> recentView;
     juce::String shownActiveId;
 
-    juce::TextButton diceButton { "Roll the dice" }, planButton { "Plan a session..." }, plansButton { "Saved plans" };
+    juce::TextButton diceButton { tr ("Roll the dice") }, planButton { tr ("Plan a session...") }, plansButton { tr ("Saved plans") };
     juce::ComboBox focusBox;
 
     juce::String diceTopicId;
     juce::Label diceLabel;
-    juce::TextButton dicePractiseButton { "Practise" }, diceAgainButton { "Roll again" }, diceCloseButton { "X" };
+    juce::TextButton dicePractiseButton { tr ("Practise") }, diceAgainButton { tr ("Roll again") }, diceCloseButton { tr ("X") };
     juce::Rectangle<int> diceStrip;
 
     juce::Rectangle<int> sessionCard, sessionLines;
     juce::Label sessionTitle;
-    juce::TextButton nextButton { "Next topic" }, extendButton { "+5 min" }, endButton { "End" };
+    juce::TextButton nextButton { tr ("Next topic") }, extendButton { tr ("+5 min") }, endButton { tr ("End") };
     bool sessionShown = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TodayPanel)

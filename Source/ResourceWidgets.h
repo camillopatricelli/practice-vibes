@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Library.h"
 #include "Theme.h"
+#include "Localisation.h"
 
 /* Widgets shared by the Topics and Links tabs: type badges, tag chips, resource rows and the resource editor. */
 
@@ -109,7 +110,7 @@ inline juce::MessageBoxOptions confirmBox (juce::MessageBoxIconType icon, const 
                                     const juce::String& confirmText, juce::Component* associated)
 {
     return juce::MessageBoxOptions{}.withIconType (icon).withTitle (title).withMessage (message)
-                                    .withButton (confirmText, 1).withButton ("Cancel", 0)
+                                    .withButton (confirmText, 1).withButton (tr ("Cancel"), 0)
                                     .withAssociatedComponent (associated);
 }
 
@@ -176,7 +177,7 @@ public:
         g.setFont (juce::FontOptions (16.0f).withStyle ("Bold"));
         g.drawText (resource.title, titleArea, juce::Justification::centredLeft, true);
 
-        auto detail = missing ? juce::String ("File not found here yet (still syncing?)") : resource.description;
+        auto detail = missing ? tr ("File not found here yet (still syncing?)") : resource.description;
 
         if (detail.isEmpty())
             detail = resource.isLink() ? resource.url : resource.fileName;
@@ -209,7 +210,7 @@ private:
     Resource resource;
     bool missing;
     juce::String highlight;
-    juce::TextButton openButton { "Open" }, menuButton;
+    juce::TextButton openButton { tr ("Open") }, menuButton;
 };
 
 //==============================================================================
@@ -230,27 +231,27 @@ public:
 
         if (isLink)
         {
-            setUp (urlLabel, "Link (URL)", urlEditor);
+            setUp (urlLabel, tr ("Link (URL)"), urlEditor);
             urlEditor.setText (r.url, false);
-            urlEditor.setTextToShowWhenEmpty ("https://www.youtube.com/watch?v=...", theme::text().withAlpha (0.35f));
+            urlEditor.setTextToShowWhenEmpty (tr ("https://www.youtube.com/watch?v=..."), theme::text().withAlpha (0.35f));
         }
 
-        setUp (titleLabel, "Title", titleEditor);
+        setUp (titleLabel, tr ("Title"), titleEditor);
         titleEditor.setText (r.title, false);
 
         if (isLink)
-            titleEditor.setTextToShowWhenEmpty ("(optional: taken from the link)", theme::text().withAlpha (0.35f));
+            titleEditor.setTextToShowWhenEmpty (tr ("(optional: taken from the link)"), theme::text().withAlpha (0.35f));
 
-        setUp (tagsLabel, "Tags", tagsEditor);
+        setUp (tagsLabel, tr ("Tags"), tagsEditor);
         tagsEditor.setText (joinTags (r.tags), false);
-        tagsEditor.setTextToShowWhenEmpty ("separated by commas", theme::text().withAlpha (0.35f));
+        tagsEditor.setTextToShowWhenEmpty (tr ("separated by commas"), theme::text().withAlpha (0.35f));
 
-        setUp (descriptionLabel, "Description / instructions", descriptionEditor);
+        setUp (descriptionLabel, tr ("Description / instructions"), descriptionEditor);
         descriptionEditor.setMultiLine (true, true);
         descriptionEditor.setReturnKeyStartsNewLine (true);
         descriptionEditor.setScrollbarsShown (true);
         descriptionEditor.setText (r.description, false);
-        descriptionEditor.setTextToShowWhenEmpty ("e.g. play along 10 times a day, 60 -> 90 bpm", theme::text().withAlpha (0.35f));
+        descriptionEditor.setTextToShowWhenEmpty (tr ("e.g. play along 10 times a day, 60 -> 90 bpm"), theme::text().withAlpha (0.35f));
 
         saveButton.onClick = [this]
         {
@@ -310,7 +311,7 @@ public:
 private:
     juce::Label urlLabel, titleLabel, tagsLabel, descriptionLabel;
     juce::TextEditor urlEditor, titleEditor, tagsEditor, descriptionEditor;
-    juce::TextButton saveButton { "Save" }, cancelButton { "Cancel" };
+    juce::TextButton saveButton { tr ("Save") }, cancelButton { tr ("Cancel") };
 };
 
 } // namespace pv

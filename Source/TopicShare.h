@@ -135,7 +135,7 @@ namespace TopicShare
         int resourceCount = 0, includedFiles = 0;
 
         bool changesAnything() const;
-        juce::String summary() const;           // one or two sentences for the import dialog
+        juce::String summary (const juce::String& memberName = {}) const;   // one or two sentences for the import dialog; memberName: "Updates Anna's copy"
     };
 
     Preview preview (const Library&, const Package&, Mode, const LocatedFiles&, const ImportAs& = {});

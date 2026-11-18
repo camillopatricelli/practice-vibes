@@ -276,8 +276,8 @@ void WarmLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& butto
 
     auto icon = icons::getIcon (button);
 
-    // Play / pause follows the button's text ("Pause", "Pause take").
-    if (icon == icons::Icon::play && button.getButtonText().startsWithIgnoreCase ("Pause"))
+    // Play / pause: the button's "pauseIcon" property (its text is translated, so it can't be compared).
+    if (icon == icons::Icon::play && (bool) button.getProperties().getWithDefault ("pauseIcon", false))
         icon = icons::Icon::pause;
 
     if (icon != icons::Icon::none)

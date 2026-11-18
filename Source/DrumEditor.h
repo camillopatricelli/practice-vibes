@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "AppEngine.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -53,18 +54,19 @@ private:
 
     // Control row
     juce::Label title, status;
-    juce::TextButton playButton { "Play drums" }, patternButton, showButton { "Edit pattern" };
+    bool showsSaveError = false;     // "Not saved: ..." stays until the drums play
+    juce::TextButton playButton { tr ("Play drums") }, patternButton, showButton { tr ("Edit pattern") };
     juce::ComboBox kitBox;
     juce::Slider volume;
-    juce::ToggleButton clicksMutedButton { "Mute clicks" };
+    juce::ToggleButton clicksMutedButton { tr ("Mute clicks") };
 
     // Editor
     juce::Label stepsLabel, swingLabel, barsLabel, hint;
     juce::ComboBox stepsBox, barsBox;
     juce::Slider swingSlider;
     juce::OwnedArray<juce::TextButton> barTabs;
-    juce::TextButton copyBarButton { "Copy to all bars" }, clearButton { "Clear" },
-                     saveButton { "Save as..." }, deleteButton { "Delete" };
+    juce::TextButton copyBarButton { tr ("Copy to all bars") }, clearButton { tr ("Clear") },
+                     saveButton { tr ("Save as...") }, deleteButton { tr ("Delete") };
     std::unique_ptr<Grid> grid;
 
     bool editorShown = false, startedMetronome = false, metronomeWasRunning = false;

@@ -8,6 +8,7 @@
 #include "StoragePanel.h"
 #include "Theme.h"
 #include "WebView.h"
+#include "Localisation.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -20,7 +21,7 @@ namespace
 
     juce::String formatDate (juce::Time t)
     {
-        return t == juce::Time() ? juce::String() : t.formatted ("%d %b %Y");
+        return t == juce::Time() ? juce::String() : i18n::date (t, "%d %b %Y");
     }
 
     /** Desktop: where shared topics are written before they're attached to a mail or a message. */
@@ -66,23 +67,23 @@ public:
             addAndMakeVisible (l);
         };
 
-        label (goalLabel, "Goal");
-        label (bpmLabel, "Target tempo");
-        label (minutesLabel, "Minutes a day");
-        label (lessonLabel, "Next lesson");
+        label (goalLabel, tr ("Goal"));
+        label (bpmLabel, tr ("Target tempo"));
+        label (minutesLabel, tr ("Minutes a day"));
+        label (lessonLabel, tr ("Next lesson"));
 
         goalEditor.setMultiLine (true, true);
         goalEditor.setReturnKeyStartsNewLine (true);
         goalEditor.setText (a.goal, false);
-        goalEditor.setTextToShowWhenEmpty ("e.g. Bars 1-16 clean, then the solo", theme::text().withAlpha (0.35f));
+        goalEditor.setTextToShowWhenEmpty (tr ("e.g. Bars 1-16 clean, then the solo"), theme::text().withAlpha (0.35f));
 
         bpmEditor.setInputRestrictions (3, "0123456789");
         bpmEditor.setText (a.targetBpm > 0.0 ? juce::String (juce::roundToInt (a.targetBpm)) : juce::String(), false);
-        bpmEditor.setTextToShowWhenEmpty ("bpm (optional)", theme::text().withAlpha (0.35f));
+        bpmEditor.setTextToShowWhenEmpty (tr ("bpm (optional)"), theme::text().withAlpha (0.35f));
 
         minutesEditor.setInputRestrictions (3, "0123456789");
         minutesEditor.setText (a.minutesPerDay > 0 ? juce::String (a.minutesPerDay) : juce::String(), false);
-        minutesEditor.setTextToShowWhenEmpty ("optional", theme::text().withAlpha (0.35f));
+        minutesEditor.setTextToShowWhenEmpty (tr ("optional"), theme::text().withAlpha (0.35f));
 
         for (auto* e : { &goalEditor, &bpmEditor, &minutesEditor })
         {
@@ -91,7 +92,7 @@ public:
         }
 
         // The next 8 weeks, day by day (id = days from today + 2; 1 = none).
-        lessonBox.addItem ("None", 1);
+        lessonBox.addItem (tr ("None"), 1);
         const auto now = juce::Time::getCurrentTime();
         const juce::Time today (now.getYear(), now.getMonth(), now.getDayOfMonth(), 12, 0);
         int selected = 1;
@@ -99,7 +100,7 @@ public:
         for (int d = 0; d < 56; ++d)
         {
             const auto day = today + juce::RelativeTime::days (d);
-            lessonBox.addItem (d == 0 ? "Today" : d == 1 ? "Tomorrow" : day.formatted ("%a %d %b"), d + 2);
+            lessonBox.addItem (d == 0 ? tr ("Today") : d == 1 ? tr ("Tomorrow") : i18n::date (day, "%a %d %b"), d + 2);
 
             if (a.nextLesson != juce::Time() && day.formatted ("%Y-%m-%d") == a.nextLesson.formatted ("%Y-%m-%d"))
                 selected = d + 2;
@@ -163,7 +164,7 @@ private:
     juce::Label goalLabel, bpmLabel, minutesLabel, lessonLabel;
     juce::TextEditor goalEditor, bpmEditor, minutesEditor;
     juce::ComboBox lessonBox;
-    juce::TextButton saveButton { "Save" }, clearButton { "No assignment" }, cancelButton { "Cancel" };
+    juce::TextButton saveButton { tr ("Save") }, clearButton { tr ("No assignment") }, cancelButton { tr ("Cancel") };
 };
 
 //==============================================================================
@@ -178,15 +179,15 @@ public:
         getProperties().set ("overlayWidth", 680);
         getProperties().set ("overlayHeight", 560);
 
-        introLabel.setText ("A group gets one topic in one go (Share > To). Members are first names or nicknames, separated "
-                            "by commas, as in the Student boxes. Groups stay on your devices: never sent to anyone.",
+        introLabel.setText (tr ("A group gets one topic in one go (Share > To). Members are first names or nicknames, separated "
+                            "by commas, as in the Student boxes. Groups stay on your devices: never sent to anyone."),
                             juce::dontSendNotification);
         introLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.7f));
         introLabel.setJustificationType (juce::Justification::topLeft);
         addAndMakeVisible (introLabel);
 
         studentsLabel.setText (knownStudents.isEmpty() ? juce::String()
-                                                       : "Your students: " + knownStudents.joinIntoString (", "),
+                                                       : tr ("Your students: {names}", knownStudents.joinIntoString (", ")),
                                juce::dontSendNotification);
         studentsLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.5f));
         studentsLabel.setJustificationType (juce::Justification::topLeft);
@@ -209,7 +210,7 @@ public:
 
             for (auto& sg : result.groups)
                 if (sg.name.isEmpty())
-                    sg.name = "Group";
+                    sg.name = tr ("Group");
 
             if (saved) saved (std::move (result));
         };
@@ -287,18 +288,18 @@ private:
             const auto& sg = groups.groups[i];
             auto* name = nameEditors.add (new juce::TextEditor());
             name->setText (sg.name, false);
-            name->setTextToShowWhenEmpty ("Group name", theme::text().withAlpha (0.35f));
+            name->setTextToShowWhenEmpty (tr ("Group name"), theme::text().withAlpha (0.35f));
             styleEditor (*name);
             rowHolder.addAndMakeVisible (name);
 
             auto* members = memberEditors.add (new juce::TextEditor());
             members->setText (sg.members.joinIntoString (", "), false);
-            members->setTextToShowWhenEmpty ("Members, e.g. Anna, Marco, Luca", theme::text().withAlpha (0.35f));
+            members->setTextToShowWhenEmpty (tr ("Members, e.g. Anna, Marco, Luca"), theme::text().withAlpha (0.35f));
             styleEditor (*members);
             rowHolder.addAndMakeVisible (members);
 
-            auto* remove = removeButtons.add (new juce::TextButton ("Remove"));
-            remove->setTooltip ("Removes the group (its members' topics stay)");
+            auto* remove = removeButtons.add (new juce::TextButton (tr ("Remove")));
+            remove->setTooltip (tr ("Removes the group (its members' topics stay)"));
             remove->onClick = [this, i]
             {
                 readRows();
@@ -319,7 +320,7 @@ private:
     juce::Viewport viewport;
     juce::OwnedArray<juce::TextEditor> nameEditors, memberEditors;
     juce::OwnedArray<juce::TextButton> removeButtons;
-    juce::TextButton addButton { "+ Add group" }, saveButton { "Save" }, cancelButton { "Cancel" };
+    juce::TextButton addButton { tr ("+ Add group") }, saveButton { tr ("Save") }, cancelButton { tr ("Cancel") };
 };
 
 //==============================================================================
@@ -337,8 +338,8 @@ public:
         getProperties().set ("overlayWidth", 560);
         getProperties().set ("overlayHeight", juce::jlimit (260, 640, 170 + files.size() * 44));
 
-        introLabel.setText ("Each member has their own file. Tap Share... on a row and send it to that member "
-                            "(their chat, mail or AirDrop), then the next one.", juce::dontSendNotification);
+        introLabel.setText (tr ("Each member has their own file. Tap Share... on a row and send it to that member "
+                            "(their chat, mail or AirDrop), then the next one."), juce::dontSendNotification);
         introLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.7f));
         introLabel.setJustificationType (juce::Justification::topLeft);
         addAndMakeVisible (introLabel);
@@ -349,7 +350,7 @@ public:
             label->setFont (theme::textFont (16.0f));
             addAndMakeVisible (label);
 
-            auto* button = buttons.add (new juce::TextButton ("Share..."));
+            auto* button = buttons.add (new juce::TextButton (tr ("Share...")));
             button->setColour (juce::TextButton::buttonColourId, theme::accent());
             button->onClick = [this, i] { shareRow (i); };
             addAndMakeVisible (button);
@@ -385,7 +386,7 @@ private:
 
         // Marked as soon as the sheet opens: the Mac menu doesn't report back, and the iPad's "done" can't tell a send
         // from a cancel for every app. The button stays, to send it again.
-        buttons[i]->setButtonText ("Shared - again?");
+        buttons[i]->setButtonText (tr ("Shared - again?"));
         buttons[i]->setColour (juce::TextButton::buttonColourId, getLookAndFeel().findColour (juce::TextButton::buttonColourId));
         share (files[i], *buttons[i], [] (bool) {});
     }
@@ -396,7 +397,7 @@ private:
     juce::Label introLabel;
     juce::OwnedArray<juce::Label> names;
     juce::OwnedArray<juce::TextButton> buttons;
-    juce::TextButton doneButton { "Done" };
+    juce::TextButton doneButton { tr ("Done") };
 };
 
 //==============================================================================
@@ -408,7 +409,7 @@ public:
     explicit TopicView (LibraryPanel& p) : owner (p)
     {
         titleEditor.setFont (theme::displayFont (22.0f, "SemiBold"));
-        titleEditor.setTextToShowWhenEmpty ("Topic title", theme::text().withAlpha (0.35f));
+        titleEditor.setTextToShowWhenEmpty (tr ("Topic title"), theme::text().withAlpha (0.35f));
         titleEditor.setJustification (juce::Justification::centredLeft);
         styleEditor (titleEditor);
         titleEditor.onTextChange = [this] { edited(); };
@@ -416,7 +417,7 @@ public:
         titleEditor.onFocusLost = [this] { owner.titleSettled (topicId); };
         addAndMakeVisible (titleEditor);
 
-        tagsEditor.setTextToShowWhenEmpty ("Tags, separated by commas (e.g. technique, jazz, lesson)", theme::text().withAlpha (0.35f));
+        tagsEditor.setTextToShowWhenEmpty (tr ("Tags, separated by commas (e.g. technique, jazz, lesson)"), theme::text().withAlpha (0.35f));
         tagsEditor.setFont (juce::FontOptions (14.0f));
         styleEditor (tagsEditor);
         tagsEditor.onTextChange = [this] { edited(); };
@@ -436,9 +437,9 @@ public:
         createdLabel.setMinimumHorizontalScale (0.7f);
         addAndMakeVisible (createdLabel);
 
-        studentEditor.setTextToShowWhenEmpty ("Student", theme::text().withAlpha (0.35f));
-        studentEditor.setTooltip ("Who this topic is for: a first name or nickname. Groups topics by student (Tags menu). "
-                                  "Stays on your devices: never sent with the topic");
+        studentEditor.setTextToShowWhenEmpty (tr ("Student"), theme::text().withAlpha (0.35f));
+        studentEditor.setTooltip (tr ("Who this topic is for: a first name or nickname. Groups topics by student (Tags menu). "
+                                  "Stays on your devices: never sent with the topic"));
         studentEditor.setFont (juce::FontOptions (14.0f));
         styleEditor (studentEditor);
         studentEditor.onTextChange = [this] { edited(); };
@@ -448,8 +449,8 @@ public:
         assignmentLabel.setColour (juce::Label::textColourId, theme::accent());
         assignmentLabel.setMinimumHorizontalScale (0.6f);
         addChildComponent (assignmentLabel);
-        assignmentButton.setTooltip ("Goal, target tempo, minutes a day and the next lesson: they go along when you share "
-                                     "the topic, and show on the student's Today tab");
+        assignmentButton.setTooltip (tr ("Goal, target tempo, minutes a day and the next lesson: they go along when you share "
+                                     "the topic, and show on the student's Today tab"));
         assignmentButton.onClick = [this] { owner.editAssignment (topicId); };
         addChildComponent (assignmentButton);
 
@@ -466,36 +467,36 @@ public:
         addAndMakeVisible (deleteButton);
 
         practiseButton.onClick = [this] { if (owner.onPractise) owner.onPractise (topicId); };
-        practiseButton.setTooltip ("Make this the topic you're practising, and bring back the song, loop, speed and tempo you used last time");
+        practiseButton.setTooltip (tr ("Make this the topic you're practising, and bring back the song, loop, speed and tempo you used last time"));
         practiseButton.setColour (juce::TextButton::buttonColourId, theme::accent());
         addAndMakeVisible (practiseButton);
 
         shareButton.onClick = [this] { owner.shareTopic (topicId); };
-        shareButton.setTooltip ("Send this topic to a teacher, a student or a bandmate as one .pvtopic file: you choose which files go in");
+        shareButton.setTooltip (tr ("Send this topic to a teacher, a student or a bandmate as one .pvtopic file: you choose which files go in"));
         addAndMakeVisible (shareButton);
 
         historyButton.onClick = [this] { if (owner.onShowHistory) owner.onShowHistory (topicId); };
-        historyButton.setTooltip ("Tempo, song speed and minutes over the weeks, and every session");
+        historyButton.setTooltip (tr ("Tempo, song speed and minutes over the weeks, and every session"));
         addAndMakeVisible (historyButton);
 
-        rotationToggle.setTooltip ("Topics in the rotation are listed on the Today tab, most neglected first");
+        rotationToggle.setTooltip (tr ("Topics in the rotation are listed on the Today tab, most neglected first"));
         rotationToggle.onClick = [this] { owner.setRotation (topicId, rotationToggle.getToggleState()); };
         addAndMakeVisible (rotationToggle);
 
-        noGuitarToggle.setTooltip ("For ear training, theory...: while you practise this topic the time is counted on the clock "
-                                   "(with Pause on the Today tab) instead of from your instrument input");
+        noGuitarToggle.setTooltip (tr ("For ear training, theory...: while you practise this topic the time is counted on the clock "
+                                   "(with Pause on the Today tab) instead of from your instrument input"));
         noGuitarToggle.onClick = [this] { owner.setNoGuitar (topicId, noGuitarToggle.getToggleState()); };
         addAndMakeVisible (noGuitarToggle);
 
-        addAndMakeVisible (styleCaption (notesLabel, "Notes"));
-        notesLabel.setTooltip ("These notes travel with the topic when you share it");
-        addAndMakeVisible (styleCaption (privateNotesLabel, "Private notes"));
-        privateNotesLabel.setTooltip ("Only for you: never included when you share the topic");
+        addAndMakeVisible (styleCaption (notesLabel, tr ("Notes")));
+        notesLabel.setTooltip (tr ("These notes travel with the topic when you share it"));
+        addAndMakeVisible (styleCaption (privateNotesLabel, tr ("Private notes")));
+        privateNotesLabel.setTooltip (tr ("Only for you: never included when you share the topic"));
         privateNotesEditor.setMultiLine (true, true);
         privateNotesEditor.setReturnKeyStartsNewLine (true);
         privateNotesEditor.setScrollbarsShown (true);
         privateNotesEditor.setFont (juce::FontOptions (15.0f));
-        privateNotesEditor.setTextToShowWhenEmpty ("Only for you: never shared", theme::text().withAlpha (0.35f));
+        privateNotesEditor.setTextToShowWhenEmpty (tr ("Only for you: never shared"), theme::text().withAlpha (0.35f));
         styleEditor (privateNotesEditor);
         privateNotesEditor.onTextChange = [this] { edited(); };
         privateNotesEditor.onFocusLost = [this] { owner.flush(); };
@@ -504,7 +505,7 @@ public:
         descriptionEditor.setReturnKeyStartsNewLine (true);
         descriptionEditor.setScrollbarsShown (true);
         descriptionEditor.setFont (juce::FontOptions (15.0f));
-        descriptionEditor.setTextToShowWhenEmpty ("What to practise, how, lesson notes...", theme::text().withAlpha (0.35f));
+        descriptionEditor.setTextToShowWhenEmpty (tr ("What to practise, how, lesson notes..."), theme::text().withAlpha (0.35f));
         styleEditor (descriptionEditor);
         descriptionEditor.onTextChange = [this] { edited(); };
         descriptionEditor.onFocusLost = [this] { owner.flush(); };
@@ -513,23 +514,23 @@ public:
         conflictLabel.setColour (juce::Label::textColourId, theme::highlight());
         conflictLabel.setMinimumHorizontalScale (0.6f);
         addChildComponent (conflictLabel);
-        conflictButton.setTooltip ("Shows each copy's title and when it was saved; the ones you don't keep go to the bin");
+        conflictButton.setTooltip (tr ("Shows each copy's title and when it was saved; the ones you don't keep go to the bin"));
         conflictButton.onClick = [this] { owner.chooseTopicVersion (topicId, conflictButton); };
         addChildComponent (conflictButton);
 
-        addAndMakeVisible (styleCaption (resourcesLabel, "Resources"));
+        addAndMakeVisible (styleCaption (resourcesLabel, tr ("Resources")));
         addFilesButton.onClick = [this] { owner.addFiles (topicId); };
         addLinkButton.onClick = [this] { owner.editResource (topicId, {}, true); };
-        addFilesButton.setTooltip ("Copies documents, images or audio files into this topic's folder"
-                                  #if ! JUCE_IOS
-                                   " (you can also drop files here)"
-                                  #endif
-                                   );
-        addLinkButton.setTooltip ("YouTube video, Google document or any web page");
+       #if JUCE_IOS
+        addFilesButton.setTooltip (tr ("Copies documents, images or audio files into this topic's folder"));
+       #else
+        addFilesButton.setTooltip (tr ("Copies documents, images or audio files into this topic's folder (you can also drop files here)"));
+       #endif
+        addLinkButton.setTooltip (tr ("YouTube video, Google document or any web page"));
         addAndMakeVisible (addFilesButton);
         addAndMakeVisible (addLinkButton);
 
-        noResourcesLabel.setText ("No resources yet: add documents, audio files or links.", juce::dontSendNotification);
+        noResourcesLabel.setText (tr ("No resources yet: add documents, audio files or links."), juce::dontSendNotification);
         noResourcesLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.45f));
         addChildComponent (noResourcesLabel);
 
@@ -557,10 +558,11 @@ public:
         if (! (sameTopic && keepFocusedEditors && tagsEditor.hasKeyboardFocus (true)) && parseTags (tagsEditor.getText()) != topic.tags)
             tagsEditor.setText (joinTags (topic.tags), false);
 
-        juce::String dates = "Created " + formatDate (topic.created);
+        juce::String dates = tr ("Created {date}", formatDate (topic.created));
 
-        if (topic.lastSent != juce::Time())     dates << "\nSent " << formatDate (topic.lastSent);
-        if (topic.lastReceived != juce::Time()) dates << (topic.lastSent != juce::Time() ? ", received " : "\nReceived ") << formatDate (topic.lastReceived);
+        if (topic.lastSent != juce::Time())     dates << "\n" << tr ("Sent {date}", formatDate (topic.lastSent));
+        if (topic.lastReceived != juce::Time()) dates << (topic.lastSent != juce::Time() ? ", " + tr ("received {date}", formatDate (topic.lastReceived))
+                                                                                         : "\n" + tr ("Received {date}", formatDate (topic.lastReceived)));
 
         createdLabel.setText (dates, juce::dontSendNotification);
         createdLabel.setTooltip (dates.replace ("\n", "  "));
@@ -573,15 +575,15 @@ public:
 
         assignmentButton.setVisible (teacher);
         assignmentLabel.setVisible (! topic.assignment.isEmpty() || teacher);
-        assignmentLabel.setText (topic.assignment.isEmpty() ? juce::String ("No assignment yet")
-                                                            : "Assignment: " + topic.assignment.describe(), juce::dontSendNotification);
+        assignmentLabel.setText (topic.assignment.isEmpty() ? tr ("No assignment yet")
+                                                            : tr ("Assignment: {details}", topic.assignment.describe()), juce::dontSendNotification);
         assignmentLabel.setTooltip (topic.assignment.describe());
 
         // Groups: who got this topic and who sent something back; a member's copy names its group.
         juce::String groupText = owner.groups.describeSends (*owner.library, topic.id);
 
         if (const auto* g = owner.groups.find (topic.group); g != nullptr && topic.group.isNotEmpty())
-            groupText = ("In the group " + g->name + (groupText.isNotEmpty() ? "\n" : "")) + groupText;
+            groupText = (tr ("In the group {name}", g->name) + (groupText.isNotEmpty() ? "\n" : "")) + groupText;
 
         groupLabel.setText (groupText, juce::dontSendNotification);
         groupLabel.setTooltip (groupText.replace ("\n", "  "));
@@ -593,16 +595,16 @@ public:
         }
 
         summaryLabel.setVisible (! topic.studentSummary.isEmpty());
-        summaryLabel.setText ("Student's practice (sent " + formatDate (topic.studentSummary.made) + "): " + topic.studentSummary.describe(),
+        summaryLabel.setText (tr ("Student's practice (sent {date}): {summary}", formatDate (topic.studentSummary.made), topic.studentSummary.describe()),
                               juce::dontSendNotification);
         rotationToggle.setToggleState (topic.inRotation, juce::dontSendNotification);
         noGuitarToggle.setToggleState (topic.noGuitar, juce::dontSendNotification);
 
         conflictLabel.setVisible (! topic.conflictFiles.isEmpty());
         conflictButton.setVisible (! topic.conflictFiles.isEmpty());
-        conflictLabel.setText ("The cloud sync made " + juce::String (topic.conflictFiles.size() == 1 ? "an extra copy" : "extra copies")
-                                   + " of this topic's file (" + topic.conflictFiles.joinIntoString (", ")
-                                   + "). Choose which version to keep.",
+        conflictLabel.setText (trn ("The cloud sync made an extra copy of this topic's file ({files}). Choose which version to keep.",
+                                    "The cloud sync made extra copies of this topic's file ({files}). Choose which version to keep.",
+                                    topic.conflictFiles.size(), topic.conflictFiles.joinIntoString (", ")),
                                juce::dontSendNotification);
 
         rows.clear();
@@ -799,9 +801,9 @@ private:
     juce::TextEditor titleEditor, tagsEditor, descriptionEditor, privateNotesEditor, studentEditor;
     juce::Label groupLabel;
     juce::Label assignmentLabel, summaryLabel, createdLabel, notesLabel, privateNotesLabel, resourcesLabel, conflictLabel, noResourcesLabel;
-    juce::TextButton deleteButton { "Delete topic" }, addFilesButton { "Add files..." }, addLinkButton { "Add link..." },
-                     practiseButton { "Practise" }, shareButton { "Share..." }, assignmentButton { "Assignment..." }, historyButton { "History" }, conflictButton { "Choose version..." };
-    juce::ToggleButton rotationToggle { "In practice rotation" }, noGuitarToggle { "Timed without playing" };
+    juce::TextButton deleteButton { tr ("Delete topic") }, addFilesButton { tr ("Add files...") }, addLinkButton { tr ("Add link...") },
+                     practiseButton { tr ("Practise") }, shareButton { tr ("Share...") }, assignmentButton { tr ("Assignment...") }, historyButton { tr ("History") }, conflictButton { tr ("Choose version...") };
+    juce::ToggleButton rotationToggle { tr ("In practice rotation") }, noGuitarToggle { tr ("Timed without playing") };
     juce::Viewport viewport;
     juce::Component rowHolder;
     std::vector<std::unique_ptr<ResourceRow>> rows;
@@ -815,9 +817,9 @@ class LibraryPanel::InboxView final : public juce::Component
 public:
     explicit InboxView (LibraryPanel& p) : owner (p)
     {
-        addAndMakeVisible (styleCaption (header, "Inbox"));
-        info.setText ("Files placed directly in the library folder (for example from another device). "
-                      "Move each one into a topic.", juce::dontSendNotification);
+        addAndMakeVisible (styleCaption (header, tr ("Inbox")));
+        info.setText (tr ("Files placed directly in the library folder (for example from another device). "
+                      "Move each one into a topic."), juce::dontSendNotification);
         info.setColour (juce::Label::textColourId, theme::text().withAlpha (0.6f));
         info.setJustificationType (juce::Justification::topLeft);
         addAndMakeVisible (info);
@@ -835,7 +837,7 @@ public:
             Resource r;
             r.id = r.fileName = f.getFileName();
             r.title = f.getFileName();
-            auto row = std::make_unique<ResourceRow> (r, false, "Move to topic...");
+            auto row = std::make_unique<ResourceRow> (r, false, tr ("Move to topic..."));
             row->onOpen = [this, f] { owner.openFile (f, f.getFileName()); };
             row->onMenu = [this, f] (juce::Component& anchor) { owner.showInboxMenu (f, anchor); };
             rowHolder.addAndMakeVisible (*row);
@@ -910,9 +912,9 @@ private:
     std::function<void()> openOutside;
     juce::TextButton outsideButton {
        #if JUCE_IOS
-        "Open in Safari / app"
+        tr ("Open in Safari / app")
        #else
-        "Open outside the app"
+        tr ("Open outside the app")
        #endif
     };
 };
@@ -924,23 +926,23 @@ LibraryPanel::LibraryPanel()
     setupLabel.setFont (juce::FontOptions (16.0f));
     // iPadOS only lets apps use whole folders from iCloud Drive (Google Drive and others are greyed out in the
     // picker), so iCloud Drive is the one way to share a library between an iPad/iPhone and another device.
-    setupLabel.setText ("Where should Practice Vibes keep your topics?\n\n"
+    setupLabel.setText (tr ("Where should Practice Vibes keep your topics?") + "\n\n"
                        #if JUCE_IOS
-                        "Keep them on this iPad, or pick a folder in iCloud Drive to share the same topics with "
-                        "your other devices (on a Windows PC: install iCloud for Windows).\n"
-                        "iCloud Drive is the only cloud drive that can keep topics in sync with an iPad or iPhone.",
+                        + tr ("Keep them on this iPad, or pick a folder in iCloud Drive to share the same topics with "
+                              "your other devices (on a Windows PC: install iCloud for Windows).") + "\n"
+                        + tr ("iCloud Drive is the only cloud drive that can keep topics in sync with an iPad or iPhone."),
                        #else
-                        "Pick a folder on this computer, or one inside a cloud drive (OneDrive, Google Drive, "
-                        "Dropbox, iCloud Drive) to share the same topics with your other computers.\n"
-                        "To share them with an iPad or iPhone too, use iCloud Drive (install iCloud for Windows): "
-                        "it is the only cloud drive iPadOS lets apps use for a whole folder.",
+                        + tr ("Pick a folder on this computer, or one inside a cloud drive (OneDrive, Google Drive, "
+                              "Dropbox, iCloud Drive) to share the same topics with your other computers.") + "\n"
+                        + tr ("To share them with an iPad or iPhone too, use iCloud Drive (install iCloud for Windows): "
+                              "it is the only cloud drive iPadOS lets apps use for a whole folder."),
                        #endif
                         juce::dontSendNotification);
     addChildComponent (setupLabel);
 
-    useDefaultButton.setButtonText ("Use " + LibraryLocation::getDefaultFolder().getFullPathName());
+    useDefaultButton.setButtonText (tr ("Use {folder}", LibraryLocation::getDefaultFolder().getFullPathName()));
    #if JUCE_IOS
-    useDefaultButton.setButtonText ("Keep them on this iPad");
+    useDefaultButton.setButtonText (tr ("Keep them on this iPad"));
    #endif
     useDefaultButton.onClick = [this]
     {
@@ -951,11 +953,11 @@ LibraryPanel::LibraryPanel()
 
     chooseFolderButton.onClick = [this] { chooseFolder(); };
    #if JUCE_IOS
-    chooseFolderButton.setButtonText ("Choose a folder in iCloud Drive");
+    chooseFolderButton.setButtonText (tr ("Choose a folder in iCloud Drive"));
    #endif
     addChildComponent (chooseFolderButton);
 
-    searchBox.setTextToShowWhenEmpty ("Search topics", theme::text().withAlpha (0.4f));
+    searchBox.setTextToShowWhenEmpty (tr ("Search topics"), theme::text().withAlpha (0.4f));
     searchBox.setFont (juce::FontOptions (15.0f));
     searchBox.setJustification (juce::Justification::centredLeft);
     styleEditor (searchBox);
@@ -965,7 +967,7 @@ LibraryPanel::LibraryPanel()
     newTopicButton.onClick = [this] { newTopic(); };
     folderButton.onClick = [this] { showFolderMenu(); };
     tagsButton.onClick = [this] { showTagMenu(); };
-    tagsButton.setTooltip ("Show only topics with a tag (on the topic or one of its resources)");
+    tagsButton.setTooltip (tr ("Show only topics with a tag (on the topic or one of its resources)"));
 
     topicList.setRowHeight (54);
     topicList.setColour (juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
@@ -1003,7 +1005,7 @@ void LibraryPanel::openLibrary (const juce::File& folder)
     flush();
     library = std::make_unique<Library> (folder);
     signature = library->computeSignature();
-    folderButton.setTooltip ("Library folder: " + folder.getFullPathName());
+    folderButton.setTooltip (tr ("Library folder: {folder}", folder.getFullPathName()));
     juce::Logger::writeToLog ("Library: " + folder.getFullPathName() + " (" + juce::String ((int) library->getTopics().size())
                               + " topics, " + juce::String (library->getInbox().size()) + " in the Inbox)");
     selectedId = {};
@@ -1039,7 +1041,7 @@ void LibraryPanel::requestDownloads()
 void LibraryPanel::chooseFolder()
 {
     const auto start = library != nullptr ? library->getRoot() : LibraryLocation::getDefaultFolder().getParentDirectory();
-    fileChooser = std::make_unique<juce::FileChooser> ("Choose the library folder", start);
+    fileChooser = std::make_unique<juce::FileChooser> (tr ("Choose the library folder"), start);
 
     fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                               [this] (const juce::FileChooser& chooser)
@@ -1053,7 +1055,7 @@ void LibraryPanel::chooseFolder()
 
         if (folder == juce::File())
         {
-            showError ("Practice Vibes can't use that folder. Try another one, or keep the topics on this device.");
+            showError (tr ("Practice Vibes can't use that folder. Try another one, or keep the topics on this device."));
             return;
         }
 
@@ -1070,29 +1072,29 @@ void LibraryPanel::showFolderMenu()
     menu.addSectionHeader (library->getRoot().getFullPathName());
     const auto isDefault = library->getRoot() == LibraryLocation::getDefaultFolder();
    #if ! JUCE_IOS
-    menu.addItem ("Show the folder", [this] { library->getRoot().revealToUser(); });
-    menu.addItem ("To share topics with an iPad or iPhone, use a folder in iCloud Drive", false, false, [] {});
+    menu.addItem (tr ("Show the folder"), [this] { library->getRoot().revealToUser(); });
+    menu.addItem (tr ("To share topics with an iPad or iPhone, use a folder in iCloud Drive"), false, false, [] {});
    #else
     if (isDefault)
-        menu.addItem ("Files app: On My iPad > Practice Vibes > Library", false, false, [] {});
+        menu.addItem (tr ("Files app: On My iPad > Practice Vibes > Library"), false, false, [] {});
 
-    menu.addItem ("Only iCloud Drive can keep topics in sync with your other devices", false, false, [] {});
+    menu.addItem (tr ("Only iCloud Drive can keep topics in sync with your other devices"), false, false, [] {});
    #endif
-    menu.addItem ("Use a different folder...", [this] { chooseFolder(); });
+    menu.addItem (tr ("Use a different folder..."), [this] { chooseFolder(); });
 
     if (! isDefault)
         menu.addItem (
                      #if JUCE_IOS
-                      "Use the folder on this iPad",
+                      tr ("Use the folder on this iPad"),
                      #else
-                      "Use the default folder",
+                      tr ("Use the default folder"),
                      #endif
                       [this]
         {
             LibraryLocation::save (LibraryLocation::getDefaultFolder());
             openLibrary (LibraryLocation::getDefaultFolder());
         });
-    menu.addItem ("Check for changes now", [this]
+    menu.addItem (tr ("Check for changes now"), [this]
     {
         flush();
         library->rescan();
@@ -1100,11 +1102,11 @@ void LibraryPanel::showFolderMenu()
         refreshAfterRescan();
     });
     menu.addSeparator();
-    menu.addItem ("Storage and clean-up...", [this] { showStorage(); });
+    menu.addItem (tr ("Storage and clean-up..."), [this] { showStorage(); });
     menu.addSeparator();
-    menu.addItem ("Import a shared topic (.pvtopic)...", [this] { chooseTopicToImport(); });
+    menu.addItem (tr ("Import a shared topic (.pvtopic)..."), [this] { chooseTopicToImport(); });
    #if ! JUCE_IOS
-    menu.addItem ("Show the shared topics folder", [] { auto f = sharedTopicsFolder(); f.createDirectory(); f.revealToUser(); });
+    menu.addItem (tr ("Show the shared topics folder"), [] { auto f = sharedTopicsFolder(); f.createDirectory(); f.revealToUser(); });
    #endif
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&folderButton));
@@ -1118,7 +1120,7 @@ void LibraryPanel::showStorage()
     flush();
     auto panel = std::make_unique<StoragePanel> (library.get(), LoopFiles::getLoopsFolder(), getAppDataFolder());
     panel->onRemoved = [this] { checkForChanges(); };
-    showOverlay ("Storage and clean-up", std::move (panel));
+    showOverlay (tr ("Storage and clean-up"), std::move (panel));
 }
 
 void LibraryPanel::shareTopic (const juce::String& topicId)
@@ -1134,13 +1136,13 @@ void LibraryPanel::shareTopic (const juce::String& topicId)
 
    #if JUCE_WINDOWS
     const auto folder = sharedTopicsFolder();
-    const juce::String buttonText = "Save and show in Explorer";
+    const juce::String buttonText = tr ("Save and show in Explorer");
    #elif JUCE_MAC
     const auto folder = sharedTopicsFolder();
-    const juce::String buttonText = "Share...";
+    const juce::String buttonText = tr ("Share...");
    #else
     const auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("Shared topics");
-    const juce::String buttonText = "Share...";
+    const juce::String buttonText = tr ("Share...");
    #endif
 
     auto context = getShareContext ? getShareContext (topicId) : ShareContext();
@@ -1216,7 +1218,7 @@ void LibraryPanel::shareTopic (const juce::String& topicId)
 
         rest();
     };
-    showOverlay ("Share " + quoted (t->title), std::move (panel));
+    showOverlay (tr ("Share {title}", quoted (t->title)), std::move (panel));
 }
 
 void LibraryPanel::editAssignment (const juce::String& topicId)
@@ -1227,7 +1229,7 @@ void LibraryPanel::editAssignment (const juce::String& topicId)
         return;
 
     flush();
-    showOverlay ("Assignment: " + t->title, std::make_unique<AssignmentEditor> (t->assignment,
+    showOverlay (tr ("Assignment: {title}", t->title), std::make_unique<AssignmentEditor> (t->assignment,
         [this, topicId] (Assignment a)
         {
             if (auto* topic = library != nullptr ? library->findTopic (topicId) : nullptr)
@@ -1254,7 +1256,7 @@ void LibraryPanel::chooseTopicToImport()
    #else
     const juce::String pattern = juce::String ("*") + TopicShare::extension;
    #endif
-    fileChooser = std::make_unique<juce::FileChooser> ("Import a shared topic", juce::File(), pattern);
+    fileChooser = std::make_unique<juce::FileChooser> (tr ("Import a shared topic"), juce::File(), pattern);
     fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [safeThis = SafePointer<LibraryPanel> (this)] (const juce::FileChooser& fc)
     {
@@ -1285,7 +1287,7 @@ void LibraryPanel::chooseTopicToImport()
             }
         }
 
-        safeThis->showError ("Could not read the chosen file.");
+        safeThis->showError (tr ("Could not read the chosen file."));
     });
 }
 
@@ -1293,7 +1295,7 @@ void LibraryPanel::importSharedTopic (const juce::File& file)
 {
     if (library == nullptr)
     {
-        showError ("Choose where your library lives first (Topics tab), then open the shared topic again.");
+        showError (tr ("Choose where your library lives first (Topics tab), then open the shared topic again."));
         return;
     }
 
@@ -1332,7 +1334,7 @@ void LibraryPanel::importSharedTopic (const juce::File& file)
 
         rest();
     };
-    showOverlay ("Import shared topic", std::move (panel));
+    showOverlay (tr ("Import shared topic"), std::move (panel));
 }
 
 //==============================================================================
@@ -1414,11 +1416,11 @@ void LibraryPanel::paintListBoxItem (int row, juce::Graphics& g, int width, int 
     {
         g.setColour (theme::highlight());
         g.setFont (juce::FontOptions (15.0f).withStyle ("Bold"));
-        g.drawText ("Inbox", r.removeFromTop (22), juce::Justification::centredLeft);
+        g.drawText (tr ("Inbox"), r.removeFromTop (22), juce::Justification::centredLeft);
         g.setColour (theme::text().withAlpha (0.65f));
         g.setFont (juce::FontOptions (12.5f));
         const auto n = library->getInbox().size();
-        g.drawText (juce::String (n) + (n == 1 ? " file" : " files") + " to sort into topics", r, juce::Justification::centredLeft);
+        g.drawText (trn ("{n} file to sort into topics", "{n} files to sort into topics", n), r, juce::Justification::centredLeft);
         return;
     }
 
@@ -1426,11 +1428,11 @@ void LibraryPanel::paintListBoxItem (int row, juce::Graphics& g, int width, int 
     {
         g.setColour (theme::text());
         g.setFont (juce::FontOptions (15.0f).withStyle ("Bold"));
-        g.drawText (t->title.isNotEmpty() ? t->title : juce::String ("(untitled)"), r.removeFromTop (22), juce::Justification::centredLeft, true);
+        g.drawText (t->title.isNotEmpty() ? t->title : tr ("(untitled)"), r.removeFromTop (22), juce::Justification::centredLeft, true);
         g.setColour (theme::text().withAlpha (0.6f));
         g.setFont (juce::FontOptions (12.5f));
         const auto n = (int) t->resources.size();
-        auto info = formatDate (t->created) + (n > 0 ? "   " + juce::String (n) + (n == 1 ? " resource" : " resources") : juce::String())
+        auto info = formatDate (t->created) + (n > 0 ? "   " + trn ("{n} resource", "{n} resources", n) : juce::String())
                   + (t->student.isNotEmpty() ? "   " + t->student : juce::String());
 
         // When the search or tag filter matched something not shown in this row, say where instead.
@@ -1464,13 +1466,13 @@ void LibraryPanel::showTagMenu()
         return;
 
     juce::PopupMenu menu;
-    menu.addItem ("All topics", true, tagFilter.isEmpty(), [this] { tagFilter = {}; updateTagButton(); rebuildList (selectedId); });
+    menu.addItem (tr ("All topics"), true, tagFilter.isEmpty(), [this] { tagFilter = {}; updateTagButton(); rebuildList (selectedId); });
     menu.addSeparator();
 
     const auto tags = library->getAllTags();
 
     if (tags.isEmpty())
-        menu.addItem ("No tags yet: type them under a topic's title or in a resource's details", false, false, [] {});
+        menu.addItem (tr ("No tags yet: type them under a topic's title or in a resource's details"), false, false, [] {});
 
     for (auto& tag : tags)
     {
@@ -1501,7 +1503,7 @@ void LibraryPanel::showTagMenu()
 
     if (! students.isEmpty() || ! groups.groups.empty() || teacher)
     {
-        menu.addSectionHeader ("Students");
+        menu.addSectionHeader (tr ("Students"));
 
         for (auto& name : students)
         {
@@ -1530,7 +1532,7 @@ void LibraryPanel::showTagMenu()
                                                           [&] (const GroupSend& s) { return s.topicId == t.id && s.groupId == g.id; }))
                     ++count;
 
-            menu.addItem ("Group: " + g.name + "  (" + juce::String (count) + ")", true, filter == tagFilter, [this, filter]
+            menu.addItem (tr ("Group: {name}  ({count})", g.name, count), true, filter == tagFilter, [this, filter]
             {
                 tagFilter = filter;
                 updateTagButton();
@@ -1540,10 +1542,10 @@ void LibraryPanel::showTagMenu()
 
         if (teacher)
         {
-            menu.addItem ("New group (ensemble)...", [this] { editGroups (true); });
+            menu.addItem (tr ("New group (ensemble)..."), [this] { editGroups (true); });
 
             if (! groups.groups.empty())
-                menu.addItem ("Edit groups...", [this] { editGroups (false); });
+                menu.addItem (tr ("Edit groups..."), [this] { editGroups (false); });
         }
     }
 
@@ -1553,10 +1555,10 @@ void LibraryPanel::showTagMenu()
 void LibraryPanel::updateTagButton()
 {
     const auto* group = tagFilter.startsWith ("@group:") ? groups.find (tagFilter.fromFirstOccurrenceOf (":", false, false)) : nullptr;
-    tagsButton.setButtonText (tagFilter.isEmpty() ? juce::String ("Tags")
-                              : tagFilter.startsWith ("@student:") ? "Student: " + tagFilter.fromFirstOccurrenceOf (":", false, false) + "   (change / clear)"
-                              : tagFilter.startsWith ("@group:") ? "Group: " + (group != nullptr ? group->name : juce::String ("?")) + "   (change / clear)"
-                              : "Tag: " + tagFilter + "   (change / clear)");
+    tagsButton.setButtonText (tagFilter.isEmpty() ? tr ("Tags")
+                              : tagFilter.startsWith ("@student:") ? tr ("Student: {name}   (change / clear)", tagFilter.fromFirstOccurrenceOf (":", false, false))
+                              : tagFilter.startsWith ("@group:") ? tr ("Group: {name}   (change / clear)", group != nullptr ? group->name : juce::String ("?"))
+                              : tr ("Tag: {tag}   (change / clear)", tagFilter));
     tagsButton.setColour (juce::TextButton::buttonColourId,
                           tagFilter.isEmpty() ? getLookAndFeel().findColour (juce::TextButton::buttonColourId) : theme::accent());
 }
@@ -1596,7 +1598,7 @@ void LibraryPanel::shareOnePerMember (const juce::Array<juce::File>& files)
        #endif
     };
 
-    showOverlay ("Send to each member", std::make_unique<MemberSharePanel> (lastSentMembers, files, shareOne,
+    showOverlay (tr ("Send to each member"), std::make_unique<MemberSharePanel> (lastSentMembers, files, shareOne,
                                                                            [this] { if (hideOverlay) hideOverlay(); }));
 }
 
@@ -1614,7 +1616,7 @@ void LibraryPanel::editGroups (bool addNew)
 
     students.sortNatural();
 
-    showOverlay ("Groups", std::make_unique<GroupEditor> (StudentGroups::load (library->getRoot()), students, addNew,
+    showOverlay (tr ("Groups"), std::make_unique<GroupEditor> (StudentGroups::load (library->getRoot()), students, addNew,
         [this] (StudentGroups edited)
         {
             if (library != nullptr)
@@ -1624,7 +1626,7 @@ void LibraryPanel::editGroups (bool addNew)
                 current.groups = std::move (edited.groups);
 
                 if (! current.save (library->getRoot()))
-                    showError ("Could not save the groups.");
+                    showError (tr ("Could not save the groups."));
 
                 groups = std::move (current);
 
@@ -1693,9 +1695,9 @@ void LibraryPanel::showSelection()
         inboxView->load (library->getInbox());
     else
         emptyLabel.setText (library->getTopics().empty()
-                                ? "No topics yet.\n\nA topic is anything you practise: a technique, a song, a lesson.\n"
-                                  "Press \"+ New topic\" to create one, then add notes, documents, audio files and links."
-                                : "Select a topic on the left.",
+                                ? tr ("No topics yet.\n\nA topic is anything you practise: a technique, a song, a lesson.\n"
+                                      "Press \"+ New topic\" to create one, then add notes, documents, audio files and links.")
+                                : tr ("Select a topic on the left."),
                             juce::dontSendNotification);
 }
 
@@ -1854,16 +1856,18 @@ void LibraryPanel::chooseTopicVersion (const juce::String& topicId, juce::Compon
     flush();
     const auto versions = Library::getTopicFileVersions (*t);
     juce::PopupMenu menu;
-    menu.addSectionHeader ("Keep which version? The others go to the bin.");
+    menu.addSectionHeader (tr ("Keep which version? The others go to the bin."));
 
     for (size_t i = 0; i < versions.size(); ++i)
     {
         const auto& v = versions[i];
         const auto isCurrent = v.fileName.equalsIgnoreCase (Library::topicFileName);
-        menu.addItem ((int) i + 1, "\"" + (v.title.isNotEmpty() ? v.title : juce::String ("(no title)")) + "\", saved "
-                                       + v.saved.formatted ("%d %b %H:%M:%S") + ", "
-                                       + juce::String (v.resources) + (v.resources == 1 ? " resource" : " resources")
-                                       + (isCurrent ? " (the one shown)" : " (" + v.fileName + ")"));
+        const auto title = v.title.isNotEmpty() ? v.title : tr ("(no title)");
+        const auto when = i18n::date (v.saved, "%d %b %H:%M:%S");
+        menu.addItem ((int) i + 1, isCurrent ? trn ("\"{title}\", saved {when}, {n} resource (the one shown)",
+                                                    "\"{title}\", saved {when}, {n} resources (the one shown)", v.resources, title, when)
+                                             : trn ("\"{title}\", saved {when}, {n} resource ({file})",
+                                                    "\"{title}\", saved {when}, {n} resources ({file})", v.resources, title, when, v.fileName));
     }
 
     juce::Component::SafePointer<LibraryPanel> safeThis (this);
@@ -1879,7 +1883,7 @@ void LibraryPanel::chooseTopicVersion (const juce::String& topicId, juce::Compon
             return;
 
         if (! Library::keepTopicFileVersion (*topic, versions[(size_t) result - 1].fileName))
-            safeThis->showError ("Could not tidy up the copies in " + topic->folder.getFullPathName());
+            safeThis->showError (tr ("Could not tidy up the copies in {folder}", topic->folder.getFullPathName()));
 
         safeThis->library->rescan();
         safeThis->signature = safeThis->library->computeSignature();
@@ -1926,7 +1930,7 @@ void LibraryPanel::newTopic()
 
     flush();
 
-    if (auto* t = library->createTopic ("New topic"))
+    if (auto* t = library->createTopic (tr ("New topic")))
     {
         const auto id = t->id;
         signature = library->computeSignature();
@@ -1938,7 +1942,7 @@ void LibraryPanel::newTopic()
     }
     else
     {
-        showError ("Could not create a topic folder in " + library->getRoot().getFullPathName());
+        showError (tr ("Could not create a topic folder in {folder}", library->getRoot().getFullPathName()));
     }
 }
 
@@ -1953,16 +1957,16 @@ void LibraryPanel::deleteTopic (const juce::String& topicId)
     const auto files = (int) std::count_if (t->resources.begin(), t->resources.end(), [] (const Resource& r) { return ! r.isLink(); });
 
    #if JUCE_IOS
-    const juce::String where = "This can't be undone.";
+    const juce::String where = tr ("This can't be undone.");
    #else
-    const juce::String where = "The folder goes to the Recycle Bin.";
+    const juce::String where = tr ("The folder goes to the Recycle Bin.");
    #endif
 
-    auto options = confirmBox (juce::MessageBoxIconType::WarningIcon, "Delete topic",
-                                                          "Delete \"" + t->title + "\" with its notes"
-                                                              + (files > 0 ? " and " + juce::String (files) + (files == 1 ? " file" : " files") : juce::String())
-                                                              + "?\n" + where,
-                                                          "Delete", this);
+    auto options = confirmBox (juce::MessageBoxIconType::WarningIcon, tr ("Delete topic"),
+                               (files > 0 ? trn ("Delete \"{title}\" with its notes and {n} file?", "Delete \"{title}\" with its notes and {n} files?", files, t->title)
+                                          : tr ("Delete \"{title}\" with its notes?", t->title))
+                                   + "\n" + where,
+                               tr ("Delete"), this);
 
     juce::AlertWindow::showAsync (options, [safeThis = SafePointer<LibraryPanel> (this), topicId] (int result)
     {
@@ -1970,7 +1974,7 @@ void LibraryPanel::deleteTopic (const juce::String& topicId)
             return;
 
         if (! safeThis->library->deleteTopic (topicId))
-            safeThis->showError ("Could not delete the topic folder (is a file in it open in another app?).");
+            safeThis->showError (tr ("Could not delete the topic folder (is a file in it open in another app?)."));
 
         safeThis->signature = safeThis->library->computeSignature();
         safeThis->rebuildList (safeThis->library->getTopics().empty() ? juce::String() : safeThis->library->getTopics().front().id);
@@ -1979,7 +1983,7 @@ void LibraryPanel::deleteTopic (const juce::String& topicId)
 
 void LibraryPanel::addFiles (const juce::String& topicId)
 {
-    fileChooser = std::make_unique<juce::FileChooser> ("Add files to the topic",
+    fileChooser = std::make_unique<juce::FileChooser> (tr ("Add files to the topic"),
                                                        juce::File::getSpecialLocation (juce::File::userDocumentsDirectory));
 
     fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
@@ -2009,7 +2013,7 @@ void LibraryPanel::addUrls (const juce::String& topicId, const juce::Array<juce:
     topicList.repaint();
 
     if (! failed.isEmpty())
-        showError ("Could not copy: " + failed.joinIntoString (", "));
+        showError (tr ("Could not copy: {files}", failed.joinIntoString (", ")));
 }
 
 void LibraryPanel::editResource (const juce::String& topicId, const juce::String& resourceId, bool isNewLink)
@@ -2069,7 +2073,7 @@ void LibraryPanel::editResource (const juce::String& topicId, const juce::String
             hideOverlay();
     };
 
-    showOverlay (isNewLink ? "Add link" : "Edit resource", std::move (editor));
+    showOverlay (isNewLink ? tr ("Add link") : tr ("Edit resource"), std::move (editor));
 }
 
 void LibraryPanel::showResourceMenu (const juce::String& topicId, const juce::String& resourceId, juce::Component& anchor)
@@ -2096,20 +2100,20 @@ void LibraryPanel::showResourceMenu (const juce::String& topicId, const juce::St
     };
 
     juce::PopupMenu menu;
-    menu.addItem ("Edit title and description...", [this, topicId, resourceId] { editResource (topicId, resourceId, false); });
-    menu.addItem ("Move up", index > 0, false, [move] { move (-1); });
-    menu.addItem ("Move down", index < count - 1, false, [move] { move (1); });
+    menu.addItem (tr ("Edit title and description..."), [this, topicId, resourceId] { editResource (topicId, resourceId, false); });
+    menu.addItem (tr ("Move up"), index > 0, false, [move] { move (-1); });
+    menu.addItem (tr ("Move down"), index < count - 1, false, [move] { move (1); });
 
    #if ! JUCE_IOS
     if (! isLink)
-        menu.addItem ("Show in folder", file.existsAsFile(), false, [file] { file.revealToUser(); });
+        menu.addItem (tr ("Show in folder"), file.existsAsFile(), false, [file] { file.revealToUser(); });
    #endif
 
     if (isLink && kindOf (*r) == ResourceKind::youtube)
-        menu.addItem ("Open in the browser", [url = r->url] { juce::URL (url).launchInDefaultBrowser(); });
+        menu.addItem (tr ("Open in the browser"), [url = r->url] { juce::URL (url).launchInDefaultBrowser(); });
 
     menu.addSeparator();
-    menu.addItem (isLink ? "Remove link" : "Remove (deletes the file)", [this, topicId, resourceId, isLink, title = r->title]
+    menu.addItem (isLink ? tr ("Remove link") : tr ("Remove (deletes the file)"), [this, topicId, resourceId, isLink, title = r->title]
     {
         auto doRemove = [safeThis = SafePointer<LibraryPanel> (this), topicId, resourceId]
         {
@@ -2118,7 +2122,7 @@ void LibraryPanel::showResourceMenu (const juce::String& topicId, const juce::St
 
             if (auto* topic = safeThis->library->findTopic (topicId))
                 if (! safeThis->library->removeResource (*topic, resourceId))
-                    safeThis->showError ("Could not remove the file (is it open in another app?).");
+                    safeThis->showError (tr ("Could not remove the file (is it open in another app?)."));
 
             safeThis->signature = safeThis->library->computeSignature();
             safeThis->showSelection();
@@ -2131,9 +2135,9 @@ void LibraryPanel::showResourceMenu (const juce::String& topicId, const juce::St
             return;
         }
 
-        auto options = confirmBox (juce::MessageBoxIconType::QuestionIcon, "Remove resource",
-                                                              "Remove \"" + title + "\" and delete its file from the topic folder?",
-                                                              "Remove", this);
+        auto options = confirmBox (juce::MessageBoxIconType::QuestionIcon, tr ("Remove resource"),
+                                   tr ("Remove \"{title}\" and delete its file from the topic folder?", title),
+                                   tr ("Remove"), this);
         juce::AlertWindow::showAsync (options, [doRemove] (int result) { if (result == 1) doRemove(); });
     });
 
@@ -2152,14 +2156,14 @@ void LibraryPanel::showInboxMenu (const juce::File& file, juce::Component& ancho
 
         if (auto* t = safeThis->library->findTopic (topicId))
             if (safeThis->library->moveInboxFile (*t, file) == nullptr)
-                safeThis->showError ("Could not move " + file.getFileName());
+                safeThis->showError (tr ("Could not move {file}", file.getFileName()));
 
         safeThis->signature = safeThis->library->computeSignature();
         safeThis->rebuildList (safeThis->library->getInbox().isEmpty() ? topicId : inboxId);
     };
 
     juce::PopupMenu menu;
-    menu.addItem ("New topic named \"" + file.getFileNameWithoutExtension() + "\"", [this, file, moveTo]
+    menu.addItem (tr ("New topic named \"{name}\"", file.getFileNameWithoutExtension()), [this, file, moveTo]
     {
         if (auto* t = library->createTopic (file.getFileNameWithoutExtension()))
             moveTo (t->id);
@@ -2224,17 +2228,17 @@ void LibraryPanel::openFile (const juce::File& file, const juce::String& title)
     }
 
    #if JUCE_IOS
-    showError ("This kind of file can't be shown on the iPad.");
+    showError (tr ("This kind of file can't be shown on the iPad."));
    #else
     if (! file.startAsProcess())
-        showError ("No app on this computer opens " + file.getFileName());
+        showError (tr ("No app on this computer opens {file}", file.getFileName()));
    #endif
 }
 
 void LibraryPanel::showError (const juce::String& message)
 {
     juce::Logger::writeToLog ("Library: " + message);
-    juce::AlertWindow::showAsync (juce::MessageBoxOptions::makeOptionsOk (juce::MessageBoxIconType::WarningIcon, "Topics", message, "OK", this),
+    juce::AlertWindow::showAsync (juce::MessageBoxOptions::makeOptionsOk (juce::MessageBoxIconType::WarningIcon, tr ("Topics"), message, tr ("OK"), this),
                                   nullptr);
 }
 

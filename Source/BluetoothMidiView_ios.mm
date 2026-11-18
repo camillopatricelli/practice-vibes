@@ -1,5 +1,6 @@
 #include "BluetoothMidiView.h"
 #include "Theme.h"
+#include "Localisation.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -25,8 +26,8 @@ namespace
             getProperties().set ("overlayWidth", 560);
             getProperties().set ("overlayHeight", 660);
 
-            hint.setText ("Switch the device on (in pairing mode, if it has one), then tap it below to connect. "
-                          "Once connected it appears as a MIDI input.", juce::dontSendNotification);
+            hint.setText (tr ("Switch the device on (in pairing mode, if it has one), then tap it below to connect. "
+                          "Once connected it appears as a MIDI input."), juce::dontSendNotification);
             hint.setFont (theme::textFont (15.0f));
             hint.setColour (juce::Label::textColourId, theme::muted());
             hint.setJustificationType (juce::Justification::topLeft);

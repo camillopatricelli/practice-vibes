@@ -47,6 +47,7 @@ private:
     mutable juce::CriticalSection lock;
     std::vector<Entry> entries;
     juce::String status;
+    bool statusIsCount = false;      // status is the "N plugins available" line (refreshed with the list)
     juce::String lastAudioUnitLog;
 
     struct RegistrationListener;

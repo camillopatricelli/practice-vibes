@@ -1,4 +1,5 @@
 #include "LoopFiles.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -16,7 +17,7 @@ namespace
         std::unique_ptr<juce::OutputStream> stream (file.createOutputStream());
 
         if (stream == nullptr)
-            return juce::Result::fail ("Can't write " + file.getFullPathName());
+            return juce::Result::fail (tr ("Can't write {file}", file.getFullPathName()));
 
         juce::WavAudioFormat wav;
         auto writer = wav.createWriterFor (stream, juce::AudioFormatWriterOptions{}.withSampleRate (sampleRate)
@@ -24,7 +25,7 @@ namespace
                                                                                     .withBitsPerSample (32));     // float: overdubs may exceed 0 dBFS
 
         if (writer == nullptr || ! writer->writeFromAudioSampleBuffer (audio, 0, audio.getNumSamples()))
-            return juce::Result::fail ("Can't write " + file.getFileName());
+            return juce::Result::fail (tr ("Can't write {file}", file.getFileName()));
 
         return juce::Result::ok();
     }
@@ -36,7 +37,7 @@ namespace
         std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
 
         if (reader == nullptr)
-            return juce::Result::fail ("Can't read " + file.getFileName());
+            return juce::Result::fail (tr ("Can't read {file}", file.getFileName()));
 
         audio.setSize ((int) juce::jlimit (1u, 2u, reader->numChannels), (int) reader->lengthInSamples);
         reader->read (&audio, 0, audio.getNumSamples(), 0, true, audio.getNumChannels() > 1);
@@ -135,10 +136,10 @@ juce::AudioBuffer<float> LoopFiles::renderMix (const LoopSet& set)
 juce::Result LoopFiles::save (const LoopSet& set, const juce::File& folder)
 {
     if (set.getNumLoops() == 0)
-        return juce::Result::fail ("There are no loops to save.");
+        return juce::Result::fail (tr ("There are no loops to save."));
 
     if (! folder.createDirectory())
-        return juce::Result::fail ("Can't create " + folder.getFullPathName());
+        return juce::Result::fail (tr ("Can't create {folder}", folder.getFullPathName()));
 
     juce::XmlElement xml (rootTag);
     xml.setAttribute ("version", 1);
@@ -178,7 +179,7 @@ juce::Result LoopFiles::save (const LoopSet& set, const juce::File& folder)
 
     // Written last: a folder without it is an incomplete save and isn't listed.
     if (! xml.writeTo (folder.getChildFile (sessionFileName)))
-        return juce::Result::fail ("Can't write " + sessionFileName);
+        return juce::Result::fail (tr ("Can't write {file}", sessionFileName));
 
     return juce::Result::ok();
 }
@@ -188,7 +189,7 @@ juce::Result LoopFiles::load (const juce::File& folder, LoopSet& set)
     const auto xml = juce::parseXML (folder.getChildFile (sessionFileName));
 
     if (xml == nullptr || ! xml->hasTagName (rootTag))
-        return juce::Result::fail ("No looper session in " + folder.getFileName());
+        return juce::Result::fail (tr ("No looper session in {folder}", folder.getFileName()));
 
     set = {};
     set.sampleRate = xml->getDoubleAttribute ("sampleRate", 48000.0);
@@ -197,7 +198,7 @@ juce::Result LoopFiles::load (const juce::File& folder, LoopSet& set)
     set.source = xml->getStringAttribute ("source") == "beforeFx" ? Looper::Source::beforeFx : Looper::Source::afterFx;
 
     if (set.sampleRate <= 0.0 || set.barSamples <= 0.0)
-        return juce::Result::fail ("The session has no valid tempo.");
+        return juce::Result::fail (tr ("The session has no valid tempo."));
 
     for (auto* track : xml->getChildWithTagNameIterator ("TRACK"))
     {
@@ -214,7 +215,7 @@ juce::Result LoopFiles::load (const juce::File& folder, LoopSet& set)
             return result;
 
         if (std::abs (fileRate - set.sampleRate) > 0.5)
-            return juce::Result::fail (track->getStringAttribute ("file") + " has a different sample rate than the session.");
+            return juce::Result::fail (tr ("{file} has a different sample rate than the session.", track->getStringAttribute ("file")));
 
         loop.bars = juce::jmax (1, track->getIntAttribute ("bars", 1));
         loop.muted = track->getBoolAttribute ("muted", false);
@@ -222,7 +223,7 @@ juce::Result LoopFiles::load (const juce::File& folder, LoopSet& set)
     }
 
     if (set.getNumLoops() == 0)
-        return juce::Result::fail ("The session has no loops.");
+        return juce::Result::fail (tr ("The session has no loops."));
 
     if (auto* drums = xml->getChildByName ("DRUMS"))
         set.drums = std::make_shared<juce::XmlElement> (*drums);
@@ -237,7 +238,7 @@ juce::String LoopFiles::describe (const juce::File& folder)
     if (auto xml = juce::parseXML (folder.getChildFile (sessionFileName)))
     {
         const auto loops = xml->getNumChildElements();
-        text << " (" << loops << (loops == 1 ? " loop)" : " loops)");
+        text << " (" << trn ("{n} loop", "{n} loops", loops) << ")";
     }
 
     return text;

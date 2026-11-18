@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "AppEngine.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -60,10 +61,10 @@ private:
     juce::Slider referenceSlider;
     juce::ComboBox tuningCombo;
     juce::Label instrumentLabel;
-    juce::TextButton guitarButton { "Guitar" }, bassButton { "Bass" }, otherButton { "Other" };
-    juce::TextButton singleButton { "Single string" }, strumButton { "Strum all strings" },
-                     needleButton { "Needle" }, strobeButton { "Strobe" };
-    juce::ToggleButton muteToggle { "Mute your instrument while tuning" };
+    juce::TextButton guitarButton { tr ("Guitar") }, bassButton { tr ("Bass") }, otherButton { tr ("Other") };
+    juce::TextButton singleButton { tr ("Single string") }, strumButton { tr ("Strum all strings") },
+                     needleButton { tr ("Needle") }, strobeButton { tr ("Strobe") };
+    juce::ToggleButton muteToggle { tr ("Mute your instrument while tuning") };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TunerPanel)
 };

@@ -1,5 +1,6 @@
 #include "TodayPanel.h"
 #include "Theme.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -17,13 +18,13 @@ namespace
         juce::StringArray parts;
 
         if (s.sessions > 0)
-            parts.add (formatPracticeDuration (s.totalSeconds) + " in total");
+            parts.add (tr ("{duration} in total", formatPracticeDuration (s.totalSeconds)));
 
         if (s.lastBpm > 0.0)
-            parts.add ("last " + juce::String (juce::roundToInt (s.lastBpm)) + " bpm");
+            parts.add (tr ("last {bpm} bpm", juce::roundToInt (s.lastBpm)));
 
         if (s.lastSpeed > 0.0)
-            parts.add ("song at " + juce::String (juce::roundToInt (s.lastSpeed * 100.0)) + " %");
+            parts.add (tr ("song at {percent} %", juce::roundToInt (s.lastSpeed * 100.0)));
 
         return parts.joinIntoString ("  -  ");
     }
@@ -41,15 +42,15 @@ public:
     {
         practiseButton.setColour (juce::TextButton::buttonColourId, theme::accent());
         practiseButton.onClick = [this] { if (onPractise) onPractise (topicId); };
-        practiseButton.setButtonText (active ? "Practising" : "Practise");
+        practiseButton.setButtonText (active ? tr ("Practising") : tr ("Practise"));
         practiseButton.setEnabled (! active);
         addAndMakeVisible (practiseButton);
         historyButton.onClick = [this] { if (onHistory) onHistory (topicId); };
-        historyButton.setTooltip ("Tempo, song speed and minutes over the weeks, and every session");
+        historyButton.setTooltip (tr ("Tempo, song speed and minutes over the weeks, and every session"));
         historyButton.setEnabled (s.sessions > 0);
         addAndMakeVisible (historyButton);
         setMouseCursor (juce::MouseCursor::PointingHandCursor);
-        setTooltip ("Click to open the topic; Practise brings back last time's song, loop, speed and tempo");
+        setTooltip (tr ("Click to open the topic; Practise brings back last time's song, loop, speed and tempo"));
     }
 
     std::function<void (const juce::String&)> onPractise, onShow, onHistory;
@@ -76,8 +77,8 @@ public:
 
         const auto now = juce::Time::getCurrentTime();
         const auto days = summary.last == juce::Time() ? 1000.0 : (now - summary.last).inDays();
-        const auto ago = summary.last == juce::Time() ? juce::String ("Not practised yet")
-                                                      : "Last practised " + formatPracticeAgo (summary.last, now);
+        const auto ago = summary.last == juce::Time() ? tr ("Not practised yet")
+                                                      : tr ("Last practised {when}", formatPracticeAgo (summary.last, now));
         const juce::Font agoFont (juce::FontOptions (13.5f).withStyle ("Bold"));
         g.setFont (agoFont);
         g.setColour (days >= 7.0 ? theme::highlight() : theme::text().withAlpha (0.75f));
@@ -119,7 +120,7 @@ private:
     juce::StringArray tags;
     PracticeLog::TopicSummary summary;
     bool active;
-    juce::TextButton practiseButton, historyButton { "History" };
+    juce::TextButton practiseButton, historyButton { tr ("History") };
 };
 
 //==============================================================================
@@ -151,13 +152,13 @@ public:
                     if (e.start >= day && e.start < day + juce::RelativeTime::days (1))
                         total += e.playedSeconds;
 
-                const auto name = day == today ? juce::String ("Today")
-                                : day == today - juce::RelativeTime::days (1) ? juce::String ("Yesterday")
-                                : day.formatted ("%a %d %b");
+                const auto name = day == today ? tr ("Today")
+                                : day == today - juce::RelativeTime::days (1) ? tr ("Yesterday")
+                                : i18n::date (day, "%a %d %b");
                 lines.push_back ({ Line::day, name, formatPracticeDuration (total) });
             }
 
-            auto what = it->isFree() ? juce::String ("Free practice") : it->topicTitle;
+            auto what = it->isFree() ? tr ("Free practice") : it->topicTitle;
 
             if (it->isFree() && it->songName.isNotEmpty())
                 what << ": " << it->songName;
@@ -166,9 +167,9 @@ public:
 
             if (it->maxBpm > 0.0)    detail.add (juce::String (juce::roundToInt (it->maxBpm)) + " bpm");
             if (it->maxSpeed > 0.0)  detail.add (juce::String (juce::roundToInt (it->maxSpeed * 100.0)) + " %");
-            if (it->looper)          detail.add ("looper");
-            if (it->noGuitar)        detail.add ("clock time");
-            if (it->manual)          detail.add ("added by hand");
+            if (it->looper)          detail.add (tr ("looper"));
+            if (it->noGuitar)        detail.add (tr ("clock time"));
+            if (it->manual)          detail.add (tr ("added by hand"));
 
             lines.push_back ({ Line::entry, what, detail.joinIntoString ("  -  "), it->id });
 
@@ -196,7 +197,7 @@ public:
         {
             g.setColour (theme::text().withAlpha (0.45f));
             g.setFont (theme::textFont (15.5f));
-            g.drawFittedText ("Nothing yet. Play, and the time you spend on each topic is recorded here by itself.",
+            g.drawFittedText (tr ("Nothing yet. Play, and the time you spend on each topic is recorded here by itself."),
                               getLocalBounds().reduced (4), juce::Justification::topLeft, 3);
             return;
         }
@@ -328,7 +329,7 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
     nowStatus.setMinimumHorizontalScale (0.7f);
     addAndMakeVisible (nowStatus);
 
-    noteEditor.setTextToShowWhenEmpty ("Note for this session (optional): what went well, what to fix next time",
+    noteEditor.setTextToShowWhenEmpty (tr ("Note for this session (optional): what went well, what to fix next time"),
                                        theme::text().withAlpha (0.35f));
     noteEditor.setFont (juce::FontOptions (14.5f));
     noteEditor.setColour (juce::TextEditor::backgroundColourId, theme::background());
@@ -339,7 +340,7 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
     noteEditor.onReturnKey = [this] { unfocusAllComponents(); };
     addAndMakeVisible (noteEditor);
 
-    stopButton.setTooltip ("Stop practising this topic (playing is then logged as free practice)");
+    stopButton.setTooltip (tr ("Stop practising this topic (playing is then logged as free practice)"));
     stopButton.onClick = [this]
     {
         tracker.setActiveTopic ({}, {});
@@ -347,7 +348,7 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
     };
     addAndMakeVisible (stopButton);
 
-    pauseButton.setTooltip ("This topic is timed without playing: pause the clock while you're away");
+    pauseButton.setTooltip (tr ("This topic is timed without playing: pause the clock while you're away"));
     pauseButton.onClick = [this]
     {
         tracker.setPaused (! tracker.isPaused());
@@ -355,11 +356,11 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
     };
     addChildComponent (pauseButton);
 
-    addTimeButton.setTooltip ("Add practice time by hand (e.g. theory done away from the app)");
+    addTimeButton.setTooltip (tr ("Add practice time by hand (e.g. theory done away from the app)"));
     addTimeButton.onClick = [this] { if (onAddTime) onAddTime ({}); };
     addAndMakeVisible (addTimeButton);
 
-    allHistoryButton.setTooltip ("Your practice across all topics: minutes per week, time per topic and every session");
+    allHistoryButton.setTooltip (tr ("Your practice across all topics: minutes per week, time per topic and every session"));
     allHistoryButton.onClick = [this] { if (onShowAllHistory) onShowAllHistory(); };
     addAndMakeVisible (allHistoryButton);
 
@@ -370,19 +371,19 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
         addAndMakeVisible (*l);
     }
 
-    rotationHeader.setText ("Practice rotation", juce::dontSendNotification);
-    rotationHeader.setTooltip ("Longest neglected first");
+    rotationHeader.setText (tr ("Practice rotation"), juce::dontSendNotification);
+    rotationHeader.setTooltip (tr ("Longest neglected first"));
 
-    diceButton.setTooltip ("Pick one rotation topic at random - the longer you've left one, the likelier it comes up");
+    diceButton.setTooltip (tr ("Pick one rotation topic at random - the longer you've left one, the likelier it comes up"));
     diceButton.onClick = [this] { rollDice(); };
-    planButton.setTooltip ("Say how long you have: a few rotation topics with time slots, ready to start");
+    planButton.setTooltip (tr ("Say how long you have: a few rotation topics with time slots, ready to start"));
     planButton.setColour (juce::TextButton::buttonColourId, theme::accent());
     planButton.onClick = [this] { if (onPlanSession) onPlanSession (focusTag()); };
-    focusBox.setTooltip ("Only topics with this tag, for the dice and the session planner");
-    focusBox.addItem ("All tags", 1);
+    focusBox.setTooltip (tr ("Only topics with this tag, for the dice and the session planner"));
+    focusBox.addItem (tr ("All tags"), 1);
     focusBox.setSelectedId (1, juce::dontSendNotification);
 
-    plansButton.setTooltip ("Your saved session plans: start one as it is, or load it to change today's session");
+    plansButton.setTooltip (tr ("Your saved session plans: start one as it is, or load it to change today's session"));
     plansButton.onClick = [this] { showPlansMenu(); };
 
     for (auto* c : std::initializer_list<juce::Component*> { &diceButton, &planButton, &plansButton, &focusBox })
@@ -420,7 +421,7 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
 
     for (auto* c : { &nextButton, &extendButton, &endButton })
         addChildComponent (*c);
-    recentHeader.setText ("Last two weeks", juce::dontSendNotification);
+    recentHeader.setText (tr ("Last two weeks"), juce::dontSendNotification);
 
     rotationEmpty.setJustificationType (juce::Justification::topLeft);
     rotationEmpty.setColour (juce::Label::textColourId, theme::text().withAlpha (0.55f));
@@ -433,12 +434,12 @@ TodayPanel::TodayPanel (PracticeTracker& t, const PracticeSession& s) : tracker 
 
     recentView = std::make_unique<RecentView>();
     recentView->onEdit = [this] (const juce::String& id) { if (onEditEntry) onEditEntry (id); };
-    recentView->setTooltip ("Tap an entry to correct or delete it");
+    recentView->setTooltip (tr ("Tap an entry to correct or delete it"));
     recentViewport.setViewedComponent (recentView.get(), false);
     recentViewport.setScrollBarsShown (true, false);
     addAndMakeVisible (recentViewport);
 
-    recentToggleButton.setTooltip ("Show the last two weeks in place of the rotation list, or the other way round");
+    recentToggleButton.setTooltip (tr ("Show the last two weeks in place of the rotation list, or the other way round"));
     recentToggleButton.onClick = [this] { recentExpanded = ! recentExpanded; resized(); repaint(); };
     addChildComponent (recentToggleButton);
 
@@ -498,21 +499,21 @@ void TodayPanel::refresh()
                 if (auto* current = tracker.getCurrent(); current != nullptr && current->topicId == topic->id && current->start >= midnight)
                     today += current->playedSeconds;
 
-                parts.add (juce::String (juce::roundToInt (today / 60.0)) + " / " + juce::String (a.minutesPerDay) + " min today");
+                parts.add (tr ("{done} / {goal} min today", juce::roundToInt (today / 60.0), a.minutesPerDay));
             }
 
             if (a.targetBpm > 0.0)
-                parts.add ("target " + juce::String (juce::roundToInt (a.targetBpm)) + " bpm"
-                           + (summary.lastBpm > 0.0 ? " (last " + juce::String (juce::roundToInt (summary.lastBpm)) + ")" : juce::String()));
+                parts.add (summary.lastBpm > 0.0 ? tr ("target {bpm} bpm (last {last})", juce::roundToInt (a.targetBpm), juce::roundToInt (summary.lastBpm))
+                                                 : tr ("target {bpm} bpm", juce::roundToInt (a.targetBpm)));
 
             if (a.nextLesson != juce::Time())
-                parts.add ("lesson " + a.nextLesson.formatted ("%a %d %b"));
+                parts.add (tr ("lesson {date}", i18n::date (a.nextLesson, "%a %d %b")));
 
             if (parts.isEmpty())
                 parts.add (a.goal);
 
-            row->assignmentText = "Teacher: " + parts.joinIntoString (middleDot());
-            row->setTooltip ("Assignment: " + a.describe());
+            row->assignmentText = tr ("Teacher: {details}", parts.joinIntoString (middleDot()));
+            row->setTooltip (tr ("Assignment: {details}", a.describe()));
         }
         row->onPractise = [this] (const juce::String& id) { if (onPractise) onPractise (id); };
         row->onShow = [this] (const juce::String& id) { if (onShowTopic) onShowTopic (id); };
@@ -522,9 +523,9 @@ void TodayPanel::refresh()
     }
 
     rotationEmpty.setText (library == nullptr
-                               ? "Set up your topics in the Topics tab first."
-                               : "No topics in the rotation yet.\n\nOpen a topic in the Topics tab and tick \"In practice rotation\": "
-                                 "it shows up here, with how long ago you last practised it.",
+                               ? tr ("Set up your topics in the Topics tab first.")
+                               : tr ("No topics in the rotation yet.\n\nOpen a topic in the Topics tab and tick \"In practice rotation\": "
+                                     "it shows up here, with how long ago you last practised it."),
                            juce::dontSendNotification);
     rotationEmpty.setVisible (rows.empty());
 
@@ -536,7 +537,7 @@ void TodayPanel::refresh()
     const auto tags = getRotationTags ? getRotationTags() : juce::StringArray();
     const auto chosen = focusTag();
     focusBox.clear (juce::dontSendNotification);
-    focusBox.addItem ("All tags", 1);
+    focusBox.addItem (tr ("All tags"), 1);
 
     for (int i = 0; i < tags.size(); ++i)
         focusBox.addItem ("#" + tags[i], i + 2);
@@ -564,15 +565,15 @@ void TodayPanel::showPlansMenu()
     for (auto& [id, name] : plans)
     {
         juce::PopupMenu sub;
-        sub.addItem ("Start", ! session.isRunning(), false, [this, planId = id] { if (onStartPlan) onStartPlan (planId); });
-        sub.addItem ("Change for today...", ! session.isRunning(), false, [this, planId = id] { if (onEditPlan) onEditPlan (planId); });
+        sub.addItem (tr ("Start"), ! session.isRunning(), false, [this, planId = id] { if (onStartPlan) onStartPlan (planId); });
+        sub.addItem (tr ("Change for today..."), ! session.isRunning(), false, [this, planId = id] { if (onEditPlan) onEditPlan (planId); });
         menu.addSubMenu (name, sub);
     }
 
     if (session.isRunning())
     {
         menu.addSeparator();
-        menu.addItem ("A session is running - end it first", false, false, [] {});
+        menu.addItem (tr ("A session is running - end it first"), false, false, [] {});
     }
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&plansButton));
@@ -605,13 +606,13 @@ void TodayPanel::rollDice()
     const auto& c = candidates[(size_t) pick];
     diceTopicId = c.topicId;
 
-    juce::String when = "not practised yet";
+    juce::String when = tr ("not practised yet");
 
     if (auto* log = tracker.getLog())
         if (const auto last = log->summarise (c.topicId).last; last != juce::Time())
-            when = "last practised " + formatPracticeAgo (last, juce::Time::getCurrentTime());
+            when = tr ("last practised {when}", formatPracticeAgo (last, juce::Time::getCurrentTime()));
 
-    diceLabel.setText ("The dice says: " + c.title + "   (" + when + ")", juce::dontSendNotification);
+    diceLabel.setText (tr ("The dice says: {title}   ({when})", c.title, when), juce::dontSendNotification);
     resized();
     repaint();
 }
@@ -629,29 +630,29 @@ void TodayPanel::updateSession()
         if (session.isRunning())
         {
             const auto n = (int) session.getSlots().size();
-            sessionTitle.setText (session.isTimeUp() ? juce::String ("Time's up!")
-                                                     : "Session: topic " + juce::String (session.getIndex() + 1) + " of " + juce::String (n)
-                                                         + (! session.isPaused() ? juce::String()
-                                                              : tracker.isStartButtonMode() ? juce::String ("  -  paused: press Start")
-                                                              : tracker.clockMode() ? juce::String ("  -  paused: press Resume")
-                                                                                    : juce::String ("  -  the clock runs while you play")),
+            sessionTitle.setText (session.isTimeUp() ? tr ("Time's up!")
+                                                     : tr ("Session: topic {index} of {count}", session.getIndex() + 1, n)
+                                                          + (! session.isPaused() ? juce::String()
+                                                              : tracker.isStartButtonMode() ? "  -  " + tr ("paused: press Start")
+                                                              : tracker.clockMode() ? "  -  " + tr ("paused: press Resume")
+                                                                                    : "  -  " + tr ("the clock runs while you play")),
                                   juce::dontSendNotification);
             sessionTitle.setColour (juce::Label::textColourId, session.isTimeUp() ? theme::highlight() : theme::text());
-            nextButton.setButtonText (session.getNext() != nullptr ? "Next topic" : "Finish");
+            nextButton.setButtonText (session.getNext() != nullptr ? tr ("Next topic") : tr ("Finish"));
             nextButton.setVisible (true);
             extendButton.setVisible (true);
-            endButton.setButtonText ("End");
+            endButton.setButtonText (tr ("End"));
         }
         else
         {
             const auto reached = session.getTopicsReached();
-            sessionTitle.setText ("Session over: " + formatPracticeDuration (session.getElapsedSeconds()) + ", "
-                                      + juce::String (reached) + (reached == 1 ? " topic" : " topics"),
+            sessionTitle.setText (trn ("Session over: {duration}, {n} topic", "Session over: {duration}, {n} topics", reached,
+                                       formatPracticeDuration (session.getElapsedSeconds())),
                                   juce::dontSendNotification);
             sessionTitle.setColour (juce::Label::textColourId, theme::text());
             nextButton.setVisible (false);
             extendButton.setVisible (false);
-            endButton.setButtonText ("Close");
+            endButton.setButtonText (tr ("Close"));
         }
     }
 
@@ -667,7 +668,7 @@ void TodayPanel::updateSession()
 void TodayPanel::updateNow()
 {
     const auto now = juce::Time::getCurrentTime();
-    titleLabel.setText ("Today, " + now.formatted ("%A %d %B"), juce::dontSendNotification);
+    titleLabel.setText (tr ("Today, {date}", i18n::date (now, "%A %d %B")), juce::dontSendNotification);
 
     double today = 0.0, week = 0.0;
 
@@ -693,24 +694,24 @@ void TodayPanel::updateNow()
         week += extra;
     }
 
-    totalsLabel.setText ("Played today: " + formatPracticeDuration (today) + "     Last 7 days: " + formatPracticeDuration (week),
+    totalsLabel.setText (tr ("Played today: {today}     Last 7 days: {week}", formatPracticeDuration (today), formatPracticeDuration (week)),
                          juce::dontSendNotification);
 
     const auto active = tracker.getActiveTopicId().isNotEmpty();
-    nowTitle.setText (active ? "Practising: " + tracker.getActiveTopicTitle() : juce::String ("Free practice"), juce::dontSendNotification);
+    nowTitle.setText (active ? tr ("Practising: {title}", tracker.getActiveTopicTitle()) : tr ("Free practice"), juce::dontSendNotification);
 
     const auto onClock = tracker.isTimedByHand();
     const auto startMode = tracker.isStartButtonMode();
-    juce::String status = startMode ? (tracker.isPaused() ? "Not timing (microphone input): press Start to log practice"
-                                                          : "Timing: press Pause when you stop")
-                        : onClock ? (tracker.isPaused() ? "Paused (timed without playing)" : "Timing (without playing)")
-                                  : (tracker.isPlaying() ? "Playing now" : "Not playing");
+    juce::String status = startMode ? (tracker.isPaused() ? tr ("Not timing (microphone input): press Start to log practice")
+                                                          : tr ("Timing: press Pause when you stop"))
+                        : onClock ? (tracker.isPaused() ? tr ("Paused (timed without playing)") : tr ("Timing (without playing)"))
+                                  : (tracker.isPlaying() ? tr ("Playing now") : tr ("Not playing"));
 
     if (active)
-        status << "  -  " << formatPracticeDuration (tracker.getActiveSeconds()) << " on this topic so far";
+        status << "  -  " << tr ("{duration} on this topic so far", formatPracticeDuration (tracker.getActiveSeconds()));
     else
-        status << (startMode ? juce::String ("  -  without a topic it's logged as free practice")
-                             : juce::String ("  -  pick a topic from the Practice rotation, or just play: it's logged as free practice"));
+        status << "  -  " << (startMode ? tr ("without a topic it's logged as free practice")
+                                        : tr ("pick a topic from the Practice rotation, or just play: it's logged as free practice"));
 
     nowStatus.setText (status, juce::dontSendNotification);
     nowStatus.setColour (juce::Label::textColourId, tracker.isPlaying() ? theme::good() : theme::text().withAlpha (0.65f));
@@ -722,10 +723,10 @@ void TodayPanel::updateNow()
         resized();
     }
 
-    pauseButton.setButtonText (tracker.isPaused() ? (startMode ? "Start" : "Resume") : "Pause");
-    pauseButton.setTooltip (startMode ? "The input is a microphone (it hears the room too): practice time counts between Start and Pause. "
-                                        "Change this per input in the Audio settings."
-                                      : "This topic is timed without playing: pause the clock while you're away");
+    pauseButton.setButtonText (tracker.isPaused() ? (startMode ? tr ("Start") : tr ("Resume")) : tr ("Pause"));
+    pauseButton.setTooltip (startMode ? tr ("The input is a microphone (it hears the room too): practice time counts between Start and Pause. "
+                                            "Change this per input in the Audio settings.")
+                                      : tr ("This topic is timed without playing: pause the clock while you're away"));
 
     if (! noteEditor.hasKeyboardFocus (true) && noteEditor.getText().trim() != tracker.getNote())
         noteEditor.setText (tracker.getNote(), false);
@@ -791,13 +792,14 @@ void TodayPanel::paint (juce::Graphics& g)
             const auto current = session.isRunning() && i == session.getIndex();
             const auto done = i < session.getIndex() || (! session.isRunning() && i <= session.getIndex());
 
-            juce::String right = juce::String (slots[(size_t) i].minutes) + " min";
+            juce::String right = tr ("{minutes} min", slots[(size_t) i].minutes);
 
             if (current)
-                right = session.isTimeUp() ? "over by " + formatClock (-session.getRemainingSeconds())
-                                           : formatClock (session.getRemainingSeconds()) + (session.isPaused() ? " left (paused)" : " left");
+                right = session.isTimeUp() ? tr ("over by {time}", formatClock (-session.getRemainingSeconds()))
+                                           : session.isPaused() ? tr ("{time} left (paused)", formatClock (session.getRemainingSeconds()))
+                                                                : tr ("{time} left", formatClock (session.getRemainingSeconds()));
             else if (done)
-                right = "done";
+                right = tr ("done");
 
             g.setFont (current ? juce::FontOptions (15.0f).withStyle ("Bold") : juce::FontOptions (15.0f));
             g.setColour (current ? theme::highlight() : theme::text().withAlpha (done ? 0.45f : 0.8f));
@@ -910,7 +912,7 @@ void TodayPanel::resized()
 
     if (! wide)
     {
-        recentToggleButton.setButtonText (recentExpanded ? "Hide" : "Show");
+        recentToggleButton.setButtonText (recentExpanded ? tr ("Hide") : tr ("Show"));
 
         if (recentExpanded)
         {

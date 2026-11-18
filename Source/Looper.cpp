@@ -1,4 +1,5 @@
 #include "Looper.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -154,7 +155,7 @@ bool Looper::copyLoops (LoopSet& set, juce::String& error)
 {
     if (isEmpty())
     {
-        error = "There are no loops to save.";
+        error = tr ("There are no loops to save.");
         return false;
     }
 
@@ -168,7 +169,7 @@ bool Looper::copyLoops (LoopSet& set, juce::String& error)
         if (juce::Time::getMillisecondCounter() > deadline)
         {
             freezeRequest = 0;
-            error = "The audio device is not running.";
+            error = tr ("The audio device is not running.");
             return false;
         }
 
@@ -178,7 +179,7 @@ bool Looper::copyLoops (LoopSet& set, juce::String& error)
     if (ack == -id)
     {
         freezeRequest = 0;
-        error = "Finish recording or overdubbing first.";
+        error = tr ("Finish recording or overdubbing first.");
         return false;
     }
 
@@ -230,7 +231,7 @@ bool Looper::loadLoops (const LoopSet& set, juce::String& error)
 {
     if (! isEmpty() || isLoading())
     {
-        error = "Clear all loops first.";
+        error = tr ("Clear all loops first.");
         return false;
     }
 
@@ -238,7 +239,7 @@ bool Looper::loadLoops (const LoopSet& set, juce::String& error)
 
     if (set.getNumLoops() == 0 || bpm < 20.0 || bpm > 400.0)
     {
-        error = "These loops can't be used (no loops, or tempo out of range).";
+        error = tr ("These loops can't be used (no loops, or tempo out of range).");
         return false;
     }
 
@@ -250,7 +251,7 @@ bool Looper::loadLoops (const LoopSet& set, juce::String& error)
     {
         if (loop.bars * barSamplesHere > maxTrackSamples())
         {
-            error = "A loop is longer than " + juce::String ((int) maxLoopSeconds) + " seconds.";
+            error = tr ("A loop is longer than {seconds} seconds.", (int) maxLoopSeconds);
             return false;
         }
     }

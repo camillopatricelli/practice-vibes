@@ -1,6 +1,7 @@
 #include "DrumEditor.h"
 #include "Theme.h"
 #include "Icons.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -32,17 +33,17 @@ public:
         for (int d = 0; d < numDrums; ++d)
         {
             auto& row = rows[(size_t) d];
-            row.mute.setButtonText ("M");
+            row.mute.setButtonText (tr ("M"));
             row.mute.setClickingTogglesState (true);
             row.mute.setColour (juce::TextButton::buttonOnColourId, theme::record());
-            row.mute.setTooltip (juce::String ("Mute the ") + juce::String (drumName ((Drum) d)).toLowerCase());
+            row.mute.setTooltip (tr ("Mute the {drum}", tr (drumName ((Drum) d)).toLowerCase()));
             row.mute.onClick = [this, d] { owner.drums.drumMuted[(size_t) d] = rows[(size_t) d].mute.getToggleState(); };
 
             row.volume.setSliderStyle (juce::Slider::LinearHorizontal);
             row.volume.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
             row.volume.setRange (0.0, 1.5, 0.01);
             row.volume.setDoubleClickReturnValue (true, DrumSequencer::defaultDrumGain ((Drum) d));
-            row.volume.setTooltip (juce::String (drumName ((Drum) d)) + " volume");
+            row.volume.setTooltip (tr ("{drum} volume", tr (drumName ((Drum) d))));
             row.volume.onValueChange = [this, d] { owner.drums.drumGains[(size_t) d] = (float) rows[(size_t) d].volume.getValue(); };
 
             addAndMakeVisible (row.mute);
@@ -87,7 +88,7 @@ public:
         {
             const auto r = rowArea (d);
             g.setColour (theme::text().withAlpha (owner.drums.drumMuted[(size_t) d].load() ? 0.35f : 0.8f));
-            g.drawText (drumName ((Drum) d), r.withWidth (labelWidth() - 4), juce::Justification::centredLeft, true);
+            g.drawText (tr (drumName ((Drum) d)), r.withWidth (labelWidth() - 4), juce::Justification::centredLeft, true);
 
             for (int step = 0; step < steps; ++step)
             {
@@ -219,22 +220,22 @@ DrumSection::DrumSection (AppEngine& e)
 {
     savedVersion = drums.getPattern();
 
-    styleLabel (title, "Drums");
+    styleLabel (title, tr ("Drums"));
     theme::styleHeader (title);
     styleLabel (status, {}, 0.6f);
     status.setMinimumHorizontalScale (0.6f);
 
     playButton.setClickingTogglesState (false);
     playButton.setColour (juce::TextButton::buttonOnColourId, theme::accent());
-    playButton.setTooltip ("Play the pattern with the metronome (starts it if needed): same tempo and bars as the loops.");
+    playButton.setTooltip (tr ("Play the pattern with the metronome (starts it if needed): same tempo and bars as the loops."));
     playButton.onClick = [this] { togglePlay(); };
 
-    patternButton.setTooltip ("Choose a pattern: the starter ones or your own");
+    patternButton.setTooltip (tr ("Choose a pattern: the starter ones or your own"));
     patternButton.onClick = [this] { showPatternMenu(); };
 
-    kitBox.addItem ("Acoustic kit", 1);
-    kitBox.addItem ("Electronic kit", 2);
-    kitBox.setTooltip ("Acoustic: a recorded drum kit. Electronic: a drum machine.");
+    kitBox.addItem (tr ("Acoustic kit"), 1);
+    kitBox.addItem (tr ("Electronic kit"), 2);
+    kitBox.setTooltip (tr ("Acoustic: a recorded drum kit. Electronic: a drum machine."));
     kitBox.onChange = [this]
     {
         drums.setKitType (kitBox.getSelectedId() == 2 ? DrumKitType::electronic : DrumKitType::acoustic);
@@ -245,10 +246,10 @@ DrumSection::DrumSection (AppEngine& e)
     volume.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
     volume.setRange (0.0, 1.5, 0.01);
     volume.setDoubleClickReturnValue (true, 0.8);
-    volume.setTooltip ("Drums volume");
+    volume.setTooltip (tr ("Drums volume"));
     volume.onValueChange = [this] { drums.gain = (float) volume.getValue(); };
 
-    clicksMutedButton.setTooltip ("Silence the metronome clicks (the clock keeps running, so the drums and loops stay in time).");
+    clicksMutedButton.setTooltip (tr ("Silence the metronome clicks (the clock keeps running, so the drums and loops stay in time)."));
     clicksMutedButton.onClick = [this]
     {
         metronome.clicksMuted = clicksMutedButton.getToggleState();
@@ -257,7 +258,7 @@ DrumSection::DrumSection (AppEngine& e)
             onClicksMutedChange();
     };
 
-    showButton.setTooltip ("Show or hide the pattern editor");
+    showButton.setTooltip (tr ("Show or hide the pattern editor"));
     showButton.onClick = [this] { setEditorShown (! editorShown); };
 
     for (auto* c : std::initializer_list<juce::Component*> { &title, &playButton, &patternButton, &kitBox, &volume,
@@ -265,22 +266,22 @@ DrumSection::DrumSection (AppEngine& e)
         addAndMakeVisible (*c);
 
     // Editor
-    styleLabel (stepsLabel, "Steps");
-    stepsBox.addItem ("8ths", 1);
-    stepsBox.addItem ("Triplets", 2);
-    stepsBox.addItem ("16ths", 3);
+    styleLabel (stepsLabel, tr ("Steps"));
+    stepsBox.addItem (tr ("8ths"), 1);
+    stepsBox.addItem (tr ("Triplets"), 2);
+    stepsBox.addItem (tr ("16ths"), 3);
     stepsBox.onChange = [this]
     {
         const auto& p = drums.getPattern();
         reshape (p.beatsPerBar, ticksForId (stepsBox.getSelectedId()), p.bars);
     };
 
-    styleLabel (swingLabel, "Swing");
+    styleLabel (swingLabel, tr ("Swing"));
     swingSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     swingSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
     swingSlider.setRange (0.5, 0.75, 0.01);
     swingSlider.setDoubleClickReturnValue (true, 0.5);
-    swingSlider.setTooltip ("Delays every second 8th (or 16th): left = straight, middle = shuffle");
+    swingSlider.setTooltip (tr ("Delays every second 8th (or 16th): left = straight, middle = shuffle"));
     swingSlider.onValueChange = [this]
     {
         auto p = drums.getPattern();
@@ -289,19 +290,19 @@ DrumSection::DrumSection (AppEngine& e)
         refreshControls();
     };
 
-    styleLabel (barsLabel, "Bars");
+    styleLabel (barsLabel, tr ("Bars"));
 
     for (auto bars : { 1, 2, 4, 8 })
         barsBox.addItem (juce::String (bars), bars);
 
-    barsBox.setTooltip ("Pattern length. It repeats over the loops; it starts again with the first loop.");
+    barsBox.setTooltip (tr ("Pattern length. It repeats over the loops; it starts again with the first loop."));
     barsBox.onChange = [this]
     {
         const auto& p = drums.getPattern();
         reshape (p.beatsPerBar, p.ticks, barsBox.getSelectedId());
     };
 
-    copyBarButton.setTooltip ("Copy the bar shown to every other bar of the pattern");
+    copyBarButton.setTooltip (tr ("Copy the bar shown to every other bar of the pattern"));
     copyBarButton.onClick = [this]
     {
         auto p = drums.getPattern();
@@ -310,7 +311,7 @@ DrumSection::DrumSection (AppEngine& e)
         refreshControls();
     };
 
-    clearButton.setTooltip ("Remove every note of the bar shown");
+    clearButton.setTooltip (tr ("Remove every note of the bar shown"));
     clearButton.onClick = [this]
     {
         for (int step = 0; step < DrumPattern::maxSteps; ++step)
@@ -320,12 +321,12 @@ DrumSection::DrumSection (AppEngine& e)
         refreshControls();
     };
 
-    saveButton.setTooltip ("Save this pattern under a name (Documents > Practice Vibes > Drum patterns)");
+    saveButton.setTooltip (tr ("Save this pattern under a name (Documents > Practice Vibes > Drum patterns)"));
     saveButton.onClick = [this] { saveAs(); };
-    deleteButton.setTooltip ("Delete this saved pattern");
+    deleteButton.setTooltip (tr ("Delete this saved pattern"));
     deleteButton.onClick = [this] { deleteCurrent(); };
 
-    styleLabel (hint, "Tap a step: on, accent, off. Right-click or hold: ghost note.", 0.5f);
+    styleLabel (hint, tr ("Tap a step: on, accent, off. Right-click or hold: ghost note."), 0.5f);
     hint.setFont (juce::FontOptions (12.0f));
 
     grid = std::make_unique<Grid> (*this);
@@ -367,7 +368,10 @@ juce::String DrumSection::displayName() const
 {
     const auto& p = drums.getPattern();
     const auto edited = ! p.sameNotes (savedVersion) || p.name != savedVersion.name;
-    return p.name + (edited ? " (edited)" : "");
+    const auto& starters = DrumPatterns::builtIn();
+    const auto isStarter = p.builtIn || std::any_of (starters.begin(), starters.end(), [&] (const DrumPattern& s) { return s.name == p.name; });
+    const auto name = isStarter ? tr (p.name) : p.name;
+    return edited ? tr ("{name} (edited)", name) : name;
 }
 
 //==============================================================================
@@ -377,16 +381,16 @@ void DrumSection::refreshControls()
     shownBar = juce::jlimit (0, p.bars - 1, shownBar);
 
     playButton.setToggleState (drums.enabled.load(), juce::dontSendNotification);
-    playButton.setButtonText (drums.enabled.load() ? "Stop drums" : "Play drums");
+    playButton.setButtonText (drums.enabled.load() ? tr ("Stop drums") : tr ("Play drums"));
     icons::setIcon (playButton, drums.enabled.load() ? icons::Icon::stop : icons::Icon::play, false);
-    patternButton.setButtonText ("Pattern: " + displayName());
+    patternButton.setButtonText (tr ("Pattern: {name}", displayName()));
     kitBox.setSelectedId (drums.getKitType() == DrumKitType::electronic ? 2 : 1, juce::dontSendNotification);
 
     if (! volume.isMouseButtonDown())
         volume.setValue (drums.gain.load(), juce::dontSendNotification);
 
     clicksMutedButton.setToggleState (metronome.clicksMuted.load(), juce::dontSendNotification);
-    showButton.setButtonText (editorShown ? "Hide pattern" : "Edit pattern");
+    showButton.setButtonText (editorShown ? tr ("Hide pattern") : tr ("Edit pattern"));
 
     stepsBox.setSelectedId (idForTicks (p.ticks), juce::dontSendNotification);
     barsBox.setSelectedId (p.bars, juce::dontSendNotification);
@@ -406,7 +410,7 @@ void DrumSection::refreshControls()
 
         for (int bar = 0; p.bars > 1 && bar < p.bars; ++bar)
         {
-            auto* tab = barTabs.add (new juce::TextButton ("Bar " + juce::String (bar + 1)));
+            auto* tab = barTabs.add (new juce::TextButton (tr ("Bar {n}", bar + 1)));
             tab->setColour (juce::TextButton::buttonOnColourId, theme::accent());
             tab->onClick = [this, bar] { setShownBar (bar); };
             addChildComponent (*tab);
@@ -475,24 +479,24 @@ void DrumSection::showPatternMenu()
     const auto user = DrumPatterns::loadUserPatterns();
     juce::PopupMenu menu;
 
-    menu.addSectionHeader ("Starter patterns");
+    menu.addSectionHeader (tr ("Starter patterns"));
 
     for (size_t i = 0; i < builtIn.size(); ++i)
-        menu.addItem ((int) i + 1, builtIn[i].name);
+        menu.addItem ((int) i + 1, tr (builtIn[i].name));
 
-    menu.addSectionHeader ("My patterns");
+    menu.addSectionHeader (tr ("My patterns"));
 
     if (user.empty())
-        menu.addItem (-1, "None saved yet: edit a pattern, then Save as...", false);
+        menu.addItem (-1, tr ("None saved yet: edit a pattern, then Save as..."), false);
 
     for (size_t i = 0; i < user.size(); ++i)
         menu.addItem (1000 + (int) i, user[i].name);
 
     menu.addSeparator();
-    menu.addItem (2000, "New empty pattern");
+    menu.addItem (2000, tr ("New empty pattern"));
 
    #if ! JUCE_IOS
-    menu.addItem (2001, "Show the patterns folder");
+    menu.addItem (2001, tr ("Show the patterns folder"));
    #endif
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (patternButton),
@@ -550,11 +554,11 @@ void DrumSection::choosePattern (const DrumPattern& chosen)
 
 void DrumSection::saveAs()
 {
-    auto* window = new juce::AlertWindow ("Save pattern", "Name:", juce::MessageBoxIconType::NoIcon, this);
+    auto* window = new juce::AlertWindow (tr ("Save pattern"), tr ("Name:"), juce::MessageBoxIconType::NoIcon, this);
     const auto& p = drums.getPattern();
-    window->addTextEditor ("name", p.builtIn || savedVersion.builtIn ? p.name + " (mine)" : p.name);
-    window->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
-    window->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    window->addTextEditor ("name", p.builtIn || savedVersion.builtIn ? tr ("{name} (mine)", tr (p.name)) : p.name);
+    window->addButton (tr ("Save"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
 
     window->enterModalState (true, juce::ModalCallbackFunction::create ([safeThis = SafePointer<DrumSection> (this), window] (int result)
     {
@@ -576,7 +580,8 @@ void DrumSection::saveAs()
 
             if (saved.failed())
             {
-                safeThis->status.setText ("Not saved: " + saved.getErrorMessage(), juce::dontSendNotification);
+                safeThis->status.setText (tr ("Not saved: {error}", saved.getErrorMessage()), juce::dontSendNotification);
+                safeThis->showsSaveError = true;
                 return;
             }
 
@@ -589,8 +594,8 @@ void DrumSection::saveAs()
         if (DrumPatterns::fileFor (name).existsAsFile() && name != safeThis->savedVersion.name)
         {
             juce::AlertWindow::showAsync (juce::MessageBoxOptions{}.withIconType (juce::MessageBoxIconType::QuestionIcon)
-                                              .withTitle ("Save pattern").withMessage ("A pattern called \"" + name + "\" exists. Replace it?")
-                                              .withButton ("Replace", 1).withButton ("Cancel", 0).withAssociatedComponent (safeThis.getComponent()),
+                                              .withTitle (tr ("Save pattern")).withMessage (tr ("A pattern called \"{name}\" exists. Replace it?", name))
+                                              .withButton (tr ("Replace"), 1).withButton (tr ("Cancel"), 0).withAssociatedComponent (safeThis.getComponent()),
                                           [save] (int r) { if (r == 1) save(); });
             return;
         }
@@ -604,8 +609,8 @@ void DrumSection::deleteCurrent()
     const auto name = drums.getPattern().name;
 
     juce::AlertWindow::showAsync (juce::MessageBoxOptions{}.withIconType (juce::MessageBoxIconType::WarningIcon)
-                                      .withTitle ("Delete pattern").withMessage ("Delete your pattern \"" + name + "\"? It keeps playing until you choose another.")
-                                      .withButton ("Delete", 1).withButton ("Cancel", 0).withAssociatedComponent (this),
+                                      .withTitle (tr ("Delete pattern")).withMessage (tr ("Delete your pattern \"{name}\"? It keeps playing until you choose another.", name))
+                                      .withButton (tr ("Delete"), 1).withButton (tr ("Cancel"), 0).withAssociatedComponent (this),
                                   [safeThis = SafePointer<DrumSection> (this), name] (int result)
     {
         if (safeThis == nullptr || result != 1)
@@ -648,12 +653,15 @@ void DrumSection::timerCallback()
     juce::String text;
 
     if (! drums.isKitReady())
-        text = "Loading the kit...";
+        text = tr ("Loading the kit...");
     else if (drums.enabled.load())
-        text = p.bars > 1 ? "Bar " + juce::String (juce::jmax (0, drums.getPlayingBar()) + 1) + " of " + juce::String (p.bars) : juce::String();
+        text = p.bars > 1 ? tr ("Bar {n} of {total}", juce::jmax (0, drums.getPlayingBar()) + 1, p.bars) : juce::String();
 
-    if (! status.getText().startsWith ("Not saved") || drums.enabled.load())
+    if (! showsSaveError || drums.enabled.load())
+    {
+        showsSaveError = false;
         status.setText (text, juce::dontSendNotification);
+    }
 
     // Playhead
     const auto playing = drums.getPlayingBar() * 1000 + drums.getPlayingStep();

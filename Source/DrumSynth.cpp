@@ -3,6 +3,7 @@
 // and six detuned square waves (the "808 metal") through high filters for hi-hats and cymbals.
 
 #include "DrumKit.h"
+#include "Localisation.h"
 
 #include <cmath>
 
@@ -290,14 +291,15 @@ namespace pv
     {
         switch (drum)
         {
-            case Drum::crash:     return "Crash";
-            case Drum::ride:      return "Ride";
-            case Drum::openHat:   return "Open hi-hat";
-            case Drum::closedHat: return "Closed hi-hat";
-            case Drum::tomHigh:   return "High tom";
-            case Drum::tomLow:    return "Low tom";
-            case Drum::snare:     return "Snare";
-            case Drum::kick:      return "Kick";
+            // English; shown with tr (drumName (...)).
+            case Drum::crash:     return i18n::key ("Crash");
+            case Drum::ride:      return i18n::key ("Ride");
+            case Drum::openHat:   return i18n::key ("Open hi-hat");
+            case Drum::closedHat: return i18n::key ("Closed hi-hat");
+            case Drum::tomHigh:   return i18n::key ("High tom");
+            case Drum::tomLow:    return i18n::key ("Low tom");
+            case Drum::snare:     return i18n::key ("Snare");
+            case Drum::kick:      return i18n::key ("Kick");
         }
 
         return "";

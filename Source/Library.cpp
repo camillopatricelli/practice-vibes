@@ -3,6 +3,7 @@
 #include "Take.h"
 #include "AppPaths.h"
 #include "FolderAccess.h"
+#include "Localisation.h"
 #include <regex>
 
 namespace pv
@@ -231,18 +232,18 @@ namespace
 
         for (auto& r : t.resources)
             if (hasWordStartingWith (resourceName (r), word))
-                return juce::String (juce::CharPointer_UTF8 ("in resource “")) + resourceName (r) + juce::String (juce::CharPointer_UTF8 ("”"));
+                return tr ("in resource {name}", quoted (resourceName (r)));
 
         for (auto& r : t.resources)
             if (anyStartsWith (r.tags, word))
-                return juce::String (juce::CharPointer_UTF8 ("tag on “")) + resourceName (r) + juce::String (juce::CharPointer_UTF8 ("”"));
+                return tr ("tag on {name}", quoted (resourceName (r)));
 
         if (hasWordStartingWith (t.description, word))
-            return juce::String ("in notes");
+            return tr ("in notes");
 
         for (auto& r : t.resources)
             if (hasWordStartingWith (r.description, word))
-                return juce::String (juce::CharPointer_UTF8 ("in notes of “")) + resourceName (r) + juce::String (juce::CharPointer_UTF8 ("”"));
+                return tr ("in notes of {name}", quoted (resourceName (r)));
 
         return std::nullopt;
     }
@@ -325,13 +326,13 @@ juce::String SongMark::describe() const
 
     if (isLoop())
     {
-        head << "Loop " << formatMarkTime (start) << "-" << formatMarkTime (end);
+        head << tr ("Loop {start}-{end}", formatMarkTime (start), formatMarkTime (end));
 
         if (speed > 0.0 && std::abs (speed - 1.0) > 0.001)
-            head << " at " << juce::roundToInt (speed * 100.0) << " %";
+            head << " " << tr ("at {percent} %", juce::roundToInt (speed * 100.0));
 
         if (std::abs (semitones) > 0.05)
-            head << (semitones > 0 ? " +" : " ") << juce::String (semitones, 1) << " st";
+            head << (semitones > 0 ? " +" : " ") << i18n::decimal (semitones, 1) << " " << tr ("st");
     }
     else
     {
@@ -346,9 +347,9 @@ juce::String Assignment::describe() const
     juce::StringArray parts;
 
     if (goal.isNotEmpty())          parts.add (goal);
-    if (targetBpm > 0.0)            parts.add ("target " + juce::String (juce::roundToInt (targetBpm)) + " bpm");
-    if (minutesPerDay > 0)          parts.add (juce::String (minutesPerDay) + " min a day");
-    if (nextLesson != juce::Time()) parts.add ("next lesson " + nextLesson.formatted ("%a %d %b"));
+    if (targetBpm > 0.0)            parts.add (tr ("target {bpm} bpm", juce::roundToInt (targetBpm)));
+    if (minutesPerDay > 0)          parts.add (tr ("{minutes} min a day", minutesPerDay));
+    if (nextLesson != juce::Time()) parts.add (tr ("next lesson {date}", i18n::date (nextLesson, "%a %d %b")));
 
     return parts.joinIntoString (middleDot());
 }
@@ -390,23 +391,25 @@ juce::String PracticeSummary::describe() const
     auto duration = [] (double seconds)
     {
         const auto minutes = juce::roundToInt (seconds / 60.0);
-        return minutes >= 60 ? juce::String (minutes / 60) + " h " + juce::String (minutes % 60) + " min"
-                             : juce::String (minutes) + " min";
+        return minutes >= 60 ? tr ("{hours} h {minutes} min", minutes / 60, minutes % 60)
+                             : tr ("{minutes} min", minutes);
     };
 
     juce::String text;
-    text << duration (totalSeconds) << " in " << (int) weeklySeconds.size() << " weeks ("
-         << sessions << (sessions == 1 ? " session)" : " sessions)");
+    text << trn ("{duration} in {weeks} weeks ({n} session)", "{duration} in {weeks} weeks ({n} sessions)", sessions,
+                 duration (totalSeconds), (int) weeklySeconds.size());
 
     if (firstBpm > 0.0 && lastBpm > 0.0)
-        text << middleDot() << "tempo " << juce::roundToInt (firstBpm) << (std::abs (firstBpm - lastBpm) >= 1.0 ? " -> " + juce::String (juce::roundToInt (lastBpm)) : juce::String()) << " bpm";
+        text << middleDot() << (std::abs (firstBpm - lastBpm) >= 1.0 ? tr ("tempo {first} -> {last} bpm", juce::roundToInt (firstBpm), juce::roundToInt (lastBpm))
+                                                                     : tr ("tempo {bpm} bpm", juce::roundToInt (firstBpm)));
 
     if (firstSpeed > 0.0 && lastSpeed > 0.0)
-        text << middleDot() << "song speed " << juce::roundToInt (firstSpeed * 100.0)
-             << (std::abs (firstSpeed - lastSpeed) >= 0.01 ? " -> " + juce::String (juce::roundToInt (lastSpeed * 100.0)) : juce::String()) << " %";
+        text << middleDot() << (std::abs (firstSpeed - lastSpeed) >= 0.01
+                                    ? tr ("song speed {first} -> {last} %", juce::roundToInt (firstSpeed * 100.0), juce::roundToInt (lastSpeed * 100.0))
+                                    : tr ("song speed {percent} %", juce::roundToInt (firstSpeed * 100.0)));
 
     if (streakDays > 1)
-        text << middleDot() << streakDays << " days in a row";
+        text << middleDot() << trn ("{n} day in a row", "{n} days in a row", streakDays);
 
     return text;
 }
@@ -524,16 +527,23 @@ bool Library::isTemporaryTopicFile (const juce::String& fileName)
 
 bool Library::isDefaultFolderName (const juce::String& folderName)
 {
-    static const std::regex pattern (R"(^New topic( \(\d+\))?$)", std::regex::icase);
-    return std::regex_match (folderName.toStdString(), pattern);
+    // "New topic" or "New topic (2)", in English or in the language in use (new topics get the translated name).
+    auto base = folderName.trim();
+    const auto open = base.lastIndexOf (" (");
+
+    if (base.endsWithChar (')') && open > 0 && open + 2 < base.length() - 1
+        && base.substring (open + 2, base.length() - 1).containsOnly ("0123456789"))
+        base = base.substring (0, open);
+
+    return base.equalsIgnoreCase ("New topic") || base.equalsIgnoreCase (tr ("New topic"));
 }
 
 juce::String Library::titleFromUrl (const juce::String& url)
 {
     switch (classifyUrl (url))
     {
-        case ResourceKind::youtube:    return "YouTube video";
-        case ResourceKind::googleDoc:  return "Google document";
+        case ResourceKind::youtube:    return tr ("YouTube video");
+        case ResourceKind::googleDoc:  return tr ("Google document");
         case ResourceKind::pdf: case ResourceKind::image: case ResourceKind::text: case ResourceKind::document:
         case ResourceKind::spreadsheet: case ResourceKind::presentation: case ResourceKind::audio: case ResourceKind::video:
         case ResourceKind::web: case ResourceKind::other:
@@ -797,7 +807,7 @@ Topic* Library::createTopic (const juce::String& title, const juce::String& topi
     auto cleanTitle = title.trim();
 
     if (cleanTitle.isEmpty())
-        cleanTitle = "New topic";
+        cleanTitle = tr ("New topic");
 
     auto folderName = juce::File::createLegalFileName (cleanTitle).trim().substring (0, 60).trim();
 

@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "PlayerProcessor.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -92,7 +93,7 @@ private:
     Mode mode = Mode::none;
 
     juce::Label title, message;
-    juce::TextButton actionButton, resetButton { "Reset" };
+    juce::TextButton actionButton, resetButton { tr ("Reset") };
     double progress = 0.0;
     juce::ProgressBar progressBar { progress };
 
@@ -100,7 +101,7 @@ private:
     {
         int stem = 0;
         juce::Label name;
-        juce::TextButton mute { "M" }, solo { "S" };
+        juce::TextButton mute { tr ("M") }, solo { tr ("S") };
         juce::Slider volume { juce::Slider::LinearHorizontal, juce::Slider::NoTextBox };
     };
 

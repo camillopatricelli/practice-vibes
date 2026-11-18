@@ -1,5 +1,6 @@
 #include "StemMixer.h"
 #include "Theme.h"
+#include "Localisation.h"
 
 #include <thread>
 
@@ -138,12 +139,12 @@ juce::String StemService::getStatus() const
     switch (job->phase.load())
     {
         case Job::downloading:
-            return "Downloading the separation model (first time only): " + mb (job->downloaded) + " of "
-                   + mb (job->total > 0 ? job->total.load() : StemSeparator::modelBytes) + " MB";
+            return tr ("Downloading the separation model (first time only): {done} of {total} MB",
+                       mb (job->downloaded), mb (job->total > 0 ? job->total.load() : StemSeparator::modelBytes));
         case Job::starting:
-            return "Starting the separation...";
+            return tr ("Starting the separation...");
         default:
-            return "Separating \"" + job->song->name + "\": " + juce::String (juce::roundToInt (job->progress * 100.0)) + " %";
+            return tr ("Separating \"{song}\": {percent} %", job->song->name, juce::roundToInt (job->progress * 100.0));
     }
 }
 
@@ -169,7 +170,7 @@ void StemService::timerCallback()
         else
         {
             part.deleteFile();
-            finish (juce::Result::fail ("couldn't download the separation model (check the internet connection)"));
+            finish (juce::Result::fail (tr ("couldn't download the separation model (check the internet connection)")));
         }
 
         return;
@@ -266,18 +267,18 @@ juce::String StemControls::describe() const
     for (auto s : Stems::displayOrder)
     {
         if (solo[(size_t) s])
-            soloed.add (Stems::fileStem (s));
+            soloed.add (Stems::displayName (s).toLowerCase());
         else if (mute[(size_t) s])
-            muted.add (Stems::fileStem (s));
+            muted.add (Stems::displayName (s).toLowerCase());
     }
 
     if (! soloed.isEmpty())
-        return soloed.joinIntoString (" + ") + " solo";
+        return tr ("{stems} solo", soloed.joinIntoString (" + "));
 
     if (! muted.isEmpty())
-        return muted.joinIntoString (", ") + " off";
+        return tr ("{stems} off", muted.joinIntoString (", "));
 
-    return "custom mix";
+    return tr ("custom mix");
 }
 
 juce::String StemControls::toString() const
@@ -356,7 +357,7 @@ StemMixer::StemMixer (Host& h) : host (h)
         for (auto* b : { &row->mute, &row->solo })
         {
             b->setClickingTogglesState (true);
-            b->setTooltip (b == &row->mute ? "Mute" : "Solo (only the soloed stems play)");
+            b->setTooltip (b == &row->mute ? tr ("Mute") : tr ("Solo (only the soloed stems play)"));
         }
 
         row->mute.setColour (juce::TextButton::buttonOnColourId, theme::record());
@@ -376,7 +377,7 @@ StemMixer::StemMixer (Host& h) : host (h)
 
         row->volume.setRange (0.0, 1.5, 0.01);
         row->volume.setDoubleClickReturnValue (true, 1.0);
-        row->volume.setTooltip ("Volume (double-click: back to 100 %)");
+        row->volume.setTooltip (tr ("Volume (double-click: back to 100 %)"));
         row->volume.onValueChange = [this, stem, r = row.get()]
         {
             host.getStemControls().volume[(size_t) stem] = (float) r->volume.getValue();
@@ -436,8 +437,8 @@ void StemMixer::update()
     if (newMode == Mode::busy)
     {
         progress = service.getProgress();
-        message.setText (service.getStatus() + (busyHere ? juce::String() : "\n\n(This is another song: its stems will be ready when you load it again.)")
-                             + "\n\nYou can go on practising meanwhile: it runs in the background.",
+        message.setText (service.getStatus() + (busyHere ? juce::String() : "\n\n" + tr ("(This is another song: its stems will be ready when you load it again.)"))
+                             + "\n\n" + tr ("You can go on practising meanwhile: it runs in the background."),
                          juce::dontSendNotification);
     }
 
@@ -465,49 +466,49 @@ void StemMixer::update()
     switch (mode)
     {
         case Mode::mixer:
-            title.setText ("Stems", juce::dontSendNotification);
+            title.setText (tr ("Stems"), juce::dontSendNotification);
             break;
 
         case Mode::busy:
-            title.setText ("Separating stems", juce::dontSendNotification);
-            actionButton.setButtonText ("Cancel");
+            title.setText (tr ("Separating stems"), juce::dontSendNotification);
+            actionButton.setButtonText (tr ("Cancel"));
             actionButton.onClick = [this] { host.getStemService().cancel(); };
             break;
 
         case Mode::loading:
-            title.setText ("Stems", juce::dontSendNotification);
-            message.setText ("Loading the stems...", juce::dontSendNotification);
+            title.setText (tr ("Stems"), juce::dontSendNotification);
+            message.setText (tr ("Loading the stems..."), juce::dontSendNotification);
             break;
 
         case Mode::offer:
         {
-            title.setText ("Separate into stems", juce::dontSendNotification);
-            juce::String text = "Splits this song into vocals, guitar, bass, drums, piano and other, so you can mute "
-                                "or solo any of them (speed, pitch and loops keep working).\n\n"
-                                "It runs in the background and takes a few minutes. The stems are kept with the "
-                                "song (about 30 MB for 4 minutes; Storage and clean-up can remove them).";
+            title.setText (tr ("Separate into stems"), juce::dontSendNotification);
+            juce::String text = tr ("Splits this song into vocals, guitar, bass, drums, piano and other, so you can mute "
+                                    "or solo any of them (speed, pitch and loops keep working).\n\n"
+                                    "It runs in the background and takes a few minutes. The stems are kept with the "
+                                    "song (about 30 MB for 4 minutes; Storage and clean-up can remove them).");
 
             if (! StemSeparator::hasModel())
-                text << "\n\nThe first time, the separation model is downloaded (115 MB).";
+                text << "\n\n" << tr ("The first time, the separation model is downloaded (115 MB).");
 
             if (const auto error = host.getStemService().getLastError(); error.isNotEmpty())
-                text << "\n\nLast attempt failed: " << error;
+                text << "\n\n" << tr ("Last attempt failed: {error}", error);
 
             message.setText (text, juce::dontSendNotification);
-            actionButton.setButtonText ("Separate stems");
+            actionButton.setButtonText (tr ("Separate stems"));
             actionButton.onClick = [this] { host.separateCurrentSong(); update(); };
             break;
         }
 
         case Mode::unavailable:
         case Mode::none:
-            title.setText ("Stems", juce::dontSendNotification);
+            title.setText (tr ("Stems"), juce::dontSendNotification);
            #if JUCE_IOS
-            message.setText ("Stem separation runs in the Windows and Mac apps. Stems made there reach the iPad with the song "
-                             "through the library folder, and then show up here.", juce::dontSendNotification);
+            message.setText (tr ("Stem separation runs in the Windows and Mac apps. Stems made there reach the iPad with the song "
+                             "through the library folder, and then show up here."), juce::dontSendNotification);
            #else
-            message.setText (host.getStemFolder() == juce::File() ? "Load a song file first (YouTube videos can't be separated)."
-                                                                  : "Stem separation isn't available in this copy of the app (the ONNX Runtime library is missing).",
+            message.setText (host.getStemFolder() == juce::File() ? tr ("Load a song file first (YouTube videos can't be separated).")
+                                                                  : tr ("Stem separation isn't available in this copy of the app (the ONNX Runtime library is missing)."),
                              juce::dontSendNotification);
            #endif
             break;

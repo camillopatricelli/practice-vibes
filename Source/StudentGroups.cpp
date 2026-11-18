@@ -1,4 +1,5 @@
 #include "StudentGroups.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -173,7 +174,7 @@ juce::String StudentGroups::describeSends (const Library& library, const juce::S
             const auto* copy = findMemberCopy (library, send->sharedId, g.id, member);
 
             if (copy != nullptr && copy->lastReceived != juce::Time())
-                back.add (member + " (" + copy->lastReceived.formatted ("%d %b") + ")");
+                back.add (member + " (" + i18n::date (copy->lastReceived, "%d %b") + ")");
             else
                 waiting.add (member);
         }
@@ -181,13 +182,14 @@ juce::String StudentGroups::describeSends (const Library& library, const juce::S
         if (lastSent == juce::Time())
             continue;
 
-        juce::String line = "Sent to " + g.name + " on " + lastSent.formatted ("%d %b") + ".";
+        juce::String line = tr ("Sent to {group} on {date}.", g.name, i18n::date (lastSent, "%d %b"));
 
         if (! back.isEmpty())
-            line << " Back from " << back.joinIntoString (", ") << ".";
+            line << " " << tr ("Back from {names}.", back.joinIntoString (", "));
 
         if (! waiting.isEmpty())
-            line << (back.isEmpty() ? " Nothing back yet from " : " Not yet: ") << waiting.joinIntoString (", ") << ".";
+            line << " " << (back.isEmpty() ? tr ("Nothing back yet from {names}.", waiting.joinIntoString (", "))
+                                           : tr ("Not yet: {names}.", waiting.joinIntoString (", ")));
 
         lines.add (line);
     }

@@ -13,6 +13,7 @@
 #include "Theme.h"
 #include "WebView.h"
 #include "AppPaths.h"
+#include "Localisation.h"
 #include "BluetoothMidiView.h"
 #include <AppIconData.h>
 
@@ -53,7 +54,7 @@ public:
         logView.setColour (juce::TextEditor::backgroundColourId, theme::panel());
         addAndMakeVisible (logView);
 
-        pathLabel.setText ("Log file: " + appLog.getFile().getFullPathName(), juce::dontSendNotification);
+        pathLabel.setText (tr ("Log file: {path}", appLog.getFile().getFullPathName()), juce::dontSendNotification);
         pathLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.6f));
         pathLabel.setMinimumHorizontalScale (0.5f);
         addAndMakeVisible (pathLabel);
@@ -97,7 +98,7 @@ private:
     AppLog& appLog;
     juce::TextEditor logView;
     juce::Label pathLabel;
-    juce::TextButton copyButton { "Copy log" };
+    juce::TextButton copyButton { tr ("Copy log") };
     bool dirty = true;
 };
 
@@ -197,7 +198,7 @@ private:
     }
 
     juce::Label title;
-    juce::TextButton closeButton { "Close" };
+    juce::TextButton closeButton { tr ("Close") };
     std::unique_ptr<juce::Component> content;
     juce::Rectangle<int> contentArea;
     bool laying = false;
@@ -226,16 +227,16 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     addChildComponent (teachingButton);
     teachingButton.onClick = [this] { setTeaching (! teaching); };
 
-    practisingButton.setTooltip ("What you're practising: played time is logged to this topic (see the Today tab)");
+    practisingButton.setTooltip (tr ("What you're practising: played time is logged to this topic (see the Today tab)"));
     practisingButton.onClick = [this] { showPractisingMenu(); };
 
     audioSettingsButton.onClick = [this] { openAudioSettings(); };
     tunerButton.onClick = [this] { toggleTuner(); };
-    tunerButton.setTooltip ("Chromatic tuner (a footswitch can open and close it too)");
+    tunerButton.setTooltip (tr ("Chromatic tuner (a footswitch can open and close it too)"));
     engine.onToggleTuner = [this] { toggleTuner(); };
     recordButton.onClick = [this] { toggleRecording(); };
-    recordButton.setTooltip ("Record yourself (your instrument after the rig) into the topic you're practising. "
-                             "Open the take later to hear it over the song, in step. A footswitch can do this too.");
+    recordButton.setTooltip (tr ("Record yourself (your instrument after the rig) into the topic you're practising. "
+                             "Open the take later to hear it over the song, in step. A footswitch can do this too."));
     engine.onToggleRecording = [this] { toggleRecording(); };
     engine.onToggleStem = [this] (int stem)
     {
@@ -262,13 +263,13 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
 
     // Top bar icons (as in the mock-up): Tuner keeps its label; settings, Bluetooth and Save are icon-only.
     icons::setIcon (tunerButton, icons::Icon::tuner, false);
-    audioSettingsButton.setTooltip ("Audio settings (devices, theme, Log tab)");
+    audioSettingsButton.setTooltip (tr ("Audio settings (devices, theme, Log tab)"));
     icons::setIcon (audioSettingsButton, icons::Icon::gear, true);
     if (bluetoothButton.getTooltip().isEmpty())
-        bluetoothButton.setTooltip ("Bluetooth MIDI (pair a footswitch)");
+        bluetoothButton.setTooltip (tr ("Bluetooth MIDI (pair a footswitch)"));
     icons::setIcon (bluetoothButton, icons::Icon::bluetooth, true);
     if (saveButton.getTooltip().isEmpty())
-        saveButton.setTooltip ("Save (settings, rig and session)");
+        saveButton.setTooltip (tr ("Save (settings, rig and session)"));
     icons::setIcon (saveButton, icons::Icon::save, true);
 
     todayPanel = std::make_unique<TodayPanel> (tracker, session);
@@ -409,12 +410,12 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
 
     tabs.setTabBarDepth (42);
     tabs.setOutline (0);
-    tabs.addTab ("Today", theme::background(), todayPanel.get(), false);
-    tabs.addTab ("Practice", theme::background(), practicePanel.get(), false);
-    tabs.addTab ("Topics", theme::background(), libraryPanel.get(), false);
-    tabs.addTab ("Links", theme::background(), linksPanel.get(), false);
-    tabs.addTab ("Looper", theme::background(), looperPanel.get(), false);
-    tabs.addTab ("Rig", theme::background(), rigPanel.get(), false);
+    tabs.addTab (tr ("Today"), theme::background(), todayPanel.get(), false);
+    tabs.addTab (tr ("Practice"), theme::background(), practicePanel.get(), false);
+    tabs.addTab (tr ("Topics"), theme::background(), libraryPanel.get(), false);
+    tabs.addTab (tr ("Links"), theme::background(), linksPanel.get(), false);
+    tabs.addTab (tr ("Looper"), theme::background(), looperPanel.get(), false);
+    tabs.addTab (tr ("Rig"), theme::background(), rigPanel.get(), false);
     addAndMakeVisible (tabs);
 
     // TabbedComponent brings the new panel to front *with* keyboard focus. A panel that doesn't take the focus
@@ -780,7 +781,7 @@ void MainComponent::updatePractisingButton()
 {
     practisingButtonCountdown = 10;   // once a second
     const auto active = tracker.getActiveTopicId().isNotEmpty();
-    auto text = active ? tracker.getActiveTopicTitle() : juce::String ("Free practice");
+    auto text = active ? tracker.getActiveTopicTitle() : tr ("Free practice");
 
     if (active && tracker.getActiveSeconds() >= 30.0)
         text << "  -  " << formatPracticeDuration (tracker.getActiveSeconds());
@@ -790,26 +791,27 @@ void MainComponent::updatePractisingButton()
         const auto n = (int) session.getSlots().size();
         text = juce::String (session.getIndex() + 1) + "/" + juce::String (n) + "  " + slot->title + "  -  "
              + formatClock (juce::jmax (0.0, session.getRemainingSeconds()))
-             + (session.isPaused() ? (tracker.isStartButtonMode() && tracker.isPaused() ? "  (paused: Start on the Today tab)"
-                                      : tracker.isTimedByHand() ? "  (paused: Resume on the Today tab)" : "  (paused: play to continue)") : "");
+             + (session.isPaused() ? "  " + (tracker.isStartButtonMode() && tracker.isPaused() ? tr ("(paused: Start on the Today tab)")
+                                             : tracker.isTimedByHand() ? tr ("(paused: Resume on the Today tab)") : tr ("(paused: play to continue)"))
+                                   : juce::String());
 
         if (session.isTimeUp())
-            text = session.getNext() != nullptr ? "Time's up - next: " + session.getNext()->title
-                                                : juce::String ("Time's up - finish the session");
+            text = session.getNext() != nullptr ? tr ("Time's up - next: {title}", session.getNext()->title)
+                                                : tr ("Time's up - finish the session");
     }
 
     juce::String prefix;
 
     if (tracker.isTimedByHand())
-        prefix = tracker.isPaused() ? "(paused) " : "(timing) ";
+        prefix = (tracker.isPaused() ? tr ("(paused)") : tr ("(timing)")) + " ";
     else if (tracker.isPlaying() && ! session.isTimeUp())
-        prefix = "(playing) ";
+        prefix = tr ("(playing)") + " ";
 
     if (teaching)
     {
-        prefix = "Lesson: ";
-        text = active ? tracker.getActiveTopicTitle() : juce::String ("no topic");
-        text << "  (not logged)";
+        prefix = tr ("Lesson:") + " ";
+        text = active ? tracker.getActiveTopicTitle() : tr ("no topic");
+        text << "  " << tr ("(not logged)");
     }
 
     practisingButton.setButtonText (prefix + text);
@@ -862,9 +864,9 @@ void MainComponent::offerToShareLesson (const juce::String& topicId)
         return;
 
     juce::AlertWindow::showAsync (juce::MessageBoxOptions{}.withIconType (juce::MessageBoxIconType::QuestionIcon)
-                                      .withTitle ("Lesson over")
-                                      .withMessage ("Send " + quoted (topic->title) + " to your student?")
-                                      .withButton ("Share...", 1).withButton ("Not now", 0)
+                                      .withTitle (tr ("Lesson over"))
+                                      .withMessage (tr ("Send {title} to your student?", quoted (topic->title)))
+                                      .withButton (tr ("Share..."), 1).withButton (tr ("Not now"), 0)
                                       .withAssociatedComponent (this),
                                   [safe = SafePointer<MainComponent> (this), topicId] (int result)
     {
@@ -891,9 +893,9 @@ void MainComponent::setTeacherSetting (bool on)
 void MainComponent::updateTeachingButton()
 {
     teachingButton.setVisible (teacherSetting);
-    teachingButton.setButtonText (teaching ? "Teaching: tap to stop" : "Teaching");
-    teachingButton.setTooltip (teaching ? "Lesson mode is on: nothing goes to your practice log. Tap when the lesson is over."
-                                        : "Start a lesson: the app works as usual but nothing goes to your practice log");
+    teachingButton.setButtonText (teaching ? tr ("Teaching: tap to stop") : tr ("Teaching"));
+    teachingButton.setTooltip (teaching ? tr ("Lesson mode is on: nothing goes to your practice log. Tap when the lesson is over.")
+                                        : tr ("Start a lesson: the app works as usual but nothing goes to your practice log"));
 
     if (teaching)
     {
@@ -914,19 +916,19 @@ void MainComponent::showPractisingMenu()
     if (session.isRunning())
     {
         if (const auto* next = session.getNext())
-            menu.addItem ("Next topic: " + next->title, [this] { sessionNext(); });
+            menu.addItem (tr ("Next topic: {title}", next->title), [this] { sessionNext(); });
         else
-            menu.addItem ("Finish the session", [this] { sessionNext(); });
+            menu.addItem (tr ("Finish the session"), [this] { sessionNext(); });
 
-        menu.addItem ("5 more minutes", [this] { sessionExtend(); });
-        menu.addItem ("End the session", [this] { sessionEnd(); });
+        menu.addItem (tr ("5 more minutes"), [this] { sessionExtend(); });
+        menu.addItem (tr ("End the session"), [this] { sessionEnd(); });
         menu.addSeparator();
     }
 
-    menu.addItem ("Open the Today tab", [this] { showTab (todayPanel.get()); });
+    menu.addItem (tr ("Open the Today tab"), [this] { showTab (todayPanel.get()); });
 
     if (tracker.getActiveTopicId().isNotEmpty())
-        menu.addItem ("Stop practising \"" + tracker.getActiveTopicTitle() + "\"", [this]
+        menu.addItem (tr ("Stop practising \"{title}\"", tracker.getActiveTopicTitle()), [this]
         {
             tracker.setActiveTopic ({}, {});
             updatePractisingButton();
@@ -945,11 +947,11 @@ void MainComponent::showPractisingMenu()
 
         if (topics.getNumItems() > 0)
         {
-            menu.addSubMenu ("Practise a rotation topic", topics);
+            menu.addSubMenu (tr ("Practise a rotation topic"), topics);
 
             if (! session.isRunning())
             {
-                menu.addItem ("Plan a session...", [this] { openSessionPlanner ({}); });
+                menu.addItem (tr ("Plan a session..."), [this] { openSessionPlanner ({}); });
 
                 if (auto* plans = savedPlans(); plans != nullptr && ! plans->getPlans().empty())
                 {
@@ -958,13 +960,13 @@ void MainComponent::showPractisingMenu()
                     for (auto& p : plans->getPlans())
                         planMenu.addItem (p.name, [this, id = p.id] { startSavedPlan (id); });
 
-                    menu.addSubMenu ("Start a saved plan", planMenu);
+                    menu.addSubMenu (tr ("Start a saved plan"), planMenu);
                 }
             }
         }
         else
         {
-            menu.addItem ("No topics in the practice rotation yet", false, false, [] {});
+            menu.addItem (tr ("No topics in the practice rotation yet"), false, false, [] {});
         }
     }
 
@@ -989,7 +991,7 @@ std::vector<PlanCandidate> MainComponent::rotationCandidates (const juce::String
 
         for (auto& t : lib->getTopics())
             if (t.inRotation && t.matchesTag (tag))
-                result.push_back ({ t.id, t.title.isNotEmpty() ? t.title : juce::String ("(untitled)"),
+                result.push_back ({ t.id, t.title.isNotEmpty() ? t.title : tr ("(untitled)"),
                                     neglectWeight (practiceLog != nullptr ? practiceLog->summarise (t.id).last : juce::Time(), now) });
     }
 
@@ -1080,7 +1082,7 @@ void MainComponent::openSessionPlanner (const juce::String& tag, const juce::Str
                 safe->startSession (slots);
         });
     };
-    showOverlay ("Plan a practice session", std::move (planner));
+    showOverlay (tr ("Plan a practice session"), std::move (planner));
 }
 
 void MainComponent::startSavedPlan (const juce::String& planId)
@@ -1174,7 +1176,7 @@ void MainComponent::showTopicHistory (const juce::String& topicId)
         TakeRow row;
         row.file = topic->getFile (r);
         row.when = row.file.getCreationTime();
-        row.title = "no backing";
+        row.title = tr ("no backing");
 
         if (const auto info = TakeInfo::load (row.file))
         {
@@ -1222,7 +1224,7 @@ void MainComponent::showTopicHistory (const juce::String& topicId)
                 safe->addLogTime (topicId, topicId);
         });
     };
-    showOverlay ("History: " + topic->title, std::move (history));
+    showOverlay (tr ("History: {title}", topic->title), std::move (history));
 }
 
 void MainComponent::showAllHistory()
@@ -1236,7 +1238,7 @@ void MainComponent::showAllHistory()
 
     if (auto* lib = libraryPanel->getLibrary())
         for (auto& t : lib->getTopics())
-            titles[t.id] = t.title.isNotEmpty() ? t.title : juce::String ("(untitled)");
+            titles[t.id] = t.title.isNotEmpty() ? t.title : tr ("(untitled)");
 
     const juce::String allId (TopicHistory::allTopicsId);
     auto history = std::make_unique<TopicHistory> (*practiceLog, allId, std::vector<TakeRow> {}, titles);
@@ -1266,7 +1268,7 @@ void MainComponent::showAllHistory()
                 safe->addLogTime ({}, allId);
         });
     };
-    showOverlay ("History: all topics", std::move (history));
+    showOverlay (tr ("History: all topics"), std::move (history));
 }
 
 void MainComponent::editLogEntry (const juce::String& entryId, const juce::String& historyTopicId)
@@ -1324,7 +1326,7 @@ void MainComponent::editLogEntry (const juce::String& entryId, const juce::Strin
         done();
     };
 
-    showOverlay ("Practice entry", std::move (editor));
+    showOverlay (tr ("Practice entry"), std::move (editor));
 }
 
 void MainComponent::offerAddToInbox (const juce::URL& song)
@@ -1347,12 +1349,12 @@ void MainComponent::offerAddToInbox (const juce::URL& song)
     const auto name = original != juce::File() ? original.getFileName() : juce::URL::removeEscapeChars (song.getFileName());
     auto options = juce::MessageBoxOptions{}
                        .withIconType (juce::MessageBoxIconType::QuestionIcon)
-                       .withTitle ("Add to your library?")
-                       .withMessage ("\"" + name + "\" isn't in your library folder.\n\n"
-                                     "Add a copy to the Topics Inbox? It then syncs to your other devices, and its stems "
-                                     "are kept next to it (stems you already made for it move along).")
-                       .withButton ("Add to Inbox", 1)
-                       .withButton ("Not now", 0)
+                       .withTitle (tr ("Add to your library?"))
+                       .withMessage (tr ("\"{name}\" isn't in your library folder.\n\n"
+                                         "Add a copy to the Topics Inbox? It then syncs to your other devices, and its stems "
+                                         "are kept next to it (stems you already made for it move along).", name))
+                       .withButton (tr ("Add to Inbox"), 1)
+                       .withButton (tr ("Not now"), 0)
                        .withAssociatedComponent (this);
 
     juce::AlertWindow::showAsync (options, [safe = SafePointer<MainComponent> (this), song, original, key, name] (int result)
@@ -1379,7 +1381,7 @@ void MainComponent::offerAddToInbox (const juce::URL& song)
         if (copy == juce::File())
         {
             juce::Logger::writeToLog ("Could not copy " + name + " into the library");
-            safe->practicePanel->showNote ("Could not copy the song into the library (details in the log)");
+            safe->practicePanel->showNote (tr ("Could not copy the song into the library (details in the log)"));
             return;
         }
 
@@ -1389,7 +1391,7 @@ void MainComponent::offerAddToInbox (const juce::URL& song)
         if (safe->practicePanel->getSongFile() == original)
             safe->practicePanel->songCopiedTo (copy);
 
-        safe->practicePanel->showNote ("Added to the Inbox: move it into a topic from the Topics tab");
+        safe->practicePanel->showNote (tr ("Added to the Inbox: move it into a topic from the Topics tab"));
         safe->libraryPanel->checkForChanges();
     });
 }
@@ -1401,10 +1403,10 @@ std::vector<std::pair<juce::String, juce::String>> MainComponent::logTopicChoice
     if (lib == nullptr)
         return {};
 
-    std::vector<std::pair<juce::String, juce::String>> choices { { {}, "Free practice" } }, topics;
+    std::vector<std::pair<juce::String, juce::String>> choices { { {}, tr ("Free practice") } }, topics;
 
     for (auto& t : lib->getTopics())
-        topics.push_back ({ t.id, t.title.isNotEmpty() ? t.title : juce::String ("(untitled)") });
+        topics.push_back ({ t.id, t.title.isNotEmpty() ? t.title : tr ("(untitled)") });
 
     std::sort (topics.begin(), topics.end(), [] (const auto& a, const auto& b) { return a.second.compareNatural (b.second) < 0; });
     choices.insert (choices.end(), topics.begin(), topics.end());
@@ -1481,7 +1483,7 @@ void MainComponent::addLogTime (const juce::String& topicId, const juce::String&
         done();
     };
 
-    showOverlay ("Add practice time", std::move (editor));
+    showOverlay (tr ("Add practice time"), std::move (editor));
 }
 
 void MainComponent::layoutYouTube()
@@ -1586,7 +1588,7 @@ void MainComponent::startRecording()
 
     if (device == nullptr || device->getActiveInputChannels().isZero())
     {
-        recordMessage = "No audio input";
+        recordMessage = tr ("No audio input");
         recordMessageCountdown = 30;
         juce::Logger::writeToLog ("Can't record a take: no audio input is open (see Audio settings)");
         return;
@@ -1619,7 +1621,7 @@ void MainComponent::startRecording()
 
     if (! engine.recorder->start (recordingFile, device->getCurrentSampleRate(), engine.looper->getCompensationSamples(), error))
     {
-        recordMessage = "Can't record";
+        recordMessage = tr ("Can't record");
         recordMessageCountdown = 30;
         juce::Logger::writeToLog ("Can't record a take: " + error);
         return;
@@ -1646,7 +1648,7 @@ void MainComponent::stopRecording (bool waitForFile)
     if (result.seconds < minimumTakeSeconds)
     {
         result.file.deleteFile();
-        recordMessage = "Too short: < " + juce::String ((int) minimumTakeSeconds) + " s";
+        recordMessage = tr ("Too short: < {seconds} s", (int) minimumTakeSeconds);
         recordMessageCountdown = 30;
         juce::Logger::writeToLog ("Take not saved: " + juce::String (result.seconds, 1) + " s is under the "
                                   + juce::String ((int) minimumTakeSeconds) + " s minimum");
@@ -1705,7 +1707,7 @@ void MainComponent::stopRecording (bool waitForFile)
                                   + juce::String (saved.getSize() / 1024) + " KB"
                                   + (usesSong ? ", in step with " + songName : juce::String()) + ") to "
                                   + saved.getParentDirectory().getFullPathName());
-        recordMessage = "Take saved";
+        recordMessage = tr ("Take saved");
         recordMessageCountdown = 30;
         libraryPanel->checkForChanges();
         updateRecordButton();
@@ -1718,7 +1720,7 @@ void MainComponent::stopRecording (bool waitForFile)
         return;
     }
 
-    recordMessage = "Saving...";
+    recordMessage = tr ("Saving...");
     recordMessageCountdown = 600;
     updateRecordButton();
 
@@ -1737,6 +1739,7 @@ void MainComponent::stopRecording (bool waitForFile)
 void MainComponent::updateRecordButton()
 {
     juce::String text;
+    bool showsRec = false;
 
     if (engine.recorder->isRecording())
     {
@@ -1758,11 +1761,12 @@ void MainComponent::updateRecordButton()
         }
         else
         {
-            text = "Rec";       // with the red dot icon
+            text = tr ("Rec");       // with the red dot icon
+            showsRec = true;
         }
     }
 
-    icons::setIcon (recordButton, text == "Rec" ? icons::Icon::record : icons::Icon::none, false);
+    icons::setIcon (recordButton, showsRec ? icons::Icon::record : icons::Icon::none, false);
 
     if (recordButton.getButtonText() != text)
         recordButton.setButtonText (text);
@@ -1809,7 +1813,7 @@ void MainComponent::openAudioSettings()
         {
             for (auto* child : c.getChildren())
             {
-                if (auto* b = dynamic_cast<juce::TextButton*> (child); b != nullptr && b->getButtonText().containsIgnoreCase ("Bluetooth"))
+                if (auto* b = dynamic_cast<juce::TextButton*> (child); b != nullptr && b->getButtonText().containsIgnoreCase ("Bluetooth"))    // JUCE's TRANS ("Bluetooth MIDI"): translations must keep "Bluetooth"
                     b->onClick = [safe = juce::Component::SafePointer<MainComponent> (this)]
                     {
                         juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->openBluetoothMidi(); });
@@ -1839,11 +1843,11 @@ void MainComponent::openAudioSettings()
               onMidiDevice (std::move (setMidiDevice))
         {
             // Which MIDI input's notes count as playing (a MIDI keyboard; the footswitch's messages never count).
-            midiLabel.setText ("MIDI notes", juce::dontSendNotification);
+            midiLabel.setText (tr ("MIDI notes"), juce::dontSendNotification);
             midiLabel.setJustificationType (juce::Justification::centredRight);
             addAndMakeVisible (midiLabel);
-            midiBox.setTooltip ("Notes played on a MIDI keyboard count as practice time, like sound on the input. "
-                                "Choose one device if other MIDI gear (a pad, a sequencer) sends notes too.");
+            midiBox.setTooltip (tr ("Notes played on a MIDI keyboard count as practice time, like sound on the input. "
+                                "Choose one device if other MIDI gear (a pad, a sequencer) sends notes too."));
             midiBox.onChange = [this]
             {
                 const auto id = midiBox.getSelectedId();
@@ -1858,12 +1862,12 @@ void MainComponent::openAudioSettings()
             addAndMakeVisible (midiBox);
 
             // Practice log: how time is counted from this input (a microphone hears the room too).
-            timingLabel.setText ("Practice log", juce::dontSendNotification);
+            timingLabel.setText (tr ("Practice log"), juce::dontSendNotification);
             timingLabel.setJustificationType (juce::Justification::centredRight);
             addAndMakeVisible (timingLabel);
 
-            timingBox.setTooltip ("How practice time is counted with this input. A microphone also hears talking and "
-                                  "other room noise, so by default it counts only between Start and Pause (Today tab).");
+            timingBox.setTooltip (tr ("How practice time is counted with this input. A microphone also hears talking and "
+                                  "other room noise, so by default it counts only between Start and Pause (Today tab)."));
             timingBox.onChange = [this]
             {
                 if (shownInput.name.isNotEmpty() && timingBox.getSelectedId() > 0)
@@ -1881,10 +1885,10 @@ void MainComponent::openAudioSettings()
             startTimer (500);   // follows device changes made in the selector below
 
             getProperties().set ("overlayWidth", 760);
-            getProperties().set ("overlayHeight", 930);
+            getProperties().set ("overlayHeight", 970);
 
-            displayHeader.setText ("Display", juce::dontSendNotification);
-            audioHeader.setText ("Audio and MIDI", juce::dontSendNotification);
+            displayHeader.setText (tr ("Display"), juce::dontSendNotification);
+            audioHeader.setText (tr ("Audio and MIDI"), juce::dontSendNotification);
             for (auto* h : { &displayHeader, &audioHeader })
             {
                 theme::styleHeader (*h);
@@ -1894,27 +1898,27 @@ void MainComponent::openAudioSettings()
 
             addAndMakeVisible (*selector);
             logToggle.setToggleState (logShown, juce::dontSendNotification);
-            logToggle.setTooltip ("A tab with everything the app writes to its log, for troubleshooting");
+            logToggle.setTooltip (tr ("A tab with everything the app writes to its log, for troubleshooting"));
             logToggle.onClick = [this, onLog] { onLog (logToggle.getToggleState()); };
             addAndMakeVisible (logToggle);
 
             teacherToggle.setToggleState (teacher, juce::dontSendNotification);
-            teacherToggle.setTooltip ("Shows a Teaching switch in the top bar: during a lesson the app works as usual "
-                                      "but nothing goes to your practice log");
+            teacherToggle.setTooltip (tr ("Shows a Teaching switch in the top bar: during a lesson the app works as usual "
+                                      "but nothing goes to your practice log"));
             teacherToggle.onClick = [this, onTeacher] { onTeacher (teacherToggle.getToggleState()); };
             addAndMakeVisible (teacherToggle);
 
-            themeLabel.setText ("Theme", juce::dontSendNotification);
+            themeLabel.setText (tr ("Theme"), juce::dontSendNotification);
             themeLabel.setJustificationType (juce::Justification::centredRight);
             addAndMakeVisible (themeLabel);
 
             // Ids: 1 + theme::Mode
-            themeBox.addItem ("Dark", 1 + (int) theme::Mode::dark);
-            themeBox.addItem ("Light", 1 + (int) theme::Mode::light);
+            themeBox.addItem (tr ("Dark"), 1 + (int) theme::Mode::dark);
+            themeBox.addItem (tr ("Light"), 1 + (int) theme::Mode::light);
            #if JUCE_MAC || JUCE_IOS
-            themeBox.addItem ("Follow the system (Appearance setting)", 1 + (int) theme::Mode::system);
+            themeBox.addItem (tr ("Follow the system (Appearance setting)"), 1 + (int) theme::Mode::system);
            #else
-            themeBox.addItem ("Follow the system (Windows app mode)", 1 + (int) theme::Mode::system);
+            themeBox.addItem (tr ("Follow the system (Windows app mode)"), 1 + (int) theme::Mode::system);
            #endif
             themeBox.setSelectedId (1 + (int) theme::getMode(), juce::dontSendNotification);
             themeBox.onChange = [this]
@@ -1924,6 +1928,39 @@ void MainComponent::openAudioSettings()
                 theme::setMode (mode);
             };
             addAndMakeVisible (themeBox);
+
+            // Language: id 1 = follow the device, then one id per available language. Applies at the next start.
+            languageLabel.setText (tr ("Language"), juce::dontSendNotification);
+            languageLabel.setJustificationType (juce::Justification::centredRight);
+            addAndMakeVisible (languageLabel);
+
+            const auto languages = i18n::availableLanguages (getAppDataFolder());
+            languageCodes = languages.getAllKeys();
+            languageBox.addItem (tr ("Device language"), 1);
+
+            for (int i = 0; i < languageCodes.size(); ++i)
+                languageBox.addItem (languages[languageCodes[i]], i + 2);
+
+            juce::String chosen;
+
+            if (auto ui = juce::parseXML (getUiSettingsFile()))
+                chosen = ui->getStringAttribute ("language");
+
+            languageBox.setSelectedId (chosen.isEmpty() || ! languageCodes.contains (chosen) ? 1 : languageCodes.indexOf (chosen) + 2,
+                                       juce::dontSendNotification);
+            languageBox.setTooltip (tr ("The language of the app. Words musicians use everywhere (Looper, Loop) and note names stay as they are."));
+            languageBox.onChange = [this]
+            {
+                const auto id = languageBox.getSelectedId();
+                saveUiSetting ("language", id >= 2 ? languageCodes[id - 2] : juce::String());
+                languageInfo.setText (tr ("Restart the app to apply the new language."), juce::dontSendNotification);
+            };
+            addAndMakeVisible (languageBox);
+
+            languageInfo.setColour (juce::Label::textColourId, theme::text().withAlpha (0.6f));
+            languageInfo.setFont (juce::FontOptions (13.0f));
+            languageInfo.setMinimumHorizontalScale (0.7f);
+            addAndMakeVisible (languageInfo);
         }
 
         void paint (juce::Graphics& g) override
@@ -1944,6 +1981,13 @@ void MainComponent::openAudioSettings()
             themeLabel.setBounds (row.removeFromLeft (110));
             row.removeFromLeft (10);
             themeBox.setBounds (row.removeFromLeft (juce::jmin (340, row.getWidth())));
+
+            auto languageRow = r.removeFromTop (40).reduced (0, 4);
+            languageLabel.setBounds (languageRow.removeFromLeft (110));
+            languageRow.removeFromLeft (10);
+            languageBox.setBounds (languageRow.removeFromLeft (juce::jmin (340, languageRow.getWidth())));
+            languageRow.removeFromLeft (12);
+            languageInfo.setBounds (languageRow);
 
             r.removeFromTop (18);
             audioHeader.setBounds (r.removeFromTop (30));
@@ -1980,11 +2024,11 @@ void MainComponent::openAudioSettings()
             shownMidiInputs = inputs;
             shownMidiDevice = chosen;
             midiBox.clear (juce::dontSendNotification);
-            midiBox.addItem ("From any MIDI input", 1);
-            midiBox.addItem ("Don't count MIDI notes", 2);
+            midiBox.addItem (tr ("From any MIDI input"), 1);
+            midiBox.addItem (tr ("Don't count MIDI notes"), 2);
 
             for (int i = 0; i < inputs.size(); ++i)
-                midiBox.addItem ("Only from " + inputs[i] + (midiInputs().contains (inputs[i]) ? "" : " (not connected)"), i + 3);
+                midiBox.addItem (midiInputs().contains (inputs[i]) ? tr ("Only from {device}", inputs[i]) : tr ("Only from {device} (not connected)", inputs[i]), i + 3);
 
             midiBox.setSelectedId (chosen == PracticeInputSettings::anyMidi ? 1
                                    : chosen == PracticeInputSettings::noMidi ? 2
@@ -2003,20 +2047,21 @@ void MainComponent::openAudioSettings()
 
             if (info.kind == InputKind::none)
             {
-                timingBox.setTextWhenNothingSelected ("No audio input open");
+                timingBox.setTextWhenNothingSelected (tr ("No audio input open"));
                 timingBox.setEnabled (false);
-                timingInfo.setText ("MIDI keyboard notes still count as playing", juce::dontSendNotification);
+                timingInfo.setText (tr ("MIDI keyboard notes still count as playing"), juce::dontSendNotification);
                 return;
             }
 
             const auto mic = info.kind == InputKind::microphone;
-            timingBox.addItem (juce::String ("Default for this input: ") + (mic ? "with Start / Pause" : "automatic"), 1 + (int) PracticeTiming::byInputType);
-            timingBox.addItem ("Automatic: count the time I play", 1 + (int) PracticeTiming::automatic);
-            timingBox.addItem ("Only between Start and Pause (Today tab)", 1 + (int) PracticeTiming::startButton);
-            timingBox.addItem ("Only MIDI keyboard notes (ignore the sound)", 1 + (int) PracticeTiming::midiNotes);
+            timingBox.addItem (mic ? tr ("Default for this input: with Start / Pause") : tr ("Default for this input: automatic"), 1 + (int) PracticeTiming::byInputType);
+            timingBox.addItem (tr ("Automatic: count the time I play"), 1 + (int) PracticeTiming::automatic);
+            timingBox.addItem (tr ("Only between Start and Pause (Today tab)"), 1 + (int) PracticeTiming::startButton);
+            timingBox.addItem (tr ("Only MIDI keyboard notes (ignore the sound)"), 1 + (int) PracticeTiming::midiNotes);
             timingBox.setSelectedId (1 + (int) timingFor (info.name), juce::dontSendNotification);
             timingBox.setEnabled (true);
-            timingInfo.setText ("\"" + info.name + "\" looks like " + (mic ? "a microphone: it hears the room too" : "an audio interface"),
+            timingInfo.setText (mic ? tr ("\"{name}\" looks like a microphone: it hears the room too", info.name)
+                                    : tr ("\"{name}\" looks like an audio interface", info.name),
                                 juce::dontSendNotification);
         }
 
@@ -2036,12 +2081,15 @@ void MainComponent::openAudioSettings()
 
         juce::Label displayHeader, audioHeader;
         std::unique_ptr<juce::Component> selector;
-        juce::ToggleButton logToggle { "Show the Log tab" }, teacherToggle { "I teach" };
+        juce::ToggleButton logToggle { tr ("Show the Log tab") }, teacherToggle { tr ("I teach") };
         juce::Label themeLabel;
         juce::ComboBox themeBox;
+        juce::Label languageLabel, languageInfo;
+        juce::ComboBox languageBox;
+        juce::StringArray languageCodes;
     };
 
-    showOverlay ("Audio settings", std::make_unique<Settings> (std::move (selector), isLogTabShown(),
+    showOverlay (tr ("Audio settings"), std::make_unique<Settings> (std::move (selector), isLogTabShown(),
                                                                [this] (bool shown)
                                                                {
                                                                    setLogTabShown (shown);
@@ -2091,7 +2139,7 @@ void MainComponent::setLogTabShown (bool shown)
 
     if (shown)
     {
-        tabs.addTab ("Log", theme::background(), logPanel.get(), false);
+        tabs.addTab (tr ("Log"), theme::background(), logPanel.get(), false);
         return;
     }
 
@@ -2116,19 +2164,19 @@ namespace
             getProperties().set ("overlayWidth", 560);
             getProperties().set ("overlayHeight", 240);
 
-            header.setText ("Pair a Bluetooth MIDI device", juce::dontSendNotification);
+            header.setText (tr ("Pair a Bluetooth MIDI device"), juce::dontSendNotification);
             theme::styleHeader (header);
             header.setColour (juce::Label::textColourId, theme::text());
             addAndMakeVisible (header);
 
             body.setText (
                          #if JUCE_WINDOWS
-                          "Windows pairs Bluetooth devices itself. Switch the footswitch on, then add it in "
-                          "Windows Settings > Bluetooth & devices. Once it's paired, it shows up under MIDI inputs "
-                          "in the audio settings.",
+                          tr ("Windows pairs Bluetooth devices itself. Switch the footswitch on, then add it in "
+                              "Windows Settings > Bluetooth & devices. Once it's paired, it shows up under MIDI inputs "
+                              "in the audio settings."),
                          #else
-                          "Pair the footswitch in the system's Bluetooth settings. Once it's paired, it shows up "
-                          "under MIDI inputs in the audio settings.",
+                          tr ("Pair the footswitch in the system's Bluetooth settings. Once it's paired, it shows up "
+                              "under MIDI inputs in the audio settings."),
                          #endif
                           juce::dontSendNotification);
             body.setFont (theme::textFont (16.0f));
@@ -2161,7 +2209,7 @@ namespace
         }
 
         juce::Label header, body;
-        juce::TextButton openButton { "Open Bluetooth settings" };
+        juce::TextButton openButton { tr ("Open Bluetooth settings") };
     };
 }
 
@@ -2170,7 +2218,7 @@ void MainComponent::openBluetoothMidi()
     // iPad: the system's device list in our own overlay card, themed like the rest of the app.
     if (auto view = createBluetoothMidiView())
     {
-        showOverlay ("Bluetooth MIDI", std::move (view));
+        showOverlay (tr ("Bluetooth MIDI"), std::move (view));
         return;
     }
 
@@ -2182,7 +2230,7 @@ void MainComponent::openBluetoothMidi()
     }
 
     // Windows: pairing happens in Windows Settings.
-    showOverlay ("Bluetooth MIDI", std::make_unique<BluetoothMidiInfo>());
+    showOverlay (tr ("Bluetooth MIDI"), std::make_unique<BluetoothMidiInfo>());
 }
 
 void MainComponent::toggleTuner()
@@ -2190,7 +2238,7 @@ void MainComponent::toggleTuner()
     if (overlay->isVisible() && dynamic_cast<TunerPanel*> (overlay->getContent()) != nullptr)
         closeOverlay();
     else
-        showOverlay ("Tuner", std::make_unique<TunerPanel> (engine));
+        showOverlay (tr ("Tuner"), std::make_unique<TunerPanel> (engine));
 }
 
 void MainComponent::showOverlay (const juce::String& title, std::unique_ptr<juce::Component> content)

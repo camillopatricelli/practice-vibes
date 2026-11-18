@@ -2,6 +2,7 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "AppEngine.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -48,20 +49,20 @@ private:
 
     std::unique_ptr<ListModel> catalogueModel, chainModel;
     juce::ListBox catalogueList, chainList;
-    juce::TextButton addButton { "Add to chain" }, scanButton { "Scan VST3" };
+    juce::TextButton addButton { tr ("Add to chain") }, scanButton { tr ("Scan VST3") };
     juce::Label catalogueStatus, chainHint;
 
-    juce::TextButton editButton { "Open UI" }, bypassButton { "Bypass" },
-                     upButton { "Up" }, downButton { "Down" }, removeButton { "Remove" };
+    juce::TextButton editButton { tr ("Open UI") }, bypassButton { tr ("Bypass") },
+                     upButton { tr ("Up") }, downButton { tr ("Down") }, removeButton { tr ("Remove") };
 
     juce::ComboBox inputChannelBox;
     std::unique_ptr<LevelMeter> inputMeter, outputMeter;
     juce::Slider inputGainSlider, outputGainSlider;
     juce::Label inputGainLabel, outputGainLabel;
-    juce::ToggleButton monitorButton { "Monitor input (use headphones!)" };
+    juce::ToggleButton monitorButton { tr ("Monitor input (use headphones!)") };
 
     juce::Label midiDevicesLabel, lastMidiLabel;
-    juce::TextButton footswitchButton { "Footswitch setup..." };
+    juce::TextButton footswitchButton { tr ("Footswitch setup...") };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RigPanel)
 };

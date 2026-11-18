@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "AppEngine.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -28,7 +29,7 @@ private:
     Footswitch& footswitch;
 
     juce::Label intro, devicesLabel;
-    juce::TextButton learnAllButton { "Learn A-D in a row" }, defaultsButton { "Default actions" };
+    juce::TextButton learnAllButton { tr ("Learn A-D in a row") }, defaultsButton { tr ("Default actions") };
     std::array<std::unique_ptr<SwitchRow>, Footswitch::numSwitches> rows;
     bool learningAll = false;
     int learnAllIndex = 0;

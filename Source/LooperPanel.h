@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "AppEngine.h"
 #include "DrumEditor.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -39,23 +40,23 @@ private:
     MetronomeProcessor& metronome;
 
     juce::Label header, hintLabel, tempoDisplay, latencyLabel;
-    juce::TextButton afterFxButton { "After FX" }, beforeFxButton { "Before FX" };
+    juce::TextButton afterFxButton { tr ("After FX") }, beforeFxButton { tr ("Before FX") };
     juce::Label sourceLabel, lengthLabel, tempoLabel, beatsLabel, offsetLabel;
     juce::ComboBox lengthBox, beatsBox;
     juce::Slider tempoSlider, offsetSlider;
-    juce::TextButton metronomeButton { "Start metronome" }, undoButton { "Undo overdub" },
-                     muteAllButton { "Mute all" }, clearAllButton { "Clear all" },
-                     footswitchButton { "Footswitch..." };
+    juce::TextButton metronomeButton { tr ("Start metronome") }, undoButton { tr ("Undo overdub") },
+                     muteAllButton { tr ("Mute all") }, clearAllButton { tr ("Clear all") },
+                     footswitchButton { tr ("Footswitch...") };
     std::unique_ptr<BeatDots> beatDots;
 
     // Latency calibration: play muted strums on the clicks (or loop the output back to the input).
-    juce::TextButton calibrateButton { "Calibrate..." };
+    juce::TextButton calibrateButton { tr ("Calibrate...") };
     bool calibrating = false, stopMetronomeAfterCalibration = false, followSongBefore = false, clicksMutedBefore = false;
     std::vector<double> calibrationLags;
     double calibrationStartMs = 0.0, calibrationMessageMs = 0.0;
     juce::String calibrationMessage;
     // Saving / loading loops (folders under LoopFiles::getLoopsFolder())
-    juce::TextButton saveButton { "Save loops" }, loadButton { "Load loops..." };
+    juce::TextButton saveButton { tr ("Save loops") }, loadButton { tr ("Load loops...") };
     juce::String fileMessage;
     double fileMessageMs = 0.0;
     void saveLoops();

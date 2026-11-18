@@ -27,6 +27,7 @@
 #include "../Source/StudentGroups.h"
 #include "../Source/Tuner.h"
 #include "../Source/GainMeterProcessor.h"
+#include "../Source/Localisation.h"
 
 #include <iostream>
 #include <map>
@@ -4938,6 +4939,59 @@ static void testTopicShare()
     }
 }
 
+static void testLocalisation()
+{
+    std::cout << "Localisation" << std::endl;
+
+    // English (no mappings): text unchanged, slots filled, plurals, dates, decimals.
+    i18n::setLanguageForTests ("en", nullptr);
+    check (tr ("Start") == "Start", "en: plain text unchanged");
+    check (tr ("Bar {n} of {total}", 3, 8) == "Bar 3 of 8", "en: slots filled in order");
+    check (tr ("{a} and {a}", "x") == "x and x", "en: a repeated slot gets the same value");
+    check (trn ("{n} bar", "{n} bars", 1) == "1 bar" && trn ("{n} bar", "{n} bars", 4) == "4 bars", "en: plural forms");
+    check (trn ("{n} bar in {name}", "{n} bars in {name}", 2, "Song") == "2 bars in Song", "en: plural with an extra slot");
+    check (trc ("short month", "May") == "May", "en: context key falls back to the English text");
+    const auto day = juce::Time (2026, 10, 17, 12, 0);     // Tue 17 Nov 2026 (months count from 0)
+    check (i18n::date (day, "%a %d %b %Y") == "Tue 17 Nov 2026", "en: date names");
+    check (i18n::date (day, "%A %d %B, %H:%M") == "Tuesday 17 November, 12:00", "en: long names and time");
+    check (i18n::decimal (1.5, 1) == "1.5" && i18n::number (120.0, 1) == "120" && i18n::number (92.5, 2) == "92.5",
+           "en: decimal point, trailing zeros dropped");
+
+    // A translation: reordered slots, plural forms, context keys, translated date format and names.
+    auto* it = new juce::LocalisedStrings (juce::String (
+        "language: Italiano\n"
+        "countries: it\n"
+        "\"Start\" = \"Avvia\"\n"
+        "\"Bar {n} of {total}\" = \"{total} battute, ora la {n}\"\n"
+        "\"{n} bar|{n} bars\" = \"{n} battuta|{n} battute\"\n"
+        "\"short month::May\" = \"mag\"\n"
+        "\"short month::Nov\" = \"nov\"\n"
+        "\"short weekday::Tue\" = \"mar\"\n"
+        "\"date format::%a %d %b %Y\" = \"%a %d %b %Y\"\n"), false);
+    i18n::setLanguageForTests ("it", it);
+    check (tr ("Start") == "Avvia", "it: translated");
+    check (tr ("Bar {n} of {total}", 3, 8).startsWith ("8 battute") && tr ("Bar {n} of {total}", 3, 8).endsWith ("la 3"),
+           "it: translator reordered the slots");
+    check (tr ("Not translated yet") == "Not translated yet", "it: missing key falls back to English");
+    check (trn ("{n} bar", "{n} bars", 1) == "1 battuta" && trn ("{n} bar", "{n} bars", 0) == "0 battute", "it: plural forms");
+    check (trc ("short month", "May") == "mag", "it: context key");
+    check (i18n::date (day, "%a %d %b %Y") == "mar 17 nov 2026", "it: date names");
+    check (i18n::decimal (1.5, 1) == "1,5" && i18n::number (1.25, 2) == "1,25", "it: decimal comma");
+
+    i18n::setLanguageForTests ("fr", nullptr);
+    check (trn ("{n} bar", "{n} bars", 0) == "0 bar", "fr rule: zero takes the singular form");
+
+    // Pseudo: accented, longer, bracketed; slots and date codes stay intact, values are not accented.
+    i18n::setLanguageForTests (i18n::pseudoCode, nullptr);
+    const auto pseudo = tr ("Bar {n} of {total}", 3, 8);
+    check (pseudo.startsWith ("[") && pseudo.endsWith ("]") && pseudo.contains ("3") && pseudo.contains ("8")
+           && ! pseudo.contains ("Bar") && pseudo.length() > juce::String ("Bar 3 of 8").length(), "pseudo: " + pseudo);
+    check (trn ("{n} take", "{n} takes", 2).contains ("2"), "pseudo plural: " + trn ("{n} take", "{n} takes", 2));
+    check (i18n::date (day, "%d %b").startsWith ("17 ["), "pseudo date: " + i18n::date (day, "%d %b"));
+
+    i18n::setLanguageForTests ("en", nullptr);
+}
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI juceInit;
@@ -4980,6 +5034,7 @@ int main()
     testTakes();
     testStorage();
     testStems();
+    testLocalisation();
 
     std::cout << (failures == 0 ? "ALL TESTS PASSED" : juce::String (failures) + " TEST(S) FAILED") << std::endl;
     return failures == 0 ? 0 : 1;

@@ -1,5 +1,6 @@
 #include "PracticeViews.h"
 #include "Theme.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -72,13 +73,13 @@ public:
         minutesBox.onChange = [this] { if (onMinutes) onMinutes (minutesBox.getSelectedId()); };
         rerollButton.onClick = [this] { if (onReroll) onReroll(); };
         removeButton.onClick = [this] { if (onRemove) onRemove(); };
-        rerollButton.setTooltip ("Another rotation topic (neglected ones come up more often)");
+        rerollButton.setTooltip (tr ("Another rotation topic (neglected ones come up more often)"));
 
         randomButton.setClickingTogglesState (true);
         randomButton.setToggleState (slot.random, juce::dontSendNotification);
         randomButton.setColour (juce::TextButton::buttonOnColourId, theme::accent());
-        randomButton.setTooltip ("On: in a saved plan this slot picks a rotation topic again every time the plan is used. "
-                                 "Off: the plan keeps this topic.");
+        randomButton.setTooltip (tr ("On: in a saved plan this slot picks a rotation topic again every time the plan is used. "
+                                 "Off: the plan keeps this topic."));
         randomButton.onClick = [this] { if (onRandom) onRandom (randomButton.getToggleState()); };
 
         for (auto* c : std::initializer_list<juce::Component*> { &minutesBox, &randomButton, &rerollButton, &removeButton })
@@ -130,18 +131,18 @@ private:
     juce::String title, tag;
     bool missing;
     juce::ComboBox minutesBox;
-    juce::TextButton randomButton { "Random" }, rerollButton { "Re-roll" }, removeButton { "X" };
+    juce::TextButton randomButton { tr ("Random") }, rerollButton { tr ("Re-roll") }, removeButton { tr ("X") };
 };
 
 SessionPlanner::SessionPlanner (CandidatesFn fn, TopicTitleFn titles, PlanList* planList, const juce::StringArray& tags,
                                 int minutes, const juce::String& tag, const juce::String& planId)
     : candidatesFor (std::move (fn)), titleOf (std::move (titles)), plans (planList)
 {
-    addAndMakeVisible (styleCaption (planLabel, "Plan"));
-    addAndMakeVisible (styleCaption (timeLabel, "I have"));
-    addAndMakeVisible (styleCaption (focusLabel, "Focus"));
+    addAndMakeVisible (styleCaption (planLabel, tr ("Plan")));
+    addAndMakeVisible (styleCaption (timeLabel, tr ("I have")));
+    addAndMakeVisible (styleCaption (focusLabel, tr ("Focus")));
 
-    planBox.setTooltip ("Plan on the spot, or start from one of your saved plans");
+    planBox.setTooltip (tr ("Plan on the spot, or start from one of your saved plans"));
     planBox.onChange = [this]
     {
         const auto i = planBox.getSelectedId() - 100;
@@ -153,11 +154,11 @@ SessionPlanner::SessionPlanner (CandidatesFn fn, TopicTitleFn titles, PlanList* 
     };
     addAndMakeVisible (planBox);
 
-    saveButton.setTooltip ("Keep this session as a named plan (stored with the library, so your other devices get it too)");
+    saveButton.setTooltip (tr ("Keep this session as a named plan (stored with the library, so your other devices get it too)"));
     saveButton.onClick = [this] { showSaveMenu(); };
     addAndMakeVisible (saveButton);
 
-    planMenuButton.setTooltip ("Rename, duplicate or delete the saved plan");
+    planMenuButton.setTooltip (tr ("Rename, duplicate or delete the saved plan"));
     planMenuButton.onClick = [this] { showPlanMenu(); };
     addAndMakeVisible (planMenuButton);
 
@@ -168,7 +169,7 @@ SessionPlanner::SessionPlanner (CandidatesFn fn, TopicTitleFn titles, PlanList* 
     timeBox.onChange = [this] { replan(); };
     addAndMakeVisible (timeBox);
 
-    focusBox.addItem ("All rotation topics", 1);
+    focusBox.addItem (tr ("All rotation topics"), 1);
 
     for (int i = 0; i < tags.size(); ++i)
         focusBox.addItem ("#" + tags[i], i + 2);
@@ -176,11 +177,11 @@ SessionPlanner::SessionPlanner (CandidatesFn fn, TopicTitleFn titles, PlanList* 
     const auto tagIndex = tags.indexOf (tag, true);
     focusBox.setSelectedId (tagIndex >= 0 ? tagIndex + 2 : 1, juce::dontSendNotification);
     focusBox.onChange = [this] { replan(); };
-    focusBox.setTooltip ("Only topics with this tag (on the topic or one of its resources)");
+    focusBox.setTooltip (tr ("Only topics with this tag (on the topic or one of its resources)"));
     addAndMakeVisible (focusBox);
 
     shuffleButton.onClick = [this] { replan(); };
-    shuffleButton.setTooltip ("Plan on the spot again (neglected topics come up more often)");
+    shuffleButton.setTooltip (tr ("Plan on the spot again (neglected topics come up more often)"));
     addAndMakeVisible (shuffleButton);
 
     addButton.onClick = [this] { showAddMenu(); };
@@ -199,7 +200,7 @@ SessionPlanner::SessionPlanner (CandidatesFn fn, TopicTitleFn titles, PlanList* 
 
     emptyLabel.setColour (juce::Label::textColourId, axisText());
     emptyLabel.setJustificationType (juce::Justification::centred);
-    emptyLabel.setText ("No rotation topics to pick from. Tick \"In practice rotation\" on topics in the Topics tab.",
+    emptyLabel.setText (tr ("No rotation topics to pick from. Tick \"In practice rotation\" on topics in the Topics tab."),
                         juce::dontSendNotification);
     addChildComponent (emptyLabel);
 
@@ -270,13 +271,13 @@ void SessionPlanner::loadPlan (const juce::String& planId)
 void SessionPlanner::refreshPlanBox()
 {
     planBox.clear (juce::dontSendNotification);
-    planBox.addItem ("Plan on the spot", 1);
+    planBox.addItem (tr ("Plan on the spot"), 1);
     int selected = 1;
 
     if (plans != nullptr && ! plans->getPlans().empty())
     {
         planBox.addSeparator();
-        planBox.addSectionHeading ("Saved plans");
+        planBox.addSectionHeading (tr ("Saved plans"));
 
         for (size_t i = 0; i < plans->getPlans().size(); ++i)
         {
@@ -296,7 +297,7 @@ void SessionPlanner::refreshPlanBox()
     saveButton.setEnabled (plans != nullptr);
 
     if (plans == nullptr)
-        saveButton.setTooltip ("Choose a library folder first: plans are kept in it");
+        saveButton.setTooltip (tr ("Choose a library folder first: plans are kept in it"));
 
     planMenuButton.setEnabled (loadedPlan() != nullptr);
 }
@@ -362,19 +363,19 @@ void SessionPlanner::rebuildRows()
 void SessionPlanner::updateTotal()
 {
     const auto playable = playableSlots (slots);
-    totalLabel.setText (playable.empty() ? juce::String() : "Total: " + juce::String (totalMinutes (playable)) + " min, "
-                                                              + juce::String ((int) playable.size()) + (playable.size() == 1 ? " topic" : " topics"),
+    totalLabel.setText (playable.empty() ? juce::String() : trn ("Total: {minutes} min, {n} topic", "Total: {minutes} min, {n} topics",
+                                                                 (int) playable.size(), totalMinutes (playable)),
                         juce::dontSendNotification);
     startButton.setEnabled (! playable.empty());
 
     juce::StringArray notes;
 
     if (playable.size() < slots.size())
-        notes.add ("Missing topics are skipped (Re-roll or X to fix them)");
+        notes.add (tr ("Missing topics are skipped (Re-roll or X to fix them)"));
 
     if (const auto* plan = loadedPlan())
-        notes.add (edited ? "Changed for today - \"" + plan->name + "\" stays as saved unless you save it"
-                          : "Saved plan \"" + plan->name + "\"");
+        notes.add (edited ? tr ("Changed for today - \"{name}\" stays as saved unless you save it", plan->name)
+                          : tr ("Saved plan \"{name}\"", plan->name));
 
     statusLabel.setText (notes.joinIntoString (". "), juce::dontSendNotification);
 
@@ -405,7 +406,7 @@ void SessionPlanner::showAddMenu()
     };
 
     juce::PopupMenu menu;
-    menu.addItem ("Roll the dice", [this, used, addPick] { addPick (pickWeighted (candidates, random, used)); });
+    menu.addItem (tr ("Roll the dice"), [this, used, addPick] { addPick (pickWeighted (candidates, random, used)); });
     menu.addSeparator();
 
     for (int i = 0; i < (int) candidates.size(); ++i)
@@ -417,10 +418,10 @@ void SessionPlanner::showAddMenu()
 
 void SessionPlanner::askName (const juce::String& title, const juce::String& initial, std::function<void (juce::String)> done)
 {
-    auto* window = new juce::AlertWindow (title, "Name:", juce::MessageBoxIconType::NoIcon, this);
+    auto* window = new juce::AlertWindow (title, tr ("Name:"), juce::MessageBoxIconType::NoIcon, this);
     window->addTextEditor ("name", initial);
-    window->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
-    window->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    window->addButton (tr ("Save"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
 
     window->enterModalState (true, juce::ModalCallbackFunction::create ([safe = SafePointer<SessionPlanner> (this), window, done] (int result)
     {
@@ -465,8 +466,8 @@ void SessionPlanner::saveAsNew (const juce::String& name)
     if (plans->findByName (name) != nullptr && (loadedPlan() == nullptr || ! loadedPlan()->name.equalsIgnoreCase (name)))
     {
         juce::AlertWindow::showAsync (juce::MessageBoxOptions{}.withIconType (juce::MessageBoxIconType::QuestionIcon)
-                                          .withTitle ("Save plan").withMessage ("A plan called \"" + name + "\" exists. Replace it?")
-                                          .withButton ("Replace", 1).withButton ("Cancel", 0).withAssociatedComponent (this),
+                                          .withTitle (tr ("Save plan")).withMessage (tr ("A plan called \"{name}\" exists. Replace it?", name))
+                                          .withButton (tr ("Replace"), 1).withButton (tr ("Cancel"), 0).withAssociatedComponent (this),
                                       [store] (int r) { if (r == 1) store(); });
         return;
     }
@@ -481,7 +482,7 @@ void SessionPlanner::showSaveMenu()
 
     auto askNew = [this]
     {
-        askName ("Save as plan", plans->uniqueName (juce::String (totalMinutes (slots)) + " min plan"),
+        askName (tr ("Save as plan"), plans->uniqueName (tr ("{minutes} min plan", totalMinutes (slots))),
                  [this] (juce::String name) { saveAsNew (name); });
     };
 
@@ -494,7 +495,7 @@ void SessionPlanner::showSaveMenu()
     }
 
     juce::PopupMenu menu;
-    menu.addItem ("Save changes to \"" + plan->name + "\"", edited, false, [this]
+    menu.addItem (tr ("Save changes to \"{name}\"", plan->name), edited, false, [this]
     {
         plans->reloadIfChanged();
 
@@ -505,7 +506,7 @@ void SessionPlanner::showSaveMenu()
             updateTotal();
         }
     });
-    menu.addItem ("Save as a new plan...", askNew);
+    menu.addItem (tr ("Save as a new plan..."), askNew);
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&saveButton));
 }
 
@@ -519,15 +520,15 @@ void SessionPlanner::showPlanMenu()
     const auto id = plan->id, name = plan->name;
     juce::PopupMenu menu;
 
-    menu.addItem ("Rename...", [this, id, name]
+    menu.addItem (tr ("Rename..."), [this, id, name]
     {
-        askName ("Rename plan", name, [this, id] (juce::String newName)
+        askName (tr ("Rename plan"), name, [this, id] (juce::String newName)
         {
             plans->reloadIfChanged();
 
             if (const auto* other = plans->findByName (newName); other != nullptr && other->id != id)
             {
-                statusLabel.setText ("There's already a plan called \"" + newName + "\"", juce::dontSendNotification);
+                statusLabel.setText (tr ("There's already a plan called \"{name}\"", newName), juce::dontSendNotification);
                 return;
             }
 
@@ -537,7 +538,7 @@ void SessionPlanner::showPlanMenu()
         });
     });
 
-    menu.addItem ("Duplicate", [this, id]
+    menu.addItem (tr ("Duplicate"), [this, id]
     {
         plans->reloadIfChanged();
         const auto copy = plans->duplicate (id);
@@ -546,11 +547,11 @@ void SessionPlanner::showPlanMenu()
             loadPlan (copy);
     });
 
-    menu.addItem ("Delete...", [this, id, name]
+    menu.addItem (tr ("Delete..."), [this, id, name]
     {
         juce::AlertWindow::showAsync (juce::MessageBoxOptions{}.withIconType (juce::MessageBoxIconType::WarningIcon)
-                                          .withTitle ("Delete plan").withMessage ("Delete the plan \"" + name + "\"? Your practice log is not affected.")
-                                          .withButton ("Delete", 1).withButton ("Cancel", 0).withAssociatedComponent (this),
+                                          .withTitle (tr ("Delete plan")).withMessage (tr ("Delete the plan \"{name}\"? Your practice log is not affected.", name))
+                                          .withButton (tr ("Delete"), 1).withButton (tr ("Cancel"), 0).withAssociatedComponent (this),
                                       [safe = SafePointer<SessionPlanner> (this), id] (int result)
         {
             if (safe == nullptr || result != 1 || safe->plans == nullptr)
@@ -662,10 +663,10 @@ public:
         // X labels: first, last (and the middle when there's room).
         g.setColour (axisText());
         const auto labelY = plot.getBottom() + 4;
-        g.drawText (points.front().when.formatted ("%d %b"), plot.getX(), labelY, 80, 16, juce::Justification::centredLeft);
+        g.drawText (i18n::date (points.front().when, "%d %b"), plot.getX(), labelY, 80, 16, juce::Justification::centredLeft);
 
         if (points.size() > 1)
-            g.drawText (points.back().when.formatted ("%d %b"), plot.getRight() - 80, labelY, 80, 16, juce::Justification::centredRight);
+            g.drawText (i18n::date (points.back().when, "%d %b"), plot.getRight() - 80, labelY, 80, 16, juce::Justification::centredRight);
 
         // Line, then markers with a surface ring so overlapping dots stay distinct.
         if (points.size() > 1)
@@ -702,12 +703,12 @@ public:
         labelPoint (g, points.back(), "now " + format (points.back().value));
 
         if (best != points.end() - 1 && best->value > points.back().value)
-            labelPoint (g, *best, "best " + format (best->value));
+            labelPoint (g, *best, tr ("best {value}", format (best->value)));
 
         if (juce::isPositiveAndBelow (hoverIndex, (int) points.size()))
         {
             const auto& p = points[(size_t) hoverIndex];
-            drawTooltip (g, posFor (p), p.when.formatted ("%a %d %b") + ": " + format (p.value) + ", "
+            drawTooltip (g, posFor (p), i18n::date (p.when, "%a %d %b") + ": " + format (p.value) + ", "
                                             + formatPracticeDuration (p.minutes * 60.0), getLocalBounds());
         }
     }
@@ -816,7 +817,7 @@ public:
         auto area = getLocalBounds();
         g.setColour (primaryText());
         g.setFont (juce::FontOptions (15.0f).withStyle ("Bold"));
-        g.drawText ("Minutes per week", area.removeFromTop (24), juce::Justification::centredLeft);
+        g.drawText (tr ("Minutes per week"), area.removeFromTop (24), juce::Justification::centredLeft);
 
         if (weeks.empty())
             return;
@@ -865,7 +866,7 @@ public:
             if (i == 0 || i == weeks.size() - 1 || (weeks.size() > 6 && i == weeks.size() / 2))
             {
                 g.setColour (axisText());
-                g.drawText (weekStart (i).formatted ("%d %b"), juce::roundToInt (x + w * 0.5f) - 40, plot.getBottom() + 4, 80, 16,
+                g.drawText (i18n::date (weekStart (i), "%d %b"), juce::roundToInt (x + w * 0.5f) - 40, plot.getBottom() + 4, 80, 16,
                             juce::Justification::centred);
             }
         }
@@ -875,8 +876,8 @@ public:
             const auto i = (size_t) hoverIndex;
             const auto x = (float) plot.getX() + slot * ((float) i + 0.5f);
             const auto h = (float) juce::jmap (weeks[i] / 60.0, 0.0, top, 0.0, (double) plot.getHeight());
-            drawTooltip (g, { x, (float) plot.getBottom() - h }, "Week of " + weekStart (i).formatted ("%d %b") + ": "
-                                                                    + formatPracticeDuration (weeks[i]), getLocalBounds());
+            drawTooltip (g, { x, (float) plot.getBottom() - h }, tr ("Week of {date}: {duration}", i18n::date (weekStart (i), "%d %b"),
+                                                                     formatPracticeDuration (weeks[i])), getLocalBounds());
         }
     }
 
@@ -934,7 +935,7 @@ public:
             for (auto i = maxRows; i < allRows.size(); ++i)
                 other.seconds += allRows[i].seconds;
 
-            other.title = "Other (" + juce::String ((int) rest) + " topics)";
+            other.title = trn ("Other ({n} topic)", "Other ({n} topics)", (int) rest);
             allRows.resize (maxRows);
             allRows.push_back (other);
         }
@@ -1094,9 +1095,9 @@ public:
             {
                 g.setFont (juce::FontOptions (14.0f));
                 g.setColour (axisText());
-                g.drawText (formatTakeLength (item.take.seconds) + "  -  tap to replay", r, juce::Justification::centredRight, true);
+                g.drawText (formatTakeLength (item.take.seconds) + "  -  " + tr ("tap to replay"), r, juce::Justification::centredRight, true);
                 g.setColour (seriesColour());
-                g.drawText (juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xb6  Take  ")) + item.when.formatted ("%a %d %b %Y, %H:%M")
+                g.drawText (juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xb6  ")) + tr ("Take") + "  " + i18n::date (item.when, "%a %d %b %Y, %H:%M")
                                 + "  -  " + item.take.title,
                             r, juce::Justification::centredLeft, true);
                 continue;
@@ -1107,9 +1108,9 @@ public:
 
             if (e.maxBpm > 0.0)    detail.add (juce::String (juce::roundToInt (e.maxBpm)) + " bpm");
             if (e.maxSpeed > 0.0)  detail.add (juce::String (juce::roundToInt (e.maxSpeed * 100.0)) + " %");
-            if (e.looper)          detail.add ("looper");
-            if (e.noGuitar)        detail.add ("clock time");
-            if (e.manual)          detail.add ("added by hand");
+            if (e.looper)          detail.add (tr ("looper"));
+            if (e.noGuitar)        detail.add (tr ("clock time"));
+            if (e.manual)          detail.add (tr ("added by hand"));
 
             const juce::Font rowFont (juce::FontOptions (14.0f));
             const auto detailText = detail.joinIntoString ("  -  ");
@@ -1118,7 +1119,7 @@ public:
             g.drawText (detailText, r, juce::Justification::centredRight, true);
 
             auto left = r.withTrimmedRight (juce::roundToInt (textWidth (rowFont, detailText)) + 16);
-            const auto when = e.start.formatted ("%a %d %b %Y, %H:%M");
+            const auto when = i18n::date (e.start, "%a %d %b %Y, %H:%M");
             g.setColour (primaryText());
 
             if (showTopics)
@@ -1237,7 +1238,7 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId,
             auto& copy = entries.back();
 
             if (copy.isFree())
-                copy.topicTitle = "Free practice";
+                copy.topicTitle = tr ("Free practice");
             else if (auto it = topicTitles.find (copy.topicId); it != topicTitles.end() && it->second.isNotEmpty())
                 copy.topicTitle = it->second;
             else if (copy.topicTitle.isEmpty())
@@ -1286,12 +1287,12 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId,
         }
 
         juce::StringArray stats;
-        stats.add (juce::String ((int) entries.size()) + (entries.size() == 1 ? " session" : " sessions"));
-        stats.add (formatPracticeDuration (total) + " in total");
-        stats.add (juce::String (topicsEver.size()) + (topicsEver.size() == 1 ? " topic" : " topics"));
-        stats.add ("since " + entries.front().start.formatted ("%d %b %Y"));
-        stats.add ("this week " + formatPracticeDuration (log.playedBetween (PracticeLog::startOfWeek (now),
-                                                                             now + juce::RelativeTime::days (1))));
+        stats.add (trn ("{n} session", "{n} sessions", (int) entries.size()));
+        stats.add (tr ("{duration} in total", formatPracticeDuration (total)));
+        stats.add (trn ("{n} topic", "{n} topics", (int) topicsEver.size()));
+        stats.add (tr ("since {date}", i18n::date (entries.front().start, "%d %b %Y")));
+        stats.add (tr ("this week {duration}", formatPracticeDuration (log.playedBetween (PracticeLog::startOfWeek (now),
+                                                                                          now + juce::RelativeTime::days (1)))));
         statsLabel.setText (stats.joinIntoString ("     "), juce::dontSendNotification);
 
         std::vector<TopicBars::Row> rows;
@@ -1300,7 +1301,7 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId,
             if (row.seconds > 0.0)
                 rows.push_back (row);
 
-        topicBars = std::make_unique<TopicBars> ("Time per topic (last " + juce::String (numWeeks) + " weeks)", std::move (rows));
+        topicBars = std::make_unique<TopicBars> (tr ("Time per topic (last {weeks} weeks)", numWeeks), std::move (rows));
         topicBars->onClick = [this] (const juce::String& id) { if (onShowTopic) onShowTopic (id); };
         addChildComponent (*topicBars);
         topicBars->setVisible (topicBars->hasData());
@@ -1309,13 +1310,13 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId,
     {
         const auto summary = log.summarise (topicId);
         juce::StringArray stats;
-        stats.add (juce::String (summary.sessions) + (summary.sessions == 1 ? " session" : " sessions"));
-        stats.add (formatPracticeDuration (summary.totalSeconds) + " in total");
-        stats.add ("since " + entries.front().start.formatted ("%d %b %Y"));
-        stats.add ("last practised " + formatPracticeAgo (summary.last, now));
+        stats.add (trn ("{n} session", "{n} sessions", summary.sessions));
+        stats.add (tr ("{duration} in total", formatPracticeDuration (summary.totalSeconds)));
+        stats.add (tr ("since {date}", i18n::date (entries.front().start, "%d %b %Y")));
+        stats.add (tr ("last practised {when}", formatPracticeAgo (summary.last, now)));
 
         if (numTakes > 0)
-            stats.add (juce::String (numTakes) + (numTakes == 1 ? " take" : " takes"));
+            stats.add (trn ("{n} take", "{n} takes", numTakes));
         statsLabel.setText (stats.joinIntoString ("     "), juce::dontSendNotification);
     }
 
@@ -1323,16 +1324,16 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId,
     statsLabel.setColour (juce::Label::textColourId, primaryText());
     addAndMakeVisible (statsLabel);
 
-    emptyLabel.setText (all ? "Nothing logged yet. Practise a topic, or just play: your sessions show up here by themselves."
-                            : "Not practised yet. Press Practise and play: your sessions, tempo and song speed show up here by themselves.",
+    emptyLabel.setText (all ? tr ("Nothing logged yet. Practise a topic, or just play: your sessions show up here by themselves.")
+                            : tr ("Not practised yet. Press Practise and play: your sessions, tempo and song speed show up here by themselves."),
                         juce::dontSendNotification);
     emptyLabel.setJustificationType (juce::Justification::centred);
     emptyLabel.setColour (juce::Label::textColourId, axisText());
     addChildComponent (emptyLabel);
     emptyLabel.setVisible (entries.empty() && takes.empty());
 
-    tempoChart = std::make_unique<LineChart> ("Metronome tempo you played along to (bpm)", " bpm", std::move (tempo));
-    speedChart = std::make_unique<LineChart> ("Song speed you played along to (%)", " %", std::move (speed));
+    tempoChart = std::make_unique<LineChart> (tr ("Metronome tempo you played along to (bpm)"), " bpm", std::move (tempo));
+    speedChart = std::make_unique<LineChart> (tr ("Song speed you played along to (%)"), " %", std::move (speed));
     weekBars = std::make_unique<WeekBars> (all ? log.weeklySecondsAll (now, numWeeks) : log.weeklySeconds (topicId, now, numWeeks),
                                            PracticeLog::startOfWeek (now));
     addChildComponent (*tempoChart);
@@ -1342,14 +1343,14 @@ TopicHistory::TopicHistory (const PracticeLog& log, const juce::String& topicId,
     speedChart->setVisible (speedChart->hasData());
     weekBars->setVisible (! entries.empty());
 
-    addAndMakeVisible (styleCaption (sessionsHeader, juce::String (takes.empty() ? "Sessions" : "Sessions and takes")
-                                                         + (entries.empty() ? "" : "  (tap a session to correct or delete it)")));
+    addAndMakeVisible (styleCaption (sessionsHeader, (takes.empty() ? tr ("Sessions") : tr ("Sessions and takes"))
+                                                         + (entries.empty() ? juce::String() : "  " + tr ("(tap a session to correct or delete it)"))));
     sessionsHeader.setVisible (! entries.empty() || ! takes.empty());
     sessionList = std::make_unique<SessionList> (std::move (entries), std::move (takes),
                                                  [this] (const juce::File& f) { if (onOpenTake) onOpenTake (f); }, all);
     sessionList->onEdit = [this] (const juce::String& id) { if (onEditEntry) onEditEntry (id); };
 
-    addTimeButton.setTooltip ("Add practice time by hand (e.g. theory done away from the app)");
+    addTimeButton.setTooltip (tr ("Add practice time by hand (e.g. theory done away from the app)"));
     addTimeButton.onClick = [this] { if (onAddTime) onAddTime(); };
     addAndMakeVisible (addTimeButton);
     sessionViewport.setViewedComponent (sessionList.get(), false);
@@ -1415,13 +1416,13 @@ void TopicHistory::resized()
 EntryEditor::EntryEditor (const PracticeEntry& entry, bool stillRunning, std::vector<std::pair<juce::String, juce::String>> topics)
     : topicChoices (std::move (topics)), ownTopicId (entry.topicId), ownTopicTitle (entry.topicTitle)
 {
-    auto what = entry.isFree() ? juce::String ("Free practice") : entry.topicTitle;
+    auto what = entry.isFree() ? tr ("Free practice") : entry.topicTitle;
 
     if (entry.songName.isNotEmpty())
         what << "  -  " << entry.songName;
 
-    summaryLabel.setText (what + "\n" + entry.start.formatted ("%a %d %b %Y, %H:%M") + " - " + entry.end.formatted ("%H:%M")
-                              + ",  " + formatPracticeDuration (entry.playedSeconds) + " played",
+    summaryLabel.setText (what + "\n" + tr ("{start} - {end},  {duration} played", i18n::date (entry.start, "%a %d %b %Y, %H:%M"),
+                                             entry.end.formatted ("%H:%M"), formatPracticeDuration (entry.playedSeconds)),
                           juce::dontSendNotification);
     setUpFields (entry);
 
@@ -1436,7 +1437,7 @@ EntryEditor::EntryEditor (const PracticeEntry& entry, bool stillRunning, std::ve
 
     if (stillRunning)
     {
-        errorLabel.setText ("This session is still being recorded: stop it first (Stop on the Today tab), then correct it.",
+        errorLabel.setText (tr ("This session is still being recorded: stop it first (Stop on the Today tab), then correct it."),
                             juce::dontSendNotification);
 
         for (juce::Component* c : { (juce::Component*) &startEditor, (juce::Component*) &minutesEditor,
@@ -1449,13 +1450,13 @@ EntryEditor::EntryEditor (const PracticeEntry& entry, bool stillRunning, std::ve
 EntryEditor::EntryEditor (NewEntry, const PracticeEntry& defaults, std::vector<std::pair<juce::String, juce::String>> topics)
     : topicChoices (std::move (topics)), ownTopicId (defaults.topicId), ownTopicTitle (defaults.topicTitle)
 {
-    summaryLabel.setText (topicChoices.empty() ? "Add time to \"" + defaults.topicTitle + "\"" : juce::String ("Add practice time"),
+    summaryLabel.setText (topicChoices.empty() ? tr ("Add time to \"{title}\"", defaults.topicTitle) : tr ("Add practice time"),
                           juce::dontSendNotification);
     setUpFields (defaults);
     minutesEditor.clear();
-    minutesEditor.setTextToShowWhenEmpty ("e.g. 20", theme::text().withAlpha (0.35f));
+    minutesEditor.setTextToShowWhenEmpty (tr ("e.g. 20"), theme::text().withAlpha (0.35f));
     deleteButton.setVisible (false);
-    saveButton.setButtonText ("Add");
+    saveButton.setButtonText (tr ("Add"));
 
     if (! topicChoices.empty())
         setUpTopicChoice (defaults.topicId);
@@ -1463,10 +1464,10 @@ EntryEditor::EntryEditor (NewEntry, const PracticeEntry& defaults, std::vector<s
 
 void EntryEditor::setUpTopicChoice (const juce::String& selectedId)
 {
-    addAndMakeVisible (styleCaption (topicLabel, "Topic"));
+    addAndMakeVisible (styleCaption (topicLabel, tr ("Topic")));
 
     for (size_t i = 0; i < topicChoices.size(); ++i)
-        topicBox.addItem (topicChoices[i].first.isEmpty() ? juce::String ("Free practice") : topicChoices[i].second, (int) i + 1);
+        topicBox.addItem (topicChoices[i].first.isEmpty() ? tr ("Free practice") : topicChoices[i].second, (int) i + 1);
 
     topicBox.setSelectedItemIndex (0, juce::dontSendNotification);
 
@@ -1506,16 +1507,16 @@ void EntryEditor::setUpFields (const PracticeEntry& entry)
         addAndMakeVisible (editor);
     };
 
-    setUp (startLabel, "Started (day/month/year hours:minutes)", startEditor);
+    setUp (startLabel, tr ("Started (day/month/year hours:minutes)"), startEditor);
     startEditor.setText (formatEntryTime (entry.start), false);
 
-    setUp (minutesLabel, "Minutes played", minutesEditor);
+    setUp (minutesLabel, tr ("Minutes played"), minutesEditor);
     const auto minutes = entry.playedSeconds / 60.0;
     minutesEditor.setText (std::abs (minutes - std::round (minutes)) < 0.05 ? juce::String (juce::roundToInt (minutes))
                                                                              : juce::String (minutes, 1), false);
     minutesEditor.setInputRestrictions (8, "0123456789.,:");
 
-    setUp (noteLabel, "Note", noteEditor);
+    setUp (noteLabel, tr ("Note"), noteEditor);
     noteEditor.setMultiLine (true, true);
     noteEditor.setReturnKeyStartsNewLine (true);
     noteEditor.setText (entry.note, false);
@@ -1528,9 +1529,9 @@ void EntryEditor::setUpFields (const PracticeEntry& entry)
     deleteButton.onClick = [this]
     {
         auto options = juce::MessageBoxOptions{}.withIconType (juce::MessageBoxIconType::WarningIcon)
-                                                .withTitle ("Delete entry")
-                                                .withMessage ("Delete this practice entry? Totals and charts are updated on every device.")
-                                                .withButton ("Delete", 1).withButton ("Cancel", 0)
+                                                .withTitle (tr ("Delete entry"))
+                                                .withMessage (tr ("Delete this practice entry? Totals and charts are updated on every device."))
+                                                .withButton (tr ("Delete"), 1).withButton (tr ("Cancel"), 0)
                                                 .withAssociatedComponent (this);
         juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<EntryEditor> (this)] (int result)
         {
@@ -1551,14 +1552,14 @@ void EntryEditor::save()
 
     if (! start.has_value())
     {
-        errorLabel.setText ("Type the start like 15/11/2026 14:30.", juce::dontSendNotification);
+        errorLabel.setText (tr ("Type the start like 15/11/2026 14:30."), juce::dontSendNotification);
         startEditor.grabKeyboardFocus();
         return;
     }
 
     if (! minutes.has_value() || *minutes <= 0.0 || *minutes > 24.0 * 60.0)
     {
-        errorLabel.setText ("Type the minutes played as a number, e.g. 25 (or 1:10 for an hour and ten minutes).",
+        errorLabel.setText (tr ("Type the minutes played as a number, e.g. 25 (or 1:10 for an hour and ten minutes)."),
                             juce::dontSendNotification);
         minutesEditor.grabKeyboardFocus();
         return;

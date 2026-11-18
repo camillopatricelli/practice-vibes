@@ -9,6 +9,7 @@
 #include "PracticePlanner.h"
 #include "SessionPlans.h"
 #include "Take.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -112,13 +113,13 @@ private:
     static constexpr int iconSize = 30;
     juce::Image appIcon;                // top bar, left of the title
     juce::Rectangle<int> iconBounds;
-    juce::TextButton recordButton        { "Rec" },
-                     tunerButton         { "Tuner" },
-                     audioSettingsButton { "Audio settings" },
-                     bluetoothButton     { "Bluetooth MIDI" },
-                     saveButton          { "Save" },
+    juce::TextButton recordButton        { tr ("Rec") },
+                     tunerButton         { tr ("Tuner") },
+                     audioSettingsButton { tr ("Audio settings") },
+                     bluetoothButton     { tr ("Bluetooth MIDI") },
+                     saveButton          { tr ("Save") },
                      practisingButton,
-                     teachingButton      { "Teaching" };
+                     teachingButton      { tr ("Teaching") };
     bool teaching = false, teacherSetting = false;
     bool recordingDemo = false;         // the take being recorded started during a lesson: named "Demo ..."
     void offerToShareLesson (const juce::String& topicId);

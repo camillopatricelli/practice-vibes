@@ -1,5 +1,6 @@
 #include "ChordView.h"
 #include "Theme.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -46,15 +47,15 @@ void ChordView::paint (juce::Graphics& g)
         title.removeFromLeft (16);
         g.setColour (theme::text().withAlpha (0.85f));
         g.setFont (theme::headerFont());
-        g.drawText ("Chords", title.removeFromLeft (90), juce::Justification::centredLeft);
+        g.drawText (tr ("Chords"), title.removeFromLeft (90), juce::Justification::centredLeft);
 
         if (track != nullptr && ! track->chords.empty())
         {
             const auto sep = juce::String ("  ") + juce::String::charToString ((juce::juce_wchar) 0x00b7) + "  ";
             g.setColour (theme::muted());
             g.setFont (theme::textFont (13.0f, "Medium"));
-            g.drawText ("Key " + track->keyName (transpose) + sep + "~" + juce::String (juce::roundToInt (track->bpm)) + " bpm" + sep
-                            + track->timeSignatureAt (juce::jmax (0, beatIndex)) + (track->hasMeterChanges() ? " (changes)" : ""),
+            g.drawText (tr ("Key {key}", track->keyName (transpose)) + sep + "~" + juce::String (juce::roundToInt (track->bpm)) + " bpm" + sep
+                            + track->timeSignatureAt (juce::jmax (0, beatIndex)) + (track->hasMeterChanges() ? " " + tr ("(changes)") : juce::String()),
                         title, juce::Justification::centredRight, true);
         }
     }
@@ -63,7 +64,7 @@ void ChordView::paint (juce::Graphics& g)
     {
         g.setColour (theme::muted());
         g.setFont (theme::textFont (16.0f));
-        g.drawFittedText (status.isNotEmpty() ? status : juce::String ("Chords appear here after you open a song."),
+        g.drawFittedText (status.isNotEmpty() ? status : tr ("Chords appear here after you open a song."),
                           area.reduced (0, 6), juce::Justification::centred, 3);
         return;
     }
@@ -122,7 +123,7 @@ void ChordView::paint (juce::Graphics& g)
         auto block = nextArea.removeFromBottom (juce::jmin (nextArea.getHeight(), 70));
         g.setColour (theme::muted());
         g.setFont (theme::textFont (12.0f, "SemiBold").withKerningFactor (0.08f));
-        g.drawText ("NEXT", block.removeFromTop (16), juce::Justification::bottomLeft);
+        g.drawText (tr ("NEXT"), block.removeFromTop (16), juce::Justification::bottomLeft);
 
         auto countRow = block.removeFromBottom (18);
         g.setColour (theme::text().withAlpha (0.8f));
@@ -132,7 +133,7 @@ void ChordView::paint (juce::Graphics& g)
         const auto beatsLeft = next.startBeat - juce::jmax (0, beatIndex);
         g.setColour (theme::muted());
         g.setFont (theme::textFont (13.0f));
-        g.drawText (beatsLeft <= 1 ? juce::String ("next beat") : "in " + juce::String (beatsLeft) + " beats",
+        g.drawText (beatsLeft <= 1 ? tr ("next beat") : tr ("in {n} beats", beatsLeft),
                     countRow, juce::Justification::centredLeft);
     }
 
@@ -179,7 +180,7 @@ void ChordView::paint (juce::Graphics& g)
     // Footer ------------------------------------------------------------------------------------------------
     g.setColour (theme::muted().withAlpha (0.7f));
     g.setFont (theme::textFont (12.0f));
-    g.drawText ("Detected automatically, may contain mistakes", footer, juce::Justification::centredLeft, true);
+    g.drawText (tr ("Detected automatically, may contain mistakes"), footer, juce::Justification::centredLeft, true);
 }
 
 } // namespace pv

@@ -1,4 +1,5 @@
 #include "SessionPlans.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -35,7 +36,7 @@ void PlanList::read()
             p.id = juce::Uuid().toDashedString();
 
         if (p.name.isEmpty())
-            p.name = "Plan";
+            p.name = tr ("Plan");
 
         for (auto* s : e->getChildWithTagNameIterator ("SLOT"))
         {
@@ -124,7 +125,7 @@ const SessionPlan* PlanList::findByName (const juce::String& name) const
 
 juce::String PlanList::uniqueName (const juce::String& base) const
 {
-    const auto clean = base.trim().isNotEmpty() ? base.trim() : juce::String ("Plan");
+    const auto clean = base.trim().isNotEmpty() ? base.trim() : tr ("Plan");
 
     if (findByName (clean) == nullptr)
         return clean;
@@ -221,7 +222,7 @@ std::vector<SessionSlot> slotsFromPlan (const SessionPlan& plan, const TopicTitl
             else
             {
                 s.missing = true;
-                s.title = p.tag.isNotEmpty() ? "No #" + p.tag + " rotation topic left" : "No rotation topic left";
+                s.title = p.tag.isNotEmpty() ? tr ("No #{tag} rotation topic left", p.tag) : tr ("No rotation topic left");
             }
         }
         else
@@ -231,7 +232,7 @@ std::vector<SessionSlot> slotsFromPlan (const SessionPlan& plan, const TopicTitl
             s.missing = s.title.isEmpty();
 
             if (s.missing)
-                s.title = "Missing topic (deleted)";
+                s.title = tr ("Missing topic (deleted)");
         }
 
         slots.push_back (s);

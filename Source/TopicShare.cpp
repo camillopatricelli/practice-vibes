@@ -3,6 +3,7 @@
 #include "AacFile.h"
 #include "PracticeLog.h"
 #include "Take.h"
+#include "Localisation.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <set>
@@ -168,10 +169,10 @@ juce::String sizeHint (juce::int64 bytes)
     if (bytes < 1024 * 1024)
         size = juce::String (juce::jmax ((juce::int64) 1, bytes / 1024)) + " KB";
     else
-        size = juce::String ((double) bytes / (1024.0 * 1024.0), bytes < 100 * 1024 * 1024 ? 1 : 0) + " MB";
+        size = i18n::decimal ((double) bytes / (1024.0 * 1024.0), bytes < 100 * 1024 * 1024 ? 1 : 0) + " MB";
 
-    return bytes <= emailLimitBytes ? size + ", fits in an email"
-                                    : size + ": too big for most email. Send it with AirDrop, WhatsApp or a cloud drive";
+    return bytes <= emailLimitBytes ? tr ("{size}, fits in an email", size)
+                                    : tr ("{size}: too big for most email. Send it with AirDrop, WhatsApp or a cloud drive", size);
 }
 
 juce::File fileNameFor (const Topic& topic, const juce::File& folder)
@@ -286,7 +287,7 @@ juce::Result write (const Topic& topic, const ExportOptions& options, const juce
             const auto m4a = shrinkFolder.getChildFile (m4aName);
 
             if (const auto result = shrinkToAac (source, m4a); result.failed())
-                return juce::Result::fail ("Could not make " + r.fileName + " smaller: " + result.getErrorMessage());
+                return juce::Result::fail (tr ("Could not make {file} smaller: {error}", r.fileName, result.getErrorMessage()));
 
             fileToAdd = m4a;
             nameInZip = m4aName;
@@ -358,10 +359,10 @@ juce::Result write (const Topic& topic, const ExportOptions& options, const juce
         juce::FileOutputStream out (tempZip.getFile());
 
         if (! out.openedOk())
-            return juce::Result::fail ("Can't write " + target.getFullPathName());
+            return juce::Result::fail (tr ("Can't write {file}", target.getFullPathName()));
 
         if (! zip.writeToStream (out, nullptr))
-            return juce::Result::fail ("Could not write the topic file");
+            return juce::Result::fail (tr ("Could not write the topic file"));
 
         out.flush();
 
@@ -370,7 +371,7 @@ juce::Result write (const Topic& topic, const ExportOptions& options, const juce
     }
 
     if (! tempZip.overwriteTargetFileWithTemporary())
-        return juce::Result::fail ("Can't write " + target.getFullPathName());
+        return juce::Result::fail (tr ("Can't write {file}", target.getFullPathName()));
 
     return juce::Result::ok();
 }
@@ -393,21 +394,21 @@ namespace
     {
         switch (kindOf (r))
         {
-            case ResourceKind::youtube:      return "YouTube video";
-            case ResourceKind::googleDoc:    return "Google document";
-            case ResourceKind::pdf:          return "PDF";
-            case ResourceKind::image:        return "Image";
-            case ResourceKind::audio:        return r.isTake ? "Recording" : "Audio";
-            case ResourceKind::video:        return "Video";
-            case ResourceKind::text:         return "Text";
-            case ResourceKind::document:     return "Document";
-            case ResourceKind::spreadsheet:  return "Spreadsheet";
-            case ResourceKind::presentation: return "Presentation";
-            case ResourceKind::web:          return "Web page";
+            case ResourceKind::youtube:      return tr ("YouTube video");
+            case ResourceKind::googleDoc:    return tr ("Google document");
+            case ResourceKind::pdf:          return tr ("PDF");
+            case ResourceKind::image:        return tr ("Image");
+            case ResourceKind::audio:        return r.isTake ? tr ("Recording") : tr ("Audio");
+            case ResourceKind::video:        return tr ("Video");
+            case ResourceKind::text:         return tr ("Text");
+            case ResourceKind::document:     return tr ("Document");
+            case ResourceKind::spreadsheet:  return tr ("Spreadsheet");
+            case ResourceKind::presentation: return tr ("Presentation");
+            case ResourceKind::web:          return tr ("Web page");
             case ResourceKind::other:        break;
         }
 
-        return "File";
+        return tr ("File");
     }
 }
 
@@ -441,7 +442,7 @@ juce::String documentHtml (const Topic& topic, const juce::StringArray& attached
 
             files << "<li>" << (attached ? "<a href=\"" + relativeHref (r.fileName) + "\">" + title + "</a>" : title)
                   << "<span class=\"meta\">" << kindName (r) << " &middot; " << escapeHtml (r.fileName)
-                  << (attached ? juce::String() : juce::String (" &middot; not included: use your own copy")) << "</span>"
+                  << (attached ? juce::String() : " &middot; " + escapeHtml (tr ("not included: use your own copy"))) << "</span>"
                   << description << marks << "</li>\n";
         }
     }
@@ -452,7 +453,8 @@ juce::String documentHtml (const Topic& topic, const juce::StringArray& attached
         tags << "<span class=\"tag\">" << escapeHtml (tag) << "</span>";
 
     juce::String html;
-    html << "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\n"
+    html << "<!doctype html>\n<html lang=\"" << (i18n::currentLanguage() == i18n::pseudoCode ? juce::String ("en") : i18n::currentLanguage())
+         << "\"><head><meta charset=\"utf-8\">\n"
          << "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
          << "<title>" << escapeHtml (topic.title) << "</title>\n<style>\n"
          << ":root { --bg: #fbf8f3; --card: #ffffff; --text: #2b2420; --muted: #7a6e66; --accent: #b0640f; --line: #e8e0d6; }\n"
@@ -480,21 +482,21 @@ juce::String documentHtml (const Topic& topic, const juce::StringArray& attached
         html << "<div>" << tags << "</div>\n";
 
     if (sharedAt != juce::Time())
-        html << "<p class=\"date\">Shared on " << sharedAt.formatted ("%d %B %Y") << "</p>\n";
+        html << "<p class=\"date\">" << escapeHtml (tr ("Shared on {date}", i18n::date (sharedAt, "%d %B %Y"))) << "</p>\n";
 
     if (! topic.assignment.isEmpty())
-        html << "<h2>Assignment</h2>\n<div class=\"notes\">" << escapeHtml (topic.assignment.describe().replace (middleDot(), "\n")) << "</div>\n";
+        html << "<h2>" << escapeHtml (tr ("Assignment")) << "</h2>\n<div class=\"notes\">" << escapeHtml (topic.assignment.describe().replace (middleDot(), "\n")) << "</div>\n";
 
     if (topic.description.trim().isNotEmpty())
-        html << "<h2>Notes</h2>\n<div class=\"notes\">" << escapeHtml (topic.description.trim()) << "</div>\n";
+        html << "<h2>" << escapeHtml (tr ("Notes")) << "</h2>\n<div class=\"notes\">" << escapeHtml (topic.description.trim()) << "</div>\n";
 
     if (links.isNotEmpty())
-        html << "<h2>Links</h2>\n<ul>\n" << links << "</ul>\n";
+        html << "<h2>" << escapeHtml (tr ("Links")) << "</h2>\n<ul>\n" << links << "</ul>\n";
 
     if (files.isNotEmpty())
-        html << "<h2>Files</h2>\n<ul>\n" << files << "</ul>\n";
+        html << "<h2>" << escapeHtml (tr ("Files")) << "</h2>\n<ul>\n" << files << "</ul>\n";
 
-    html << "<footer>Made with Practice Vibes</footer>\n</main></body></html>\n";
+    html << "<footer>" << escapeHtml (tr ("Made with Practice Vibes")) << "</footer>\n</main></body></html>\n";
     return html;
 }
 
@@ -506,10 +508,10 @@ juce::Result writeDocument (const Topic& topic, const ExportOptions& options, co
 
     // A fresh folder each time: attachments left out this time mustn't go along.
     if (target.isDirectory() && ! target.deleteRecursively())
-        return juce::Result::fail ("Can't replace " + target.getFullPathName() + " (is a file in it open?)");
+        return juce::Result::fail (tr ("Can't replace {folder} (is a file in it open?)", target.getFullPathName()));
 
     if (! target.createDirectory())
-        return juce::Result::fail ("Can't create " + target.getFullPathName());
+        return juce::Result::fail (tr ("Can't create {folder}", target.getFullPathName()));
 
     Topic shown = topic;
     juce::StringArray attached;
@@ -532,11 +534,11 @@ juce::Result writeDocument (const Topic& topic, const ExportOptions& options, co
             dest = target.getChildFile (uniqueName (source.getFileNameWithoutExtension(), ".m4a", attached));
 
             if (const auto result = shrinkToAac (source, dest); result.failed())
-                return juce::Result::fail ("Could not make " + r.fileName + " smaller: " + result.getErrorMessage());
+                return juce::Result::fail (tr ("Could not make {file} smaller: {error}", r.fileName, result.getErrorMessage()));
         }
         else if (! source.copyFileTo (dest))
         {
-            return juce::Result::fail ("Could not copy " + r.fileName);
+            return juce::Result::fail (tr ("Could not copy {file}", r.fileName));
         }
 
         for (auto& m : shown.marks)
@@ -551,7 +553,7 @@ juce::Result writeDocument (const Topic& topic, const ExportOptions& options, co
     const auto page = target.getChildFile (name + ".html");
 
     if (! page.replaceWithText (documentHtml (shown, attached, juce::Time::getCurrentTime()), false, false, "\n"))
-        return juce::Result::fail ("Can't write " + page.getFullPathName());
+        return juce::Result::fail (tr ("Can't write {file}", page.getFullPathName()));
 
     written.add (page);
     written.addArray (files);
@@ -576,7 +578,7 @@ std::unique_ptr<Package> open (const juce::File& pvtopic, juce::String& error)
 
     if (zip.getNumEntries() == 0 || zip.getEntry (Library::topicFileName) == nullptr)
     {
-        error = "This is not a Practice Vibes topic file (or it is damaged).";
+        error = tr ("This is not a Practice Vibes topic file (or it is damaged).");
         return nullptr;
     }
 
@@ -586,7 +588,7 @@ std::unique_ptr<Package> open (const juce::File& pvtopic, juce::String& error)
 
     if (! package->stage.createDirectory())
     {
-        error = "Can't unpack the topic: no room for a temporary folder.";
+        error = tr ("Can't unpack the topic: no room for a temporary folder.");
         return nullptr;
     }
 
@@ -611,7 +613,7 @@ std::unique_ptr<Package> open (const juce::File& pvtopic, juce::String& error)
 
         if (in == nullptr || ! out.openedOk() || out.writeFromInputStream (*in, -1) != entry->uncompressedSize)
         {
-            error = "The topic file is damaged (could not unpack " + name + ").";
+            error = tr ("The topic file is damaged (could not unpack {name}).", name);
             return nullptr;
         }
     }
@@ -620,7 +622,7 @@ std::unique_ptr<Package> open (const juce::File& pvtopic, juce::String& error)
 
     if (xml == nullptr)
     {
-        error = "This is not a Practice Vibes topic file (its topic.xml can't be read).";
+        error = tr ("This is not a Practice Vibes topic file (its topic.xml can't be read).");
         return nullptr;
     }
 
@@ -712,49 +714,45 @@ bool Preview::changesAnything() const
         || ! newResources.isEmpty() || ! updatedFiles.isEmpty() || ! reconnected.isEmpty();
 }
 
-juce::String Preview::summary() const
+juce::String Preview::summary (const juce::String& memberName) const
 {
-    auto plural = [] (int n, const juce::String& one, const juce::String& many)
-    {
-        return juce::String (n) + " " + (n == 1 ? one : many);
-    };
-
     juce::String text;
 
     if (! updatesExisting)
     {
-        text << "New topic " << quoted (title) << ": " << plural (resourceCount, "resource", "resources");
-
         if (includedFiles > 0)
-            text << " (" << plural (includedFiles, "file", "files") << " included)";
-
-        text << ".";
+            text << trn ("New topic {title}: {n} resource ({files} included).", "New topic {title}: {n} resources ({files} included).",
+                         resourceCount, quoted (title), trn ("{n} file", "{n} files", includedFiles));
+        else
+            text << trn ("New topic {title}: {n} resource.", "New topic {title}: {n} resources.", resourceCount, quoted (title));
     }
     else if (! changesAnything())
     {
-        text << "You already have " << quoted (existingTitle) << " as it is in this file: nothing to update.";
+        text << tr ("You already have {title} as it is in this file: nothing to update.", quoted (existingTitle));
     }
     else
     {
         juce::StringArray changes;
 
-        if (titleChanged)                 changes.add ("renamed to " + quoted (title));
-        if (! newResources.isEmpty())     changes.add (plural (newResources.size(), "new resource", "new resources"));
-        if (! updatedFiles.isEmpty())     changes.add (plural (updatedFiles.size(), "updated file", "updated files"));
-        if (notesChanged)                 changes.add ("notes changed");
-        if (tagsChanged)                  changes.add ("new tags");
-        if (detailsChanged)               changes.add ("resource details changed");
-        if (newMarks > 0)                 changes.add (plural (newMarks, "new marker or loop", "new markers or loops"));
-        if (hasSummary)                   changes.add ("a practice summary");
-        if (assignmentChanged)            changes.add ("new assignment");
-        if (! reconnected.isEmpty())      changes.add (plural (reconnected.size(), "file connected", "files connected"));
+        if (titleChanged)                 changes.add (tr ("renamed to {title}", quoted (title)));
+        if (! newResources.isEmpty())     changes.add (trn ("{n} new resource", "{n} new resources", newResources.size()));
+        if (! updatedFiles.isEmpty())     changes.add (trn ("{n} updated file", "{n} updated files", updatedFiles.size()));
+        if (notesChanged)                 changes.add (tr ("notes changed"));
+        if (tagsChanged)                  changes.add (tr ("new tags"));
+        if (detailsChanged)               changes.add (tr ("resource details changed"));
+        if (newMarks > 0)                 changes.add (trn ("{n} new marker or loop", "{n} new markers or loops", newMarks));
+        if (hasSummary)                   changes.add (tr ("a practice summary"));
+        if (assignmentChanged)            changes.add (tr ("new assignment"));
+        if (! reconnected.isEmpty())      changes.add (trn ("{n} file connected", "{n} files connected", reconnected.size()));
 
-        text << "Updates your topic " << quoted (existingTitle) << ": " << changes.joinIntoString (", ") << ".";
+        text << (memberName.isNotEmpty() ? tr ("Updates {member}'s copy {title}: {changes}.", memberName, quoted (existingTitle), changes.joinIntoString (", "))
+                                         : tr ("Updates your topic {title}: {changes}.", quoted (existingTitle), changes.joinIntoString (", ")));
     }
 
     if (! missing.isEmpty())
-        text << "\n" << (missing.size() == 1 ? "One file was" : juce::String (missing.size()) + " files were")
-             << " left out by the sender and isn't on this device yet (it stays listed as missing until you locate it).";
+        text << "\n" << trn ("One file was left out by the sender and isn't on this device yet (it stays listed as missing until you locate it).",
+                             "{n} files were left out by the sender and aren't on this device yet (they stay listed as missing until you locate them).",
+                             missing.size());
 
     return text;
 }
@@ -863,7 +861,7 @@ juce::Result apply (Library& library, const Package& package, Mode mode, const L
                                         : library.createTopic (incoming.title, mode == Mode::copy || memberCopy ? juce::String() : incoming.id);
 
     if (target == nullptr)
-        return juce::Result::fail ("Could not create the topic folder in the library.");
+        return juce::Result::fail (tr ("Could not create the topic folder in the library."));
 
     const bool isNew = existing == nullptr;
 
@@ -880,7 +878,7 @@ juce::Result apply (Library& library, const Package& package, Mode mode, const L
             if (source.existsAsFile() && (replace || ! dest.existsAsFile()))
             {
                 if (! copyReplacing (source, dest))
-                    return juce::Result::fail ("Could not copy " + r.fileName + " into the topic.");
+                    return juce::Result::fail (pv::tr ("Could not copy {file} into the topic.", r.fileName));
 
                 // A take's details travel with it.
                 const auto info = package.stage.getChildFile (TakeInfo::folderName).getChildFile (r.fileName + ".xml");
@@ -944,7 +942,7 @@ juce::Result apply (Library& library, const Package& package, Mode mode, const L
                 target->tags.add (tag);
 
     if (! library.saveTopic (*target))
-        return juce::Result::fail ("Could not save the topic.");
+        return juce::Result::fail (tr ("Could not save the topic."));
 
     topicId = target->id;
     return juce::Result::ok();

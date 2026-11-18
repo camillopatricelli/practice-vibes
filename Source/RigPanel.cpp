@@ -2,6 +2,7 @@
 #include "FootswitchPanel.h"
 #include "Icons.h"
 #include "Theme.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -76,10 +77,10 @@ RigPanel::RigPanel (AppEngine& e)
         addAndMakeVisible (label);
     };
 
-    setupHeader (catalogueHeader, "Available plugins");
-    setupHeader (chainHeader, "Effects chain");
-    setupHeader (levelsHeader, "Input / output");
-    setupHeader (midiHeader, "MIDI footswitch");
+    setupHeader (catalogueHeader, tr ("Available plugins"));
+    setupHeader (chainHeader, tr ("Effects chain"));
+    setupHeader (levelsHeader, tr ("Input / output"));
+    setupHeader (midiHeader, tr ("MIDI footswitch"));
 
     for (auto* b : { &addButton, &scanButton, &editButton, &bypassButton, &upButton, &downButton, &removeButton, &footswitchButton })
         addAndMakeVisible (*b);
@@ -93,7 +94,7 @@ RigPanel::RigPanel (AppEngine& e)
             return {};
 
         const auto& entry = catalogueEntries[(size_t) row];
-        return "[" + entry.kind + "]  " + entry.description.name;
+        return "[" + tr (entry.kind) + "]  " + entry.description.name;
     };
     catalogueModel->onDoubleClick = [this] (int) { addSelectedPlugin(); };
     catalogueList.setModel (catalogueModel.get());
@@ -112,7 +113,7 @@ RigPanel::RigPanel (AppEngine& e)
     else
     {
         // iPad: AudioUnits are listed from the system; this re-reads that list (e.g. after installing a plugin app).
-        scanButton.setButtonText ("Refresh list");
+        scanButton.setButtonText (tr ("Refresh list"));
         scanButton.onClick = [this] { engine.catalogue->refresh(); };
     }
 
@@ -124,8 +125,8 @@ RigPanel::RigPanel (AppEngine& e)
     chainModel->rowText = [this] (int row)
     {
         const auto number = engine.chain->hasInstrument() ? row : row + 1;     // effects count from 1
-        return (engine.chain->isInstrument (row) ? juce::String ("Instrument:  ") : juce::String (number) + ".  ")
-             + engine.chain->getPluginName (row) + (engine.chain->isBypassed (row) ? "   (bypassed)" : "");
+        return (engine.chain->isInstrument (row) ? tr ("Instrument:") + "  " : juce::String (number) + ".  ")
+             + engine.chain->getPluginName (row) + (engine.chain->isBypassed (row) ? "   " + tr ("(bypassed)") : juce::String());
     };
     chainModel->onDoubleClick = [this] (int row) { openEditor (row); };
     chainList.setModel (chainModel.get());
@@ -138,15 +139,15 @@ RigPanel::RigPanel (AppEngine& e)
     chainHint.setMinimumHorizontalScale (0.6f);
     addAndMakeVisible (chainHint);
 
-    addButton.setTooltip ("Effects are added at the end of the chain. An instrument (a synth or piano plugin) goes on top "
-                          "and is played from your MIDI keyboard; adding another instrument replaces it.");
+    addButton.setTooltip (tr ("Effects are added at the end of the chain. An instrument (a synth or piano plugin) goes on top "
+                          "and is played from your MIDI keyboard; adding another instrument replaces it."));
 
     // Icon buttons: five of them share the chain column, too narrow for their words in portrait.
-    editButton.setTooltip ("Open the plugin's window");
-    bypassButton.setTooltip ("Bypass the plugin (on/off)");
-    upButton.setTooltip ("Move the plugin up the chain");
-    downButton.setTooltip ("Move the plugin down the chain");
-    removeButton.setTooltip ("Remove the plugin from the chain");
+    editButton.setTooltip (tr ("Open the plugin's window"));
+    bypassButton.setTooltip (tr ("Bypass the plugin (on/off)"));
+    upButton.setTooltip (tr ("Move the plugin up the chain"));
+    downButton.setTooltip (tr ("Move the plugin down the chain"));
+    removeButton.setTooltip (tr ("Remove the plugin from the chain"));
     icons::setIcon (editButton, icons::Icon::openWindow, true);
     icons::setIcon (bypassButton, icons::Icon::power, true);
     icons::setIcon (upButton, icons::Icon::arrowUp, true);
@@ -214,8 +215,8 @@ RigPanel::RigPanel (AppEngine& e)
         addAndMakeVisible (slider);
     };
 
-    setupGain (inputGainSlider, inputGainLabel, "Input gain", -24.0, 24.0, engine.chain->getInputStage());
-    setupGain (outputGainSlider, outputGainLabel, "Output level", -60.0, 12.0, engine.chain->getOutputStage());
+    setupGain (inputGainSlider, inputGainLabel, tr ("Input gain"), -24.0, 24.0, engine.chain->getInputStage());
+    setupGain (outputGainSlider, outputGainLabel, tr ("Output level"), -60.0, 12.0, engine.chain->getOutputStage());
 
     monitorButton.setToggleState (! engine.chain->getOutputStage().muted.load(), juce::dontSendNotification);
     monitorButton.onClick = [this]
@@ -230,17 +231,17 @@ RigPanel::RigPanel (AppEngine& e)
     midiDevicesLabel.setMinimumHorizontalScale (0.6f);
     addAndMakeVisible (midiDevicesLabel);
 
-    lastMidiLabel.setText ("No MIDI received yet", juce::dontSendNotification);
+    lastMidiLabel.setText (tr ("No MIDI received yet"), juce::dontSendNotification);
     lastMidiLabel.setFont (theme::displayFont (19.0f, "SemiBold"));
     lastMidiLabel.setColour (juce::Label::textColourId, theme::highlight());
     lastMidiLabel.setMinimumHorizontalScale (0.6f);
     addAndMakeVisible (lastMidiLabel);
 
-    footswitchButton.setTooltip ("Learn the pedal's switches and choose what they do (looper, metronome, bypass).");
+    footswitchButton.setTooltip (tr ("Learn the pedal's switches and choose what they do (looper, metronome, bypass)."));
     footswitchButton.onClick = [this]
     {
         if (showOverlay)
-            showOverlay ("Footswitch", std::make_unique<FootswitchPanel> (engine));
+            showOverlay (tr ("Footswitch"), std::make_unique<FootswitchPanel> (engine));
     };
 
     engine.onMidiMessage = [this] (const juce::MidiMessage& m, const juce::String& source) { handleMidi (m, source); };
@@ -372,8 +373,8 @@ void RigPanel::timerCallback()
 
     // An instrument is silent until monitoring is on (it goes through the same output stage as the input).
     const auto hint = ! engine.chain->hasInstrument() ? juce::String()
-                    : engine.chain->getOutputStage().muted.load() ? juce::String ("Turn on Monitor input to hear the instrument")
-                                                                   : juce::String ("Play the instrument from your MIDI keyboard");
+                    : engine.chain->getOutputStage().muted.load() ? tr ("Turn on Monitor input to hear the instrument")
+                                                                   : tr ("Play the instrument from your MIDI keyboard");
 
     if (chainHint.getText() != hint)
         chainHint.setText (hint, juce::dontSendNotification);
@@ -424,14 +425,14 @@ void RigPanel::refreshInputChannels()
 
         for (int i = 0; i < names.size(); ++i)
             if (active[i])
-                inputChannelBox.addItem (names[i].isNotEmpty() ? names[i] : "Input " + juce::String (i + 1), itemId++);
+                inputChannelBox.addItem (names[i].isNotEmpty() ? names[i] : tr ("Input {n}", i + 1), itemId++);
     }
 
     const auto numItems = inputChannelBox.getNumItems();
     inputChannelBox.setEnabled (numItems > 0);
 
     if (numItems == 0)
-        inputChannelBox.setTextWhenNothingSelected ("No audio input");
+        inputChannelBox.setTextWhenNothingSelected (tr ("No audio input"));
     else
         inputChannelBox.setSelectedItemIndex (juce::jmin (engine.chain->getInputChannel(), numItems - 1),
                                               juce::dontSendNotification);
@@ -440,8 +441,8 @@ void RigPanel::refreshInputChannels()
 void RigPanel::refreshMidiDevices()
 {
     const auto names = engine.midi->getEnabledInputNames();
-    midiDevicesLabel.setText (names.isEmpty() ? juce::String ("No MIDI inputs - tap 'Bluetooth MIDI' to pair the footswitch")
-                                              : "Inputs: " + names.joinIntoString (", "),
+    midiDevicesLabel.setText (names.isEmpty() ? tr ("No MIDI inputs - tap 'Bluetooth MIDI' to pair the footswitch")
+                                              : tr ("Inputs: {names}", names.joinIntoString (", ")),
                               juce::dontSendNotification);
 }
 

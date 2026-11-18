@@ -4,17 +4,21 @@
 #include "Icons.h"
 #include "Theme.h"
 #include "YouTubePlayer.h"
+#include "Localisation.h"
 
 namespace pv
 {
 
 /** The hint under the waveform (the zoom modifier is Cmd on macOS, Ctrl elsewhere). */
-static const char* const waveformHint =
+static juce::String waveformHint()
+{
    #if JUCE_MAC
-    "Click the waveform to jump, drag to loop, drag a loop edge to adjust it. Zoom: pinch the trackpad, or Cmd+wheel. Double-click a slider to reset it.";
+    return tr ("Click the waveform to jump, drag to loop, drag a loop edge to adjust it. Zoom: pinch the trackpad, or Cmd+wheel. Double-click a slider to reset it.");
    #else
-    "Tap the waveform to jump, drag to loop, drag a loop edge to adjust it. Zoom: pinch, or Ctrl+wheel. Double-click a slider to reset it.";
+    return tr ("Tap the waveform to jump, drag to loop, drag a loop edge to adjust it. Zoom: pinch, or Ctrl+wheel. Double-click a slider to reset it.");
    #endif
+}
+
 
 //==============================================================================
 class PracticePanel::BeatIndicator final : public juce::Component
@@ -232,8 +236,8 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
     setWantsKeyboardFocus (true);
 
     // Song ------------------------------------------------------------------
-    styleHeader (songHeader, "Song");
-    styleLabel (songLabel, "No song loaded", 0.7f);
+    styleHeader (songHeader, tr ("Song"));
+    styleLabel (songLabel, tr ("No song loaded"), 0.7f);
     songLabel.setMinimumHorizontalScale (0.6f);
     timeLabel.setText ("0:00.0 / 0:00.0");
     timeLabel.setFontSize (18.0f);
@@ -246,8 +250,8 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
                                                              &chordView, &snapButton, &marksButton })
         addAndMakeVisible (c);
 
-    marksButton.setTooltip ("Markers and saved loops with a short comment (\"bar 17: watch the fingering\"). "
-                            "They're kept in the song's topic and go along when you share it. On a take: comments at a time.");
+    marksButton.setTooltip (tr ("Markers and saved loops with a short comment (\"bar 17: watch the fingering\"). "
+                            "They're kept in the song's topic and go along when you share it. On a take: comments at a time."));
     marksButton.onClick = [this] { showMarksMenu(); };
 
     youTubeTimeline = std::make_unique<YouTubeTimeline> (*this);
@@ -255,7 +259,7 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
     addChildComponent (compactButton);
     addChildComponent (closeVideoButton);
     addChildComponent (openOnYouTubeButton);
-    compactButton.setTooltip ("Small floating player that stays on top while you use the other tabs");
+    compactButton.setTooltip (tr ("Small floating player that stays on top while you use the other tabs"));
     compactButton.onClick = [this] { if (onCompactRequested) onCompactRequested(); };
     closeVideoButton.onClick = [this] { closeYouTube(); };
     openOnYouTubeButton.onClick = [this] { if (youtube != nullptr) juce::URL (youtube->getWatchUrl()).launchInDefaultBrowser(); };
@@ -267,14 +271,14 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
     addChildComponent (closeTakeButton);
     closeTakeButton.onClick = [this] { closeTake(); };
     addChildComponent (exportMixButton);
-    exportMixButton.setTooltip ("Song + your take in one .m4a file, as you hear it now (speed, loop and the two volumes), "
-                                "e.g. to send to a teacher");
+    exportMixButton.setTooltip (tr ("Song + your take in one .m4a file, as you hear it now (speed, loop and the two volumes), "
+                                "e.g. to send to a teacher"));
     exportMixButton.onClick = [this] { exportMix(); };
 
     openButton.onClick = [this] { openFile(); };
 
     addAndMakeVisible (stemsButton);
-    stemsButton.setTooltip ("Split the song into vocals, guitar, bass, drums, piano and other; mute or solo any of them");
+    stemsButton.setTooltip (tr ("Split the song into vocals, guitar, bass, drums, piano and other; mute or solo any of them"));
     stemsButton.onClick = [this] { showStemMixer(); };
     stemService.onFinished = [this] (const juce::File& folder, const juce::Result& result)
     {
@@ -371,16 +375,16 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
     // Icons (mock-up): round Play, icon-only back / stop / zoom; icon + text elsewhere.
     icons::setRound (playButton);
     icons::setIcon (playButton, icons::Icon::play, true);
-    playButton.setTooltip ("Play / pause (space)");
-    rewindButton.setTooltip ("Back to the start");
+    playButton.setTooltip (tr ("Play / pause (space)"));
+    rewindButton.setTooltip (tr ("Back to the start"));
     icons::setIcon (rewindButton, icons::Icon::back, true);
-    stopButton.setTooltip ("Stop");
+    stopButton.setTooltip (tr ("Stop"));
     icons::setIcon (stopButton, icons::Icon::stop, true);
-    zoomOutButton.setTooltip ("Zoom out");
+    zoomOutButton.setTooltip (tr ("Zoom out"));
     icons::setIcon (zoomOutButton, icons::Icon::zoomOut, true);
-    zoomInButton.setTooltip ("Zoom in");
+    zoomInButton.setTooltip (tr ("Zoom in"));
     icons::setIcon (zoomInButton, icons::Icon::zoomIn, true);
-    fitButton.setTooltip ("Show the whole song");
+    fitButton.setTooltip (tr ("Show the whole song"));
     icons::setIcon (fitButton, icons::Icon::fit, true);
     icons::setIcon (openButton, icons::Icon::folder, false);
     icons::setIcon (stemsButton, icons::Icon::stems, false);
@@ -402,7 +406,7 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
         updateLoopButtons();
     };
 
-    styleLabel (speedLabel, "Speed");
+    styleLabel (speedLabel, tr ("Speed"));
     styleHorizontal (speedSlider, 25.0, 150.0, 1.0, 100.0, " %");
     speedSlider.onValueChange = [this]
     {
@@ -412,11 +416,11 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
             player.setSpeed (speedSlider.getValue() / 100.0);
     };
 
-    styleLabel (pitchLabel, "Pitch");
-    styleHorizontal (pitchSlider, -12.0, 12.0, 0.1, 0.0, " st");
+    styleLabel (pitchLabel, tr ("Pitch"));
+    styleHorizontal (pitchSlider, -12.0, 12.0, 0.1, 0.0, " " + tr ("st"));
     pitchSlider.onValueChange = [this] { player.setSemitones (pitchSlider.getValue()); };
 
-    styleLabel (songVolumeLabel, "Volume");
+    styleLabel (songVolumeLabel, tr ("Volume"));
     styleHorizontal (songVolumeSlider, -40.0, 6.0, 0.5, 0.0, " dB");
     songVolumeSlider.onValueChange = [this]
     {
@@ -428,12 +432,12 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
             player.gain = gain;
     };
 
-    styleLabel (guitarVolumeLabel, "Take");
+    styleLabel (guitarVolumeLabel, tr ("Take"));
     styleHorizontal (guitarVolumeSlider, -40.0, 6.0, 0.5, 0.0, " dB");
-    guitarVolumeSlider.setTooltip ("Volume of the recorded take");
+    guitarVolumeSlider.setTooltip (tr ("Volume of the recorded take"));
     guitarVolumeSlider.onValueChange = [this] { player.takeGain = juce::Decibels::decibelsToGain ((float) guitarVolumeSlider.getValue(), -40.0f); };
 
-    styleLabel (hintLabel, waveformHint, 0.45f);
+    styleLabel (hintLabel, waveformHint(), 0.45f);
     hintLabel.setMinimumHorizontalScale (0.5f);
     noteLabel.setColour (juce::Label::textColourId, theme::highlight());
     noteLabel.setMinimumHorizontalScale (0.5f);
@@ -453,7 +457,7 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
                                                              &everyLabel, &maxLabel })
         addAndMakeVisible (c);
 
-    styleHeader (metronomeHeader, "Metronome");
+    styleHeader (metronomeHeader, tr ("Metronome"));
 
     bpmDisplay.setFont (theme::displayFont (34.0f, "SemiBold"));
     bpmDisplay.setColour (juce::Label::textColourId, theme::highlight());
@@ -467,7 +471,7 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
             metronome.start();
     };
 
-    styleLabel (bpmLabel, "Tempo");
+    styleLabel (bpmLabel, tr ("Tempo"));
     styleHorizontal (bpmSlider, 30.0, 300.0, 1.0, metronome.startBpm.load(), " bpm");
     bpmSlider.onValueChange = [this]
     {
@@ -475,7 +479,7 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
         metronome.tempoChangedByUser();
     };
 
-    styleLabel (beatsLabel, "Beats per bar");
+    styleLabel (beatsLabel, tr ("Beats per bar"));
 
     for (int i = 1; i <= 12; ++i)
         beatsBox.addItem (juce::String (i), i);
@@ -484,11 +488,11 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
     beatsBox.setSelectedId (metronome.beatsPerBar.load(), juce::dontSendNotification);
     beatsBox.onChange = [this] { metronome.beatsPerBar = juce::jmax (1, beatsBox.getSelectedId()); };
 
-    styleLabel (subdivisionLabel, "Subdivision");
-    subdivisionBox.addItem ("Quarters", 1);
-    subdivisionBox.addItem ("8ths", 2);
-    subdivisionBox.addItem ("Triplets", 3);
-    subdivisionBox.addItem ("16ths", 4);
+    styleLabel (subdivisionLabel, tr ("Subdivision"));
+    subdivisionBox.addItem (tr ("Quarters"), 1);
+    subdivisionBox.addItem (tr ("8ths"), 2);
+    subdivisionBox.addItem (tr ("Triplets"), 3);
+    subdivisionBox.addItem (tr ("16ths"), 4);
     subdivisionBox.setSelectedId (metronome.subdivision.load() + 1, juce::dontSendNotification);
     subdivisionBox.onChange = [this]
     {
@@ -496,26 +500,26 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
         updateSubdivisionControls();
     };
 
-    styleLabel (soundLabel, "Sound");
-    soundBox.addItem ("Beep", 1);
-    soundBox.addItem ("Click", 2);
-    soundBox.addItem ("Drums", 3);
+    styleLabel (soundLabel, tr ("Sound"));
+    soundBox.addItem (tr ("Beep"), 1);
+    soundBox.addItem (tr ("Click"), 2);
+    soundBox.addItem (tr ("Drums"), 3);
     soundBox.setSelectedId (metronome.sound.load() + 1, juce::dontSendNotification);
     soundBox.onChange = [this] { metronome.sound = soundBox.getSelectedId() - 1; };
 
-    styleLabel (subLevelLabel, "Subdivision vol.");
+    styleLabel (subLevelLabel, tr ("Subdivision vol."));
     styleHorizontal (subLevelSlider, 0.0, 100.0, 1.0, metronome.subdivisionLevel.load() * 100.0, " %");
     subLevelSlider.onValueChange = [this] { metronome.subdivisionLevel = (float) (subLevelSlider.getValue() / 100.0); };
 
-    styleLabel (swingLabel, "Swing");
+    styleLabel (swingLabel, tr ("Swing"));
     styleHorizontal (swingSlider, 50.0, 75.0, 1.0, 50.0, {});
     swingSlider.setValue (metronome.swing.load() * 100.0, juce::dontSendNotification);
     swingSlider.textFromValueFunction = [] (double v)
     {
         const auto percent = juce::roundToInt (v);
-        return percent <= 50 ? juce::String ("Straight")
-             : percent == 67 ? juce::String ("Shuffle")
-             : percent >= 75 ? juce::String ("Dotted")
+        return percent <= 50 ? tr ("Straight")
+             : percent == 67 ? tr ("Shuffle")
+             : percent >= 75 ? tr ("Dotted")
                              : juce::String (percent) + " %";
     };
     swingSlider.valueFromTextFunction = [] (const juce::String& text)
@@ -525,15 +529,15 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
                                                                                   : t.getDoubleValue();
     };
     swingSlider.updateText();
-    swingSlider.setTooltip ("Delays every second 8th (or 16th): 50 % = straight, 67 % = triplet shuffle, 75 % = dotted 8th + 16th.");
+    swingSlider.setTooltip (tr ("Delays every second 8th (or 16th): 50 % = straight, 67 % = triplet shuffle, 75 % = dotted 8th + 16th."));
     swingSlider.onValueChange = [this] { metronome.swing = swingSlider.getValue() / 100.0; };
     updateSubdivisionControls();
 
-    styleLabel (clickVolumeLabel, "Click volume");
+    styleLabel (clickVolumeLabel, tr ("Click volume"));
     styleHorizontal (clickVolumeSlider, -40.0, 6.0, 0.5, juce::Decibels::gainToDecibels (metronome.gain.load()), " dB");
     clickVolumeSlider.onValueChange = [this] { metronome.gain = juce::Decibels::decibelsToGain ((float) clickVolumeSlider.getValue(), -40.0f); };
 
-    followToggle.setTooltip ("While the song plays, the metronome clicks on the song's detected beats and bars.");
+    followToggle.setTooltip (tr ("While the song plays, the metronome clicks on the song's detected beats and bars."));
     followToggle.setToggleState (metronome.followSong.load(), juce::dontSendNotification);
     followToggle.onClick = [this]
     {
@@ -548,21 +552,21 @@ PracticePanel::PracticePanel (PlayerProcessor& p, MetronomeProcessor& m)
         updateTrainerControls();
     };
 
-    styleLabel (stepLabel, "Add");
+    styleLabel (stepLabel, tr ("Add"));
     styleIncDec (stepSlider, -20.0, 20.0, 1.0, metronome.trainerStepBpm.load());
     stepSlider.setTextValueSuffix (" bpm");
     stepSlider.onValueChange = [this] { metronome.trainerStepBpm = stepSlider.getValue(); };
 
-    styleLabel (everyLabel, "every");
+    styleLabel (everyLabel, tr ("every"));
     styleIncDec (intervalSlider, 0.5, 60.0, 0.5, metronome.trainerInterval.load());
     intervalSlider.onValueChange = [this] { metronome.trainerInterval = intervalSlider.getValue(); };
 
-    unitBox.addItem ("bars", 1);
-    unitBox.addItem ("minutes", 2);
+    unitBox.addItem (tr ("bars"), 1);
+    unitBox.addItem (tr ("minutes"), 2);
     unitBox.setSelectedId (metronome.trainerUnit.load() + 1, juce::dontSendNotification);
     unitBox.onChange = [this] { metronome.trainerUnit = unitBox.getSelectedId() - 1; };
 
-    styleLabel (maxLabel, "up to");
+    styleLabel (maxLabel, tr ("up to"));
     styleIncDec (maxBpmSlider, 30.0, 300.0, 1.0, metronome.trainerMaxBpm.load());
     maxBpmSlider.setTextValueSuffix (" bpm");
     maxBpmSlider.onValueChange = [this] { metronome.trainerMaxBpm = maxBpmSlider.getValue(); };
@@ -591,7 +595,7 @@ void PracticePanel::startChordAnalysis (std::shared_ptr<const LoadedSong> song)
     metronome.setSongGrid (nullptr);
     songGridFound = false;
     updateFollowControls();
-    chordView.setTrack (nullptr, song != nullptr ? "Analysing chords..." : "");
+    chordView.setTrack (nullptr, song != nullptr ? tr ("Analysing chords...") : juce::String());
 
     if (song == nullptr)
         return;
@@ -626,7 +630,7 @@ void PracticePanel::startChordAnalysis (std::shared_ptr<const LoadedSong> song)
                 return;
 
             const auto found = ! track->chords.empty();
-            safeThis->chordView.setTrack (found ? track : nullptr, found ? juce::String() : juce::String ("No chords found in this song."));
+            safeThis->chordView.setTrack (found ? track : nullptr, found ? juce::String() : tr ("No chords found in this song."));
             safeThis->waveform.setChords (found ? track : nullptr);
             safeThis->metronome.setSongGrid (found ? track : nullptr);
             safeThis->songGridFound = found;
@@ -675,7 +679,7 @@ void PracticePanel::showYouTube()
     metronome.setSongGrid (nullptr);
     songGridFound = false;
     updateFollowControls();
-    chordView.setTrack (nullptr, "Chords can't be detected for YouTube videos: the app never receives their audio.");
+    chordView.setTrack (nullptr, tr ("Chords can't be detected for YouTube videos: the app never receives their audio."));
 
     pitchSlider.setValue (0.0, juce::dontSendNotification);
     youtube->setRate (speedSlider.getValue() / 100.0);
@@ -698,7 +702,7 @@ void PracticePanel::closeYouTube()
         youtube->unload();
 
     // Back to the song file (if any): restore its labels, speed and chord analysis.
-    songLabel.setText (shownSong != nullptr ? shownSong->name : juce::String ("No song loaded"), juce::dontSendNotification);
+    songLabel.setText (shownSong != nullptr ? shownSong->name : tr ("No song loaded"), juce::dontSendNotification);
     player.setSpeed (speedSlider.getValue() / 100.0);
     player.gain = juce::Decibels::decibelsToGain ((float) songVolumeSlider.getValue(), -40.0f);
     startChordAnalysis (shownSong);
@@ -721,8 +725,8 @@ void PracticePanel::updateModeVisibility()
     pitchLabel.setEnabled (! youTubeMode);
     stemsButton.setVisible (! youTubeMode);
 
-    hintLabel.setText (youTubeMode ? "YouTube: tap the timeline to jump, drag on it to set a loop. Speed snaps to the speeds the video offers."
-                                   : waveformHint,
+    hintLabel.setText (youTubeMode ? tr ("YouTube: tap the timeline to jump, drag on it to set a loop. Speed snaps to the speeds the video offers.")
+                                   : waveformHint(),
                        juce::dontSendNotification);
 }
 
@@ -750,16 +754,16 @@ void PracticePanel::updateStems()
         loadStems();
     }
 
-    juce::String text = "Stems";
+    juce::String text = tr ("Stems");
+    const auto active = ! stemService.isBusy() && player.hasStems() && ! stemControls.isNeutral();
 
     if (stemService.isBusy())
-        text = "Stems " + juce::String (juce::roundToInt (stemService.getProgress() * 100.0)) + " %";
-    else if (player.hasStems() && ! stemControls.isNeutral())
-        text = "Stems: " + stemControls.describe();
+        text = tr ("Stems {percent} %", juce::roundToInt (stemService.getProgress() * 100.0));
+    else if (active)
+        text = tr ("Stems: {mix}", stemControls.describe());
 
     if (stemsButton.getButtonText() != text)
     {
-        const auto active = text.startsWith ("Stems:");
         stemsButton.setButtonText (text);
         stemsButton.setColour (juce::TextButton::buttonColourId, active ? theme::accent() : findColour (juce::TextButton::buttonColourId, false));
         resized();
@@ -813,8 +817,8 @@ juce::String PracticePanel::toggleStem (int stem)
     stemControls.solo[(size_t) stem] = false;
     applyStemGains();
 
-    auto text = Stems::displayName (stem) + " stem " + (muted ? "muted" : "unmuted")
-                  + (player.hasStems() ? juce::String() : juce::String (" (this song has no stems yet)"));
+    auto text = (muted ? tr ("{stem} stem muted", Stems::displayName (stem)) : tr ("{stem} stem unmuted", Stems::displayName (stem)))
+                  + (player.hasStems() ? juce::String() : " " + tr ("(this song has no stems yet)"));
     showNote (text);
     return text;
 }
@@ -853,7 +857,7 @@ juce::String PracticePanel::formatTime (double seconds)
 
 void PracticePanel::openFile()
 {
-    fileChooser = std::make_unique<juce::FileChooser> ("Choose a song",
+    fileChooser = std::make_unique<juce::FileChooser> (tr ("Choose a song"),
                                                        juce::File::getSpecialLocation (juce::File::userMusicDirectory),
                                                        "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.m4a;*.aac;*.ogg");
 
@@ -882,7 +886,7 @@ bool PracticePanel::isSeparatingStems() const
 void PracticePanel::loadSong (const juce::URL& url, std::optional<PracticeSetup> then, std::function<void()> onLoaded)
 {
     closeYouTube();
-    songLabel.setText ("Loading " + juce::URL::removeEscapeChars (url.getFileName()) + "...", juce::dontSendNotification);
+    songLabel.setText (tr ("Loading {name}...", juce::URL::removeEscapeChars (url.getFileName())), juce::dontSendNotification);
     openButton.setEnabled (false);
 
     const auto file = url.isLocalFile() ? url.getLocalFile() : juce::File();
@@ -896,7 +900,7 @@ void PracticePanel::loadSong (const juce::URL& url, std::optional<PracticeSetup>
 
         if (error.isNotEmpty())
         {
-            safeThis->songLabel.setText ("Could not load: " + error, juce::dontSendNotification);
+            safeThis->songLabel.setText (tr ("Could not load: {error}", error), juce::dontSendNotification);
             return;
         }
 
@@ -924,11 +928,11 @@ void PracticePanel::openTake (const juce::File& takeSongFile, const juce::File& 
         if (safeThis == nullptr)
             return;
 
-        safeThis->songLabel.setText ("Loading the take...", juce::dontSendNotification);
+        safeThis->songLabel.setText (tr ("Loading the take..."), juce::dontSendNotification);
         safeThis->player.loadTakeAsync (juce::URL (takeFile), timeline, [safeThis] (const juce::String& error)
         {
             if (safeThis != nullptr && error.isNotEmpty())
-                safeThis->songLabel.setText ("Could not load the take: " + error, juce::dontSendNotification);
+                safeThis->songLabel.setText (tr ("Could not load the take: {error}", error), juce::dontSendNotification);
         });
     };
 
@@ -948,7 +952,7 @@ void PracticePanel::exportMix()
    #if JUCE_IOS
     renderMix (juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile (name), true);
    #else
-    fileChooser = std::make_unique<juce::FileChooser> ("Export the mix (song + take)",
+    fileChooser = std::make_unique<juce::FileChooser> (tr ("Export the mix (song + take)"),
                                                        juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile (name),
                                                        "*.m4a");
     fileChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
@@ -975,7 +979,7 @@ void PracticePanel::renderMix (const juce::File& target, bool share)
         stemGains[(size_t) s] = player.stemGains[(size_t) s].load();
 
     exportMixButton.setEnabled (false);
-    exportMixButton.setButtonText ("Exporting...");
+    exportMixButton.setButtonText (tr ("Exporting..."));
 
     juce::Thread::launch ([safeThis = SafePointer<PracticePanel> (this), song, take, songGain, takeGain, stems, stemGains, target, share]
     {
@@ -992,12 +996,12 @@ void PracticePanel::renderMix (const juce::File& target, bool share)
                 return;
 
             safeThis->exportMixButton.setEnabled (true);
-            safeThis->exportMixButton.setButtonText ("Export mix...");
+            safeThis->exportMixButton.setButtonText (tr ("Export mix..."));
 
             if (result.failed())
             {
                 juce::Logger::writeToLog ("Could not export the mix: " + result.getErrorMessage());
-                safeThis->songLabel.setText ("Could not export the mix: " + result.getErrorMessage(), juce::dontSendNotification);
+                safeThis->songLabel.setText (tr ("Could not export the mix: {error}", result.getErrorMessage()), juce::dontSendNotification);
                 return;
             }
 
@@ -1049,22 +1053,22 @@ void PracticePanel::showMarksMenu()
 
     if (! marks.has_value())
     {
-        menu.addItem (youTubeMode ? "Marks are for songs from a topic (not YouTube videos yet)"
-                                  : "Marks are saved in topics: add this song to a topic first", false, false, [] {});
+        menu.addItem (youTubeMode ? tr ("Marks are for songs from a topic (not YouTube videos yet)")
+                                  : tr ("Marks are saved in topics: add this song to a topic first"), false, false, [] {});
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&marksButton));
         return;
     }
 
     const auto now = take ? player.getTakePosition() : player.getPositionSeconds();
 
-    menu.addSectionHeader (take ? "Comments on the take" : "Marks on this song");
-    menu.addItem ((take ? "Add a comment at " : "Add a marker at ") + formatMarkTime (now) + "...", [this, file, now]
+    menu.addSectionHeader (take ? tr ("Comments on the take") : tr ("Marks on this song"));
+    menu.addItem (take ? tr ("Add a comment at {time}...", formatMarkTime (now)) : tr ("Add a marker at {time}...", formatMarkTime (now)), [this, file, now]
     {
         SongMark m;
         m.id = juce::Uuid().toDashedString();
         m.fileName = file.getFileName();
         m.start = now;
-        editMark (file, m, "New marker at " + formatMarkTime (now));
+        editMark (file, m, tr ("New marker at {time}", formatMarkTime (now)));
     });
 
     if (! take && loopExists())
@@ -1076,7 +1080,7 @@ void PracticePanel::showMarksMenu()
         loop.end = loopEndSeconds();
         loop.speed = speedSlider.getValue() / 100.0;
         loop.semitones = pitchSlider.getValue();
-        menu.addItem ("Save this loop (" + loop.describe() + ")...", [this, file, loop] { editMark (file, loop, "Save the loop"); });
+        menu.addItem (tr ("Save this loop ({loop})...", loop.describe()), [this, file, loop] { editMark (file, loop, tr ("Save the loop")); });
     }
 
     if (! marks->empty())
@@ -1091,8 +1095,8 @@ void PracticePanel::showMarksMenu()
         for (auto& m : *marks)
         {
             juce::PopupMenu one;
-            one.addItem ("Edit comment...", [this, file, m] { editMark (file, m, "Edit comment"); });
-            one.addItem ("Remove", [this, file, id = m.id]
+            one.addItem (tr ("Edit comment..."), [this, file, m] { editMark (file, m, tr ("Edit comment")); });
+            one.addItem (tr ("Remove"), [this, file, id = m.id]
             {
                 if (removeMark)
                     removeMark (file, id);
@@ -1102,7 +1106,7 @@ void PracticePanel::showMarksMenu()
             edit.addSubMenu (m.describe(), one);
         }
 
-        menu.addSubMenu ("Edit or remove", edit);
+        menu.addSubMenu (tr ("Edit or remove"), edit);
     }
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&marksButton));
@@ -1110,11 +1114,11 @@ void PracticePanel::showMarksMenu()
 
 void PracticePanel::editMark (const juce::File& file, SongMark mark, const juce::String& title)
 {
-    auto* window = new juce::AlertWindow (title, "Comment (optional), e.g. \"bar 17: watch the fingering\":",
+    auto* window = new juce::AlertWindow (title, tr ("Comment (optional), e.g. \"bar 17: watch the fingering\":"),
                                           juce::MessageBoxIconType::NoIcon, this);
     window->addTextEditor ("text", mark.text);
-    window->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
-    window->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    window->addButton (tr ("Save"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
 
     window->enterModalState (true, juce::ModalCallbackFunction::create ([safe = SafePointer<PracticePanel> (this), window, file, mark] (int result) mutable
     {
@@ -1203,7 +1207,7 @@ void PracticePanel::updateTakeMode()
         }
 
         takeSong = nullptr;
-        songLabel.setText (shownSong != nullptr ? shownSong->name : juce::String ("No song loaded"), juce::dontSendNotification);
+        songLabel.setText (shownSong != nullptr ? shownSong->name : tr ("No song loaded"), juce::dontSendNotification);
     }
 
     for (auto* c : std::initializer_list<juce::Component*> { &setAButton, &setBButton, &loopButton, &clearLoopButton, &snapButton })
@@ -1216,8 +1220,8 @@ void PracticePanel::updateTakeMode()
     for (auto* c : std::initializer_list<juce::Component*> { &speedSlider, &speedLabel, &pitchSlider, &pitchLabel })
         c->setEnabled (! on);
 
-    hintLabel.setText (on ? "Replaying a take: the song does what it did while you recorded (position, speed, pitch, loop). Tap the bar to jump."
-                          : waveformHint,
+    hintLabel.setText (on ? tr ("Replaying a take: the song does what it did while you recorded (position, speed, pitch, loop). Tap the bar to jump.")
+                          : waveformHint(),
                        juce::dontSendNotification);
     updateLoopButtons();
     resized();
@@ -1301,8 +1305,8 @@ void PracticePanel::applySetup (const PracticeSetup& s)
         metronome.tempoChangedByUser();
         subdivisionBox.setSelectedId (s.subdivision + 1, juce::dontSendNotification);
         updateSubdivisionControls();
-        showNote ("Metronome set to " + juce::String (juce::roundToInt (metronome.startBpm.load())) + " bpm, "
-                  + juce::String (metronome.beatsPerBar.load()) + " beats from your last session on this topic");
+        showNote (tr ("Metronome set to {bpm} bpm, {beats} beats from your last session on this topic",
+                      juce::roundToInt (metronome.startBpm.load()), metronome.beatsPerBar.load()));
     }
 }
 
@@ -1340,8 +1344,8 @@ void PracticePanel::updateLoopButtons()
 {
     loopButton.setEnabled (loopExists());
     loopButton.setToggleState (loopIsEnabled(), juce::dontSendNotification);
-    loopButton.setButtonText (loopExists() ? "Loop " + formatTime (loopStartSeconds()) + " - " + formatTime (loopEndSeconds())
-                                           : juce::String ("Loop"));
+    loopButton.setButtonText (loopExists() ? tr ("Loop {start} - {end}", formatTime (loopStartSeconds()), formatTime (loopEndSeconds()))
+                                           : tr ("Loop"));
     loopButton.setColour (juce::TextButton::buttonOnColourId, theme::accent());
     clearLoopButton.setEnabled (loopExists());
     zoomLoopButton.setEnabled (player.hasLoop());
@@ -1350,7 +1354,7 @@ void PracticePanel::updateLoopButtons()
         youTubeTimeline->repaint();
 
     if (pendingLoopStart < 0.0)
-        setAButton.setButtonText ("Set A");
+        setAButton.setButtonText (tr ("Set A"));
 
     waveform.repaint();
 }
@@ -1359,8 +1363,8 @@ void PracticePanel::updateSnapButton()
 {
     using Mode = WaveformView::SnapMode;
     const auto mode = waveform.getSnapMode();
-    snapButton.setButtonText (mode == Mode::bars ? "Snap: bars" : (mode == Mode::beats ? "Snap: beats" : "Snap: off"));
-    snapButton.setTooltip ("Loop edges snap to the detected bars or beats. Tap to change.");
+    snapButton.setButtonText (mode == Mode::bars ? tr ("Snap: bars") : (mode == Mode::beats ? tr ("Snap: beats") : tr ("Snap: off")));
+    snapButton.setTooltip (tr ("Loop edges snap to the detected bars or beats. Tap to change."));
 }
 
 void PracticePanel::updateFollowControls()
@@ -1422,7 +1426,7 @@ void PracticePanel::timerCallback()
             closeYouTube();   // a song was loaded from elsewhere (e.g. the command line)
 
         shownSong = song;
-        songLabel.setText (song != nullptr ? song->name : juce::String ("No song loaded"), juce::dontSendNotification);
+        songLabel.setText (song != nullptr ? song->name : tr ("No song loaded"), juce::dontSendNotification);
         pendingLoopStart = -1.0;
         waveform.songChanged();
         updateLoopButtons();
@@ -1436,7 +1440,8 @@ void PracticePanel::timerCallback()
         for (auto* b : { &rewindButton, &playButton, &stopButton, &setAButton, &setBButton })
             b->setEnabled (st.ready && st.errorCode == 0);
 
-        playButton.setButtonText (st.playing ? "Pause" : "Play");
+        playButton.setButtonText (st.playing ? tr ("Pause") : tr ("Play"));
+        playButton.getProperties().set ("pauseIcon", st.playing);
         timeLabel.setText (formatTime (st.time) + " / " + formatTime (st.duration), juce::dontSendNotification);
 
         const auto error = youtube->getErrorText();
@@ -1445,10 +1450,10 @@ void PracticePanel::timerCallback()
         if (error.isNotEmpty())
             text = error;
         else if (! st.ready)
-            text += "  (loading...)";
+            text += "  " + tr ("(loading...)");
        #if JUCE_IOS
         else if (! st.playing && st.time < 0.5)
-            text += "  (first time: tap the video itself to start)";
+            text += "  " + tr ("(first time: tap the video itself to start)");
        #endif
 
         songLabel.setText (text, juce::dontSendNotification);
@@ -1488,10 +1493,11 @@ void PracticePanel::timerCallback()
 
         if (isTakeMode())
         {
-            playButton.setButtonText (player.isTakePlaying() ? "Pause take" : "Play take");
+            playButton.setButtonText (player.isTakePlaying() ? tr ("Pause take") : tr ("Play take"));
+            playButton.getProperties().set ("pauseIcon", player.isTakePlaying());
             timeLabel.setText (formatTime (player.getTakePosition()) + " / " + formatTime (player.getTakeLength()),
                                juce::dontSendNotification);
-            songLabel.setText ("Take: " + takeTitle + (shownSong != nullptr ? "  -  over " + shownSong->name : juce::String()),
+            songLabel.setText (shownSong != nullptr ? tr ("Take: {take}  -  over {song}", takeTitle, shownSong->name) : tr ("Take: {take}", takeTitle),
                                juce::dontSendNotification);
 
             // Show the speed and pitch the take is replaying with.
@@ -1505,7 +1511,8 @@ void PracticePanel::timerCallback()
         }
         else
         {
-            playButton.setButtonText (player.isPlaying() ? "Pause" : "Play");
+            playButton.setButtonText (player.isPlaying() ? tr ("Pause") : tr ("Play"));
+            playButton.getProperties().set ("pauseIcon", player.isPlaying());
             timeLabel.setText (formatTime (player.getPositionSeconds()) + " / " + formatTime (player.getLengthSeconds()),
                                juce::dontSendNotification);
         }
@@ -1518,7 +1525,7 @@ void PracticePanel::timerCallback()
         waveform.setChordTranspose (transpose);
     }
 
-    metronomeButton.setButtonText (metronome.isRunning() ? "Stop metronome" : "Start metronome");
+    metronomeButton.setButtonText (metronome.isRunning() ? tr ("Stop metronome") : tr ("Start metronome"));
 
     // The Looper tab edits the same metronome and can lock its tempo.
     if (metronome.isTempoLocked() != tempoWasLocked)
@@ -1563,7 +1570,7 @@ void PracticePanel::paint (juce::Graphics& g)
         {
             g.setColour (theme::text().withAlpha (0.5f));
             g.setFont (juce::FontOptions (16.0f));
-            g.drawText ("The video is in the compact player (press Expand on it to bring it back here).",
+            g.drawText (tr ("The video is in the compact player (press Expand on it to bring it back here)."),
                         videoArea, juce::Justification::centred);
         }
     }

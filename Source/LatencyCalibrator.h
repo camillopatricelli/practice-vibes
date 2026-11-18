@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
+#include "Localisation.h"
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -51,7 +52,7 @@ public:
 
         if (r.total < minHits)
         {
-            r.problem = "too few hits (" + juce::String (r.total) + ")";
+            r.problem = tr ("too few hits ({count})", r.total);
             return r;
         }
 
@@ -72,7 +73,7 @@ public:
         r.ok = r.used >= minHits && r.used * 10 >= r.total * 6;
 
         if (! r.ok)
-            r.problem = "the hits were too uneven (" + juce::String (r.used) + " of " + juce::String (r.total) + " agreed)";
+            r.problem = tr ("the hits were too uneven ({used} of {total} agreed)", r.used, r.total);
 
         return r;
     }

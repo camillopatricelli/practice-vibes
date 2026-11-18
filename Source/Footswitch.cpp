@@ -1,5 +1,6 @@
 #include "Footswitch.h"
 #include "Stems.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -26,12 +27,12 @@ juce::String MidiTrigger::describe() const
     switch (type)
     {
         case Type::controller: return "CC " + juce::String (number) + ch;
-        case Type::note:       return "Note " + juce::MidiMessage::getMidiNoteName (number, true, true, 3) + ch;
-        case Type::program:    return "Program " + juce::String (number) + ch;
+        case Type::note:       return tr ("Note {note}", juce::MidiMessage::getMidiNoteName (number, true, true, 3)) + ch;
+        case Type::program:    return tr ("Program {number}", number) + ch;
         case Type::none:       break;
     }
 
-    return "not learned";
+    return tr ("not learned");
 }
 
 juce::String MidiTrigger::toString() const
@@ -64,25 +65,23 @@ MidiTrigger MidiTrigger::fromString (const juce::String& text)
 //==============================================================================
 juce::String FootswitchAction::describe() const
 {
-    const auto t = "Track " + juce::String (track + 1);
-
     switch (kind)
     {
-        case Kind::trackPress: return t + ": record / overdub / play";
-        case Kind::trackClear: return t + ": clear";
-        case Kind::trackMute:  return t + ": mute / unmute";
-        case Kind::undo:       return "Undo last overdub";
-        case Kind::muteAll:    return "Mute / unmute all tracks";
-        case Kind::clearAll:   return "Clear all tracks";
-        case Kind::metronome:  return "Start / stop metronome";
-        case Kind::bypass:     return "Rig: bypass selected plugin";
-        case Kind::tuner:      return "Tuner on / off";
-        case Kind::record:     return "Record a take (start / stop)";
-        case Kind::stem:       return "Mute / unmute the song's " + Stems::fileStem (track) + " stem";
+        case Kind::trackPress: return tr ("Track {n}: record / overdub / play", track + 1);
+        case Kind::trackClear: return tr ("Track {n}: clear", track + 1);
+        case Kind::trackMute:  return tr ("Track {n}: mute / unmute", track + 1);
+        case Kind::undo:       return tr ("Undo last overdub");
+        case Kind::muteAll:    return tr ("Mute / unmute all tracks");
+        case Kind::clearAll:   return tr ("Clear all tracks");
+        case Kind::metronome:  return tr ("Start / stop metronome");
+        case Kind::bypass:     return tr ("Rig: bypass selected plugin");
+        case Kind::tuner:      return tr ("Tuner on / off");
+        case Kind::record:     return tr ("Record a take (start / stop)");
+        case Kind::stem:       return tr ("Mute / unmute the song's {stem} stem", Stems::displayName (track).toLowerCase());
         case Kind::none:       break;
     }
 
-    return "Nothing";
+    return tr ("Nothing");
 }
 
 juce::String FootswitchAction::toString() const

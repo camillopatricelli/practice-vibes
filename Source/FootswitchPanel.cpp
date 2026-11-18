@@ -1,5 +1,6 @@
 #include "FootswitchPanel.h"
 #include "Theme.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -36,8 +37,8 @@ public:
             addAndMakeVisible (*label);
         }
 
-        tapLabel.setText ("Tap", juce::dontSendNotification);
-        holdLabel.setText ("Hold 1 s", juce::dontSendNotification);
+        tapLabel.setText (tr ("Tap"), juce::dontSendNotification);
+        holdLabel.setText (tr ("Hold 1 s"), juce::dontSendNotification);
 
         for (size_t a = 0; a < actions.size(); ++a)
         {
@@ -62,16 +63,16 @@ public:
         juce::String text;
 
         if (learning)
-            text = "Press switch " + Footswitch::switchName (index) + " on the pedal now...";
+            text = tr ("Press switch {name} on the pedal now...", Footswitch::switchName (index));
         else if (! sw.trigger.isValid())
-            text = "Not learned";
+            text = tr ("Not learned");
         else
-            text = sw.trigger.describe() + (pending ? "  - checking switch type..."
-                                           : sw.momentary ? "  - momentary (tap + hold)"
-                                                          : "  - latching (tap only)");
+            text = sw.trigger.describe() + "  - " + (pending ? tr ("checking switch type...")
+                                                     : sw.momentary ? tr ("momentary (tap + hold)")
+                                                                    : tr ("latching (tap only)"));
 
         triggerLabel.setText (text, juce::dontSendNotification);
-        learnButton.setButtonText (learning ? "Cancel" : "Learn");
+        learnButton.setButtonText (learning ? tr ("Cancel") : tr ("Learn"));
         forgetButton.setEnabled (sw.trigger.isValid());
 
         selectAction (tapBox, sw.tap);
@@ -80,8 +81,8 @@ public:
         const auto holdPossible = sw.momentary || ! sw.trigger.isValid();
         holdBox.setEnabled (holdPossible);
         holdLabel.setEnabled (holdPossible);
-        holdBox.setTooltip (holdPossible ? juce::String() : "This switch sends one message per stomp, so the app cannot tell a hold. "
-                                                            "Set it to momentary on the pedal and learn it again.");
+        holdBox.setTooltip (holdPossible ? juce::String() : tr ("This switch sends one message per stomp, so the app cannot tell a hold. "
+                                                                "Set it to momentary on the pedal and learn it again."));
 
         const auto lamp = juce::jlimit (0.0f, 1.0f, 1.0f - (float) footswitch.secondsSinceActivity (index) / 0.4f);
         const auto down = footswitch.isDown (index);
@@ -151,7 +152,7 @@ private:
     const std::vector<FootswitchAction> actions = FootswitchAction::all (Looper::numTracks);
 
     juce::Label nameLabel, triggerLabel, tapLabel, holdLabel;
-    juce::TextButton learnButton { "Learn" }, forgetButton { "Forget" };
+    juce::TextButton learnButton { tr ("Learn") }, forgetButton { tr ("Forget") };
     juce::ComboBox tapBox, holdBox;
     juce::Rectangle<int> lampArea;
     float lampLevel = 0.0f;
@@ -162,10 +163,10 @@ private:
 FootswitchPanel::FootswitchPanel (AppEngine& e)
     : engine (e), footswitch (*e.footswitch)
 {
-    intro.setText ("Each switch has a tap action (on the press, so recording starts exactly on the stomp) and, "
+    intro.setText (tr ("Each switch has a tap action (on the press, so recording starts exactly on the stomp) and, "
                    "for momentary switches, a hold action after 1 second.\n"
                    "M-VAVE Chocolate: in CubeSuite choose Custom Control, give each switch its own CC number "
-                   "and set Visual behavior Off (momentary). Then tap Learn and press the switch.",
+                   "and set Visual behavior Off (momentary). Then tap Learn and press the switch."),
                    juce::dontSendNotification);
     intro.setColour (juce::Label::textColourId, theme::text().withAlpha (0.8f));
     intro.setJustificationType (juce::Justification::topLeft);
@@ -190,7 +191,7 @@ FootswitchPanel::FootswitchPanel (AppEngine& e)
         }
     };
 
-    defaultsButton.setTooltip ("Switch A-D = track 1-4: tap records / overdubs / plays, hold clears the track. Learned switches are kept.");
+    defaultsButton.setTooltip (tr ("Switch A-D = track 1-4: tap records / overdubs / plays, hold clears the track. Learned switches are kept."));
     defaultsButton.onClick = [this] { footswitch.setDefaultActions(); };
     addAndMakeVisible (learnAllButton);
     addAndMakeVisible (defaultsButton);
@@ -232,11 +233,11 @@ void FootswitchPanel::timerCallback()
             learningAll = false;
     }
 
-    learnAllButton.setButtonText (learningAll ? "Stop learning" : "Learn A-D in a row");
+    learnAllButton.setButtonText (learningAll ? tr ("Stop learning") : tr ("Learn A-D in a row"));
 
     const auto names = engine.midi->getEnabledInputNames();
-    devicesLabel.setText (names.isEmpty() ? juce::String ("No MIDI inputs: connect or pair the pedal (Bluetooth MIDI button on the top bar)")
-                                          : "MIDI inputs: " + names.joinIntoString (", "),
+    devicesLabel.setText (names.isEmpty() ? tr ("No MIDI inputs: connect or pair the pedal (Bluetooth MIDI button on the top bar)")
+                                          : tr ("MIDI inputs: {names}", names.joinIntoString (", ")),
                           juce::dontSendNotification);
 
     for (auto& row : rows)

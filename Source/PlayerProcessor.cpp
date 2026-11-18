@@ -1,6 +1,7 @@
 #include "PlayerProcessor.h"
 #include "AacFile.h"
 #include "MediaFoundationAudio.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -76,7 +77,7 @@ namespace
 
             if (result.failed())
             {
-                error = "can't decode this " + extension.substring (1).toUpperCase() + " file: " + result.getErrorMessage();
+                error = tr ("can't decode this {format} file: {error}", extension.substring (1).toUpperCase(), result.getErrorMessage());
                 return {};
             }
 
@@ -88,7 +89,7 @@ namespace
 
         if (stream == nullptr)
         {
-            error = "could not open the file";
+            error = tr ("could not open the file");
             return {};
         }
 
@@ -104,8 +105,8 @@ namespace
         if (reader == nullptr)
         {
             error = extension.isNotEmpty() && formats.findFormatForFileExtension (extension) == nullptr
-                        ? "unsupported audio format (" + extension + ")"
-                        : "unsupported or damaged audio file";
+                        ? tr ("unsupported audio format ({extension})", extension)
+                        : tr ("unsupported or damaged audio file");
             return {};
         }
 
@@ -113,7 +114,7 @@ namespace
 
         if (length <= 0)
         {
-            error = "the file contains no audio";
+            error = tr ("the file contains no audio");
             return {};
         }
 
@@ -399,7 +400,7 @@ juce::Result PlayerProcessor::renderTakeMix (std::shared_ptr<const LoadedSong> s
                                              std::shared_ptr<const StemSet> stems, std::array<float, Stems::count> stemGains)
 {
     if (song == nullptr || take == nullptr || take->audio.audio.getNumSamples() == 0)
-        return juce::Result::fail ("nothing to export");
+        return juce::Result::fail (tr ("nothing to export"));
 
     constexpr int block = 512;
     sampleRate = take->audio.sampleRate;

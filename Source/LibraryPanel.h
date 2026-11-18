@@ -4,6 +4,7 @@
 #include "Library.h"
 #include "SharePanel.h"
 #include "StudentGroups.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -115,10 +116,10 @@ private:
 
     // Shown until the user has picked a library folder.
     juce::Label setupLabel;
-    juce::TextButton useDefaultButton, chooseFolderButton { "Choose a folder..." };
+    juce::TextButton useDefaultButton, chooseFolderButton { tr ("Choose a folder...") };
 
     juce::TextEditor searchBox;
-    juce::TextButton newTopicButton { "+ New topic" }, folderButton { "Library folder..." }, tagsButton { "Tags" };
+    juce::TextButton newTopicButton { tr ("+ New topic") }, folderButton { tr ("Library folder...") }, tagsButton { tr ("Tags") };
     juce::ListBox topicList { "Topics", this };
     juce::Label emptyLabel;
 

@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "TopicShare.h"
 #include "StudentGroups.h"
+#include "Localisation.h"
 #include <optional>
 
 namespace pv
@@ -58,12 +59,12 @@ private:
     ShareContext context;
     juce::Label nameLabel;
     juce::TextEditor nameEditor;
-    juce::ToggleButton newTopicToggle { "As a new topic: the same lesson for another student (their own copy)" };
+    juce::ToggleButton newTopicToggle { tr ("As a new topic: the same lesson for another student (their own copy)") };
     juce::Label toLabel, newTopicHint;
     juce::ComboBox toBox, groupModeBox;
     juce::ToggleButton summaryToggle;
-    juce::ToggleButton shrinkToggle { "Make WAV / AIFF files smaller (AAC, 192 kbit/s)" };
-    juce::TextButton shareButton, cancelButton { "Cancel" };
+    juce::ToggleButton shrinkToggle { tr ("Make WAV / AIFF files smaller (AAC, 192 kbit/s)") };
+    juce::TextButton shareButton, cancelButton { tr ("Cancel") };
     bool writing = false;
 
     JUCE_DECLARE_WEAK_REFERENCEABLE (SharePanel)
@@ -107,7 +108,7 @@ private:
     juce::OwnedArray<juce::TextButton> locateButtons;
     juce::Component missingHolder;
     juce::Viewport missingViewport;
-    juce::TextButton applyButton, copyButton { "Import as copy" }, cancelButton { "Cancel" };
+    juce::TextButton applyButton, copyButton { tr ("Import as copy") }, cancelButton { tr ("Cancel") };
     std::unique_ptr<juce::FileChooser> chooser;
 
     JUCE_DECLARE_WEAK_REFERENCEABLE (ImportPanel)

@@ -6,6 +6,7 @@
 #include "PracticeLog.h"
 #include "PracticePlanner.h"
 #include "SessionPlans.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -59,9 +60,9 @@ private:
 
     juce::Label planLabel, timeLabel, focusLabel, totalLabel, statusLabel, emptyLabel;
     juce::ComboBox planBox, timeBox, focusBox;
-    juce::TextButton saveButton { "Save as plan..." }, planMenuButton { "Plan..." },
-                     shuffleButton { "Shuffle" }, addButton { "+ Add a topic" },
-                     startButton { "Start session" }, cancelButton { "Cancel" };
+    juce::TextButton saveButton { tr ("Save as plan...") }, planMenuButton { tr ("Plan...") },
+                     shuffleButton { tr ("Shuffle") }, addButton { tr ("+ Add a topic") },
+                     startButton { tr ("Start session") }, cancelButton { tr ("Cancel") };
     std::vector<std::unique_ptr<SlotRow>> rows;
     juce::Viewport rowViewport;
     juce::Component rowHolder;
@@ -102,7 +103,7 @@ private:
     juce::ComboBox topicBox;
     juce::Label summaryLabel, topicLabel, startLabel, minutesLabel, noteLabel, errorLabel;
     juce::TextEditor startEditor, minutesEditor, noteEditor;
-    juce::TextButton saveButton { "Save" }, cancelButton { "Cancel" }, deleteButton { "Delete entry" };
+    juce::TextButton saveButton { tr ("Save") }, cancelButton { tr ("Cancel") }, deleteButton { tr ("Delete entry") };
 };
 
 /** A recorded take listed in a topic's history. */
@@ -145,7 +146,7 @@ private:
 
     juce::Label statsLabel, emptyLabel, sessionsHeader;
     std::unique_ptr<TopicBars> topicBars;
-    juce::TextButton addTimeButton { "+ Add time..." };
+    juce::TextButton addTimeButton { tr ("+ Add time...") };
     std::unique_ptr<LineChart> tempoChart, speedChart;
     std::unique_ptr<WeekBars> weekBars;
     std::unique_ptr<SessionList> sessionList;

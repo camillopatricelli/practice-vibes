@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Links.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -46,7 +47,7 @@ private:
     juce::String tagFilter;
 
     juce::TextEditor searchBox;
-    juce::TextButton newButton { "+ New link" }, tagsButton { "Tags" }, setupButton { "Set up the library in the Topics tab" };
+    juce::TextButton newButton { tr ("+ New link") }, tagsButton { tr ("Tags") }, setupButton { tr ("Set up the library in the Topics tab") };
     juce::Label emptyLabel;
     juce::Viewport viewport;
     juce::Component rowHolder;

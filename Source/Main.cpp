@@ -2,6 +2,7 @@
 #include "AppEngine.h"
 #include "AppLog.h"
 #include "AppPaths.h"
+#include "Localisation.h"
 #include "MainComponent.h"
 #include "SharePicker.h"
 #include "TopicShare.h"
@@ -103,8 +104,18 @@ public:
         pv::StorageScan::clearWebCacheIfAsked (getAppDataFolder());    // before any web view uses it
 
         // The look, before any component exists: theme (Dark / Light / Follow system) from ui.xml, then the fonts and colours.
+        // ... and the language (empty = the device language; a change applies at the next start).
         if (auto ui = juce::parseXML (getUiSettingsFile()))
+        {
             theme::setMode (theme::modeFromName (ui->getStringAttribute ("theme", "dark")));
+            i18n::initialise (ui->getStringAttribute ("language"), getAppDataFolder());
+        }
+        else
+        {
+            i18n::initialise ({}, getAppDataFolder());
+        }
+
+        juce::Logger::writeToLog ("Language: " + i18n::currentLanguage() + " (device: " + i18n::deviceLanguage() + ")");
 
         lookAndFeel = std::make_unique<WarmLookAndFeel>();
         juce::LookAndFeel::setDefaultLookAndFeel (lookAndFeel.get());

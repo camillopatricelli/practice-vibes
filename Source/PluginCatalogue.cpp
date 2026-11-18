@@ -1,5 +1,6 @@
 #include "PluginCatalogue.h"
 #include "AppPaths.h"
+#include "Localisation.h"
 
 #if JUCE_MAC || JUCE_IOS
  #include <AudioToolbox/AudioToolbox.h>
@@ -15,11 +16,12 @@ namespace
     /** JUCE's AudioUnit identifiers look like "AudioUnit:Effects/aufx,Sbtl,Manu". */
     juce::String kindFromAudioUnitCategory (const juce::String& category)
     {
-        if (category == "Effects")      return "Effect";
-        if (category == "Synths")       return "Instrument";
-        if (category == "Generators")   return "Generator";
-        if (category == "MidiEffects")  return "MIDI FX";
-        return "Other";
+        // Kinds are data (sorting, comparisons); RigPanel shows them with tr().
+        if (category == "Effects")      return i18n::key ("Effect");
+        if (category == "Synths")       return i18n::key ("Instrument");
+        if (category == "Generators")   return i18n::key ("Generator");
+        if (category == "MidiEffects")  return i18n::key ("MIDI FX");
+        return i18n::key ("Other");
     }
 
    #if JUCE_MAC || JUCE_IOS
@@ -140,8 +142,11 @@ void PluginCatalogue::refresh()
         const juce::ScopedLock sl (lock);
         entries = std::move (result);
 
-        if (status.isEmpty() || status.endsWith (" plugins available"))
-            status = juce::String ((int) entries.size()) + " plugins available";
+        if (status.isEmpty() || statusIsCount)
+        {
+            status = trn ("{n} plugin available", "{n} plugins available", (int) entries.size());
+            statusIsCount = true;
+        }
     }
 
     juce::Logger::writeToLog ("Plugin catalogue: " + juce::String ((int) getEntries().size()) + " plugins");
@@ -191,6 +196,7 @@ void PluginCatalogue::setStatus (const juce::String& newStatus)
     {
         const juce::ScopedLock sl (lock);
         status = newStatus;
+        statusIsCount = false;
     }
 
     sendChangeMessage();
@@ -212,7 +218,7 @@ void PluginCatalogue::run()
 
         while (! threadShouldExit())
         {
-            setStatus ("Scanning: " + juce::File (scanner.getNextPluginFileThatWillBeScanned()).getFileName());
+            setStatus (tr ("Scanning: {file}", juce::File (scanner.getNextPluginFileThatWillBeScanned()).getFileName()));
 
             if (! scanner.scanNextFile (true, pluginName))
                 break;
@@ -225,7 +231,7 @@ void PluginCatalogue::run()
     if (auto xml = scannedList.createXml())
         xml->writeTo (getPluginCacheFile());
 
-    setStatus ("Scan finished: " + juce::String (scannedList.getNumTypes()) + " desktop plugins");
+    setStatus (trn ("Scan finished: {n} desktop plugin", "Scan finished: {n} desktop plugins", scannedList.getNumTypes()));
 
     std::weak_ptr<bool> weakAlive = alive;
     juce::MessageManager::callAsync ([this, weakAlive]

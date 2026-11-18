@@ -1,4 +1,5 @@
 #include "Tuner.h"
+#include "Localisation.h"
 #include <complex>
 
 namespace pv
@@ -213,25 +214,25 @@ float PitchSmoother::add (const PitchReading& reading, double now)
 const std::vector<Tuning>& tuningPresets (TunerInstrument instrument)
 {
     static const std::vector<Tuning> guitar {
-        { "Standard",         { 40, 45, 50, 55, 59, 64 } },     // E A D G B E
-        { "Half step down",   { 39, 44, 49, 54, 58, 63 } },     // Eb Ab Db Gb Bb Eb
-        { "Full step down",   { 38, 43, 48, 53, 57, 62 } },     // D G C F A D
-        { "Drop D",           { 38, 45, 50, 55, 59, 64 } },     // D A D G B E
-        { "Drop C",           { 36, 43, 48, 53, 57, 62 } },     // C G C F A D
-        { "DADGAD",           { 38, 45, 50, 55, 57, 62 } },
-        { "Open G",           { 38, 43, 50, 55, 59, 62 } },     // D G D G B D
-        { "Open D",           { 38, 45, 50, 54, 57, 62 } },     // D A D F# A D
-        { "Open E",           { 40, 47, 52, 56, 59, 64 } },     // E B E G# B E
-        { "Open C",           { 36, 43, 48, 55, 60, 64 } },     // C G C G C E
+        { i18n::key ("Standard"),         { 40, 45, 50, 55, 59, 64 } },     // E A D G B E
+        { i18n::key ("Half step down"),   { 39, 44, 49, 54, 58, 63 } },     // Eb Ab Db Gb Bb Eb
+        { i18n::key ("Full step down"),   { 38, 43, 48, 53, 57, 62 } },     // D G C F A D
+        { i18n::key ("Drop D"),           { 38, 45, 50, 55, 59, 64 } },     // D A D G B E
+        { i18n::key ("Drop C"),           { 36, 43, 48, 53, 57, 62 } },     // C G C F A D
+        { i18n::key ("DADGAD"),           { 38, 45, 50, 55, 57, 62 } },
+        { i18n::key ("Open G"),           { 38, 43, 50, 55, 59, 62 } },     // D G D G B D
+        { i18n::key ("Open D"),           { 38, 45, 50, 54, 57, 62 } },     // D A D F# A D
+        { i18n::key ("Open E"),           { 40, 47, 52, 56, 59, 64 } },     // E B E G# B E
+        { i18n::key ("Open C"),           { 36, 43, 48, 55, 60, 64 } },     // C G C G C E
     };
     static const std::vector<Tuning> bass {
-        { "Standard (4 strings)",       { 28, 33, 38, 43 } },               // E A D G
-        { "Half step down (4 strings)", { 27, 32, 37, 42 } },               // Eb Ab Db Gb
-        { "Full step down (4 strings)", { 26, 31, 36, 41 } },               // D G C F
-        { "Drop D (4 strings)",         { 26, 33, 38, 43 } },               // D A D G
-        { "Standard (5 strings)",       { 23, 28, 33, 38, 43 } },           // B E A D G
-        { "High C (5 strings)",         { 28, 33, 38, 43, 48 } },           // E A D G C
-        { "Standard (6 strings)",       { 23, 28, 33, 38, 43, 48 } },       // B E A D G C
+        { i18n::key ("Standard (4 strings)"),       { 28, 33, 38, 43 } },               // E A D G
+        { i18n::key ("Half step down (4 strings)"), { 27, 32, 37, 42 } },               // Eb Ab Db Gb
+        { i18n::key ("Full step down (4 strings)"), { 26, 31, 36, 41 } },               // D G C F
+        { i18n::key ("Drop D (4 strings)"),         { 26, 33, 38, 43 } },               // D A D G
+        { i18n::key ("Standard (5 strings)"),       { 23, 28, 33, 38, 43 } },           // B E A D G
+        { i18n::key ("High C (5 strings)"),         { 28, 33, 38, 43, 48 } },           // E A D G C
+        { i18n::key ("Standard (6 strings)"),       { 23, 28, 33, 38, 43, 48 } },       // B E A D G C
     };
     static const std::vector<Tuning> none;
 
@@ -244,7 +245,7 @@ juce::String tuningName (const StringNotes& strings, TunerInstrument instrument)
         if (t.strings == strings)
             return t.name;
 
-    return "Custom";
+    return i18n::key ("Custom");
 }
 
 float noteFrequency (int midiNote, float referenceA4) noexcept

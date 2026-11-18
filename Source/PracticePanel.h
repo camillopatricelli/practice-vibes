@@ -10,6 +10,7 @@
 #include "Take.h"
 #include "TimeDisplay.h"
 #include "WaveformView.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -91,7 +92,7 @@ private:
     // Stems (see Stems.h / StemMixer.h): separated in the background, mixed by the player
     StemService stemService;
     StemControls stemControls;
-    juce::TextButton stemsButton { "Stems" };
+    juce::TextButton stemsButton { tr ("Stems") };
     juce::File stemFolder;                              // for the song loaded now
     std::shared_ptr<const LoadedSong> stemsSong, stemsSongOfFile;
     bool stemsChecked = false, loadingStems = false;
@@ -112,7 +113,7 @@ private:
     std::unique_ptr<TakeTimelineView> takeTimeline;
     juce::Label guitarVolumeLabel;
     juce::Slider guitarVolumeSlider;
-    juce::TextButton closeTakeButton { "Close take" }, exportMixButton { "Export mix..." };
+    juce::TextButton closeTakeButton { tr ("Close take") }, exportMixButton { tr ("Export mix...") };
     juce::ScopedMessageBox shareBox;                // iPad share sheet for an exported mix
     void exportMix();
     void renderMix (const juce::File& target, bool share);
@@ -130,7 +131,7 @@ private:
     juce::Rectangle<int> videoArea;
     juce::Rectangle<int> playbackCard, metronomeCard;   // painted as rounded cards
     std::unique_ptr<YouTubeTimeline> youTubeTimeline;
-    juce::TextButton compactButton { "Compact player" }, closeVideoButton { "Close video" }, openOnYouTubeButton { "Open on YouTube" };
+    juce::TextButton compactButton { tr ("Compact player") }, closeVideoButton { tr ("Close video") }, openOnYouTubeButton { tr ("Open on YouTube") };
     void updateModeVisibility();
     double positionSeconds() const;
     bool loopIsEnabled() const;
@@ -156,19 +157,19 @@ private:
     // Song
     juce::Label songHeader, songLabel;
     TimeDisplay timeLabel;
-    juce::TextButton openButton { "Open audio file" };
-    juce::TextButton marksButton { "Marks" };
+    juce::TextButton openButton { tr ("Open audio file") };
+    juce::TextButton marksButton { tr ("Marks") };
     juce::File takeFile;                        // the open take's audio file
     void showMarksMenu();
     void recallMark (const SongMark&);
     void editMark (const juce::File&, SongMark, const juce::String& title);
     juce::File markedFile() const               { return isTakeMode() ? takeFile : songFile; }
     WaveformView waveform;
-    juce::TextButton zoomOutButton { "-" }, zoomInButton { "+" }, fitButton { "Fit" }, zoomLoopButton { "Zoom to loop" };
+    juce::TextButton zoomOutButton { "-" }, zoomInButton { "+" }, fitButton { tr ("Fit") }, zoomLoopButton { tr ("Zoom to loop") };
     juce::TextButton snapButton;
     void updateSnapButton();
-    juce::TextButton rewindButton { "|<" }, playButton { "Play" }, stopButton { "Stop" },
-                     setAButton { "Set A" }, setBButton { "Set B" }, loopButton { "Loop" }, clearLoopButton { "Clear loop" };
+    juce::TextButton rewindButton { "|<" }, playButton { tr ("Play") }, stopButton { tr ("Stop") },
+                     setAButton { tr ("Set A") }, setBButton { tr ("Set B") }, loopButton { tr ("Loop") }, clearLoopButton { tr ("Clear loop") };
     double pendingLoopStart = -1.0;
     std::shared_ptr<const LoadedSong> shownSong;   // detects songs loaded from elsewhere (e.g. command line)
     std::shared_ptr<const LoadedSong> songOfFile;  // the song `songFile` belongs to
@@ -185,7 +186,7 @@ private:
 
     // Metronome
     juce::Label metronomeHeader, bpmDisplay;
-    juce::TextButton metronomeButton { "Start metronome" };
+    juce::TextButton metronomeButton { tr ("Start metronome") };
     std::unique_ptr<BeatIndicator> beatIndicator;
     juce::Slider bpmSlider, clickVolumeSlider;
     juce::Label bpmLabel, beatsLabel, clickVolumeLabel;
@@ -195,8 +196,8 @@ private:
     juce::Slider subLevelSlider, swingSlider;
     void updateSubdivisionControls();
 
-    juce::ToggleButton trainerToggle { "Speed trainer" };
-    juce::ToggleButton followToggle { "Follow song beats" };
+    juce::ToggleButton trainerToggle { tr ("Speed trainer") };
+    juce::ToggleButton followToggle { tr ("Follow song beats") };
     void updateFollowControls();
     bool tempoWasLocked = false, songGridFound = false;
     juce::Slider stepSlider, intervalSlider, maxBpmSlider;

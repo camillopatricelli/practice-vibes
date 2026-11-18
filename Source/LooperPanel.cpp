@@ -4,6 +4,7 @@
 #include "LoopFiles.h"
 #include "Theme.h"
 #include "Icons.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -82,7 +83,7 @@ public:
         addAndMakeVisible (pedalLabel);
 
         pedalButton.onClick = [this] { looper.pressTrack (track); };
-        pedalButton.setTooltip ("Record, then overdub / play (key " + juce::String (track + 1) + ")");
+        pedalButton.setTooltip (tr ("Record, then overdub / play (key {key})", track + 1));
         addAndMakeVisible (pedalButton);
 
         muteButton.onClick = [this] { looper.toggleMute (track); };
@@ -128,18 +129,18 @@ public:
 
         switch (state)
         {
-            case Looper::State::empty:       text = "Record";                                   colour = theme::raised(); break;
-            case Looper::State::armed:       text = "Waiting for bar line...";                  colour = armedColour;   break;
-            case Looper::State::recording:   text = "Recording - tap to stop";                  colour = recordColour;  break;
-            case Looper::State::playing:     text = muted ? "Muted - tap to play" : "Playing - tap to overdub";
+            case Looper::State::empty:       text = tr ("Record");                              colour = theme::raised(); break;
+            case Looper::State::armed:       text = tr ("Waiting for bar line...");             colour = armedColour;   break;
+            case Looper::State::recording:   text = tr ("Recording - tap to stop");             colour = recordColour;  break;
+            case Looper::State::playing:     text = muted ? tr ("Muted - tap to play") : tr ("Playing - tap to overdub");
                                              colour = muted ? theme::track() : playColour; break;
-            case Looper::State::overdubbing: text = "Overdubbing - tap to stop";                colour = overdubColour; break;
+            case Looper::State::overdubbing: text = tr ("Overdubbing - tap to stop");           colour = overdubColour; break;
         }
 
         pedalButton.setButtonText (text);
         icons::setIcon (pedalButton, state == Looper::State::empty ? icons::Icon::record : icons::Icon::none, false);
         pedalButton.setColour (juce::TextButton::buttonColourId, colour);
-        muteButton.setButtonText (muted ? "Unmute" : "Mute");
+        muteButton.setButtonText (muted ? tr ("Unmute") : tr ("Mute"));
         muteButton.setEnabled (state == Looper::State::playing || state == Looper::State::overdubbing);
         clearButton.setEnabled (state != Looper::State::empty);
 
@@ -196,13 +197,13 @@ public:
         juce::String info;
 
         if (lastState == Looper::State::empty)
-            info = "empty";
+            info = tr ("empty");
         else if (lastState == Looper::State::armed)
-            info = "starts on the next bar line";
+            info = tr ("starts on the next bar line");
         else if (lastState == Looper::State::recording)
-            info = lastBars > 0 ? "bar " + juce::String (lastBars) : juce::String();
+            info = lastBars > 0 ? tr ("bar {n}", lastBars) : juce::String();
         else
-            info = juce::String (lastBars) + (lastBars == 1 ? " bar" : " bars");
+            info = trn ("{n} bar", "{n} bars", lastBars);
 
         g.setColour (theme::text().withAlpha (0.85f));
         g.setFont (juce::FontOptions (15.0f));
@@ -235,7 +236,7 @@ private:
     const int track;
 
     juce::Label nameLabel, pedalLabel;
-    juce::TextButton pedalButton, muteButton { "Mute" }, clearButton { "Clear" };
+    juce::TextButton pedalButton, muteButton { tr ("Mute") }, clearButton { tr ("Clear") };
     juce::Slider volumeSlider;
     juce::Rectangle<int> progressArea;
 
@@ -252,12 +253,12 @@ LooperPanel::LooperPanel (AppEngine& e)
     loadSettings();
     setWantsKeyboardFocus (true);
 
-    header.setText ("Looper", juce::dontSendNotification);
+    header.setText (tr ("Looper"), juce::dontSendNotification);
     theme::styleHeader (header);
     header.setColour (juce::Label::textColourId, theme::text().withAlpha (0.9f));
     addAndMakeVisible (header);
 
-    styleLabel (sourceLabel, "Record");
+    styleLabel (sourceLabel, tr ("Record"));
     addAndMakeVisible (sourceLabel);
 
     for (auto* b : { &afterFxButton, &beforeFxButton })
@@ -268,18 +269,18 @@ LooperPanel::LooperPanel (AppEngine& e)
         addAndMakeVisible (*b);
     }
 
-    afterFxButton.setTooltip ("Record your instrument as you hear it, with the rig's effects.");
-    beforeFxButton.setTooltip ("Record your dry instrument; loops are played through the rig, so changing the tone changes them too.");
+    afterFxButton.setTooltip (tr ("Record your instrument as you hear it, with the rig's effects."));
+    beforeFxButton.setTooltip (tr ("Record your dry instrument; loops are played through the rig, so changing the tone changes them too."));
     (looper.source.load() == (int) Looper::Source::beforeFx ? beforeFxButton : afterFxButton).setToggleState (true, juce::dontSendNotification);
     afterFxButton.onClick = [this] { looper.source = (int) Looper::Source::afterFx; saveSettings(); };
     beforeFxButton.onClick = [this] { looper.source = (int) Looper::Source::beforeFx; saveSettings(); };
 
-    styleLabel (lengthLabel, "Length");
+    styleLabel (lengthLabel, tr ("Length"));
     addAndMakeVisible (lengthLabel);
-    lengthBox.addItem ("Free (stop on a bar line)", 100);
+    lengthBox.addItem (tr ("Free (stop on a bar line)"), 100);
 
     for (auto bars : { 1, 2, 3, 4, 6, 8, 12, 16 })
-        lengthBox.addItem (juce::String (bars) + (bars == 1 ? " bar" : " bars"), bars);
+        lengthBox.addItem (trn ("{n} bar", "{n} bars", bars), bars);
 
     lengthBox.setSelectedId (looper.fixedBars.load() > 0 ? looper.fixedBars.load() : 100, juce::dontSendNotification);
     lengthBox.onChange = [this]
@@ -294,18 +295,18 @@ LooperPanel::LooperPanel (AppEngine& e)
     clearAllButton.onClick = [this] { looper.clearAll(); };
     muteAllButton.onClick = [this] { looper.toggleMuteAll(); };
 
-    footswitchButton.setTooltip ("Control the looper with a MIDI pedal: learn its switches, choose tap and hold actions.");
+    footswitchButton.setTooltip (tr ("Control the looper with a MIDI pedal: learn its switches, choose tap and hold actions."));
     footswitchButton.onClick = [this]
     {
         if (showOverlay)
-            showOverlay ("Footswitch", std::make_unique<FootswitchPanel> (engine));
+            showOverlay (tr ("Footswitch"), std::make_unique<FootswitchPanel> (engine));
     };
 
     for (auto* b : { &undoButton, &clearAllButton, &muteAllButton, &metronomeButton, &footswitchButton })
         addAndMakeVisible (*b);
 
     // Metronome (shared with the Practice tab)
-    styleLabel (tempoLabel, "Tempo");
+    styleLabel (tempoLabel, tr ("Tempo"));
     tempoSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     tempoSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 90, 26);
     tempoSlider.setRange (30.0, 300.0, 1.0);
@@ -317,7 +318,7 @@ LooperPanel::LooperPanel (AppEngine& e)
         metronome.tempoChangedByUser();
     };
 
-    styleLabel (beatsLabel, "Beats per bar");
+    styleLabel (beatsLabel, tr ("Beats per bar"));
 
     for (int i = 1; i <= 12; ++i)
         beatsBox.addItem (juce::String (i), i);
@@ -344,14 +345,14 @@ LooperPanel::LooperPanel (AppEngine& e)
         addAndMakeVisible (*c);
 
     // Latency
-    styleLabel (offsetLabel, "Latency fine-tune");
+    styleLabel (offsetLabel, tr ("Latency fine-tune"));
     offsetSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     offsetSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 90, 26);
     offsetSlider.setRange (-100.0, 100.0, 0.5);
     offsetSlider.setTextValueSuffix (" ms");
     offsetSlider.setValue (looper.latencyOffsetMs.load(), juce::dontSendNotification);
     offsetSlider.setDoubleClickReturnValue (true, 0.0);
-    offsetSlider.setTooltip ("If overdubs land late, move this up; if early, down.");
+    offsetSlider.setTooltip (tr ("If overdubs land late, move this up; if early, down."));
     offsetSlider.onValueChange = [this] { looper.latencyOffsetMs = (float) offsetSlider.getValue(); };
     offsetSlider.onDragEnd = [this] { saveSettings(); };
     styleLabel (latencyLabel, {}, 0.6f);
@@ -359,13 +360,13 @@ LooperPanel::LooperPanel (AppEngine& e)
     styleLabel (hintLabel, {}, 0.7f);
     hintLabel.setJustificationType (juce::Justification::topLeft);
 
-    calibrateButton.setTooltip ("Measure the latency: play short muted notes (or strums) right on the clicks "
-                                "(or connect the audio output to the input with a cable).");
+    calibrateButton.setTooltip (tr ("Measure the latency: play short muted notes (or strums) right on the clicks "
+                                "(or connect the audio output to the input with a cable)."));
     calibrateButton.onClick = [this]
     {
         if (calibrating)
         {
-            calibrationMessage = "Calibration cancelled.";
+            calibrationMessage = tr ("Calibration cancelled.");
             endCalibration();
         }
         else
@@ -374,9 +375,9 @@ LooperPanel::LooperPanel (AppEngine& e)
         }
     };
 
-    saveButton.setTooltip ("Save every track as a WAV (plus a mix) in Documents > Practice Vibes > Loops, to load again later or use in a DAW.");
+    saveButton.setTooltip (tr ("Save every track as a WAV (plus a mix) in Documents > Practice Vibes > Loops, to load again later or use in a DAW."));
     saveButton.onClick = [this] { saveLoops(); };
-    loadButton.setTooltip ("Load saved loops (the looper must be empty).");
+    loadButton.setTooltip (tr ("Load saved loops (the looper must be empty)."));
     loadButton.onClick = [this] { showLoadMenu(); };
 
     for (auto* c : std::initializer_list<juce::Component*> { &offsetLabel, &offsetSlider, &calibrateButton, &latencyLabel, &hintLabel,
@@ -428,11 +429,12 @@ void LooperPanel::updatePedalBadges()
                 continue;
 
             letters.add (Footswitch::switchName (i));
-            details.add ("Footswitch " + Footswitch::switchName (i) + ": tap = record / overdub / play"
-                         + (sw.momentary && sw.hold.kind != FootswitchAction::Kind::none ? ", hold = " + sw.hold.describe() : juce::String()));
+            details.add (sw.momentary && sw.hold.kind != FootswitchAction::Kind::none
+                             ? tr ("Footswitch {name}: tap = record / overdub / play, hold = {action}", Footswitch::switchName (i), sw.hold.describe())
+                             : tr ("Footswitch {name}: tap = record / overdub / play", Footswitch::switchName (i)));
         }
 
-        rows[(size_t) t]->setPedal (letters.isEmpty() ? juce::String() : "pedal " + letters.joinIntoString ("+"),
+        rows[(size_t) t]->setPedal (letters.isEmpty() ? juce::String() : tr ("pedal {letters}", letters.joinIntoString ("+")),
                                     details.joinIntoString ("\n"));
     }
 }
@@ -451,7 +453,7 @@ void LooperPanel::saveLoops()
 
     if (! looper.copyLoops (set, error))
     {
-        showFileMessage ("Not saved: " + error);
+        showFileMessage (tr ("Not saved: {error}", error));
         return;
     }
 
@@ -461,14 +463,14 @@ void LooperPanel::saveLoops()
 
     if (result.failed())
     {
-        showFileMessage ("Not saved: " + result.getErrorMessage());
+        showFileMessage (tr ("Not saved: {error}", result.getErrorMessage()));
         juce::Logger::writeToLog ("Saving loops failed: " + result.getErrorMessage());
         return;
     }
 
     juce::Logger::writeToLog ("Saved " + juce::String (set.getNumLoops()) + " loop(s) to " + folder.getFullPathName());
-    showFileMessage ("Saved " + juce::String (set.getNumLoops()) + (set.getNumLoops() == 1 ? " loop" : " loops")
-                     + " as \"" + folder.getFileName() + "\" (Loops folder: track WAVs + mix.wav).");
+    showFileMessage (trn ("Saved {n} loop as \"{name}\" (Loops folder: track WAVs + mix.wav).",
+                          "Saved {n} loops as \"{name}\" (Loops folder: track WAVs + mix.wav).", set.getNumLoops(), folder.getFileName()));
 }
 
 void LooperPanel::showLoadMenu()
@@ -477,17 +479,17 @@ void LooperPanel::showLoadMenu()
     juce::PopupMenu menu;
 
     if (sessions.isEmpty())
-        menu.addItem (-1, "No saved loops yet", false);
+        menu.addItem (-1, tr ("No saved loops yet"), false);
 
     if (! looper.isEmpty())
-        menu.addSectionHeader ("Clear all loops before loading");
+        menu.addSectionHeader (tr ("Clear all loops before loading"));
 
     for (int i = 0; i < juce::jmin (30, sessions.size()); ++i)
         menu.addItem (i + 1, LoopFiles::describe (sessions[i]), looper.isEmpty() && ! looper.isLoading());
 
    #if ! JUCE_IOS
     menu.addSeparator();
-    menu.addItem (1000, "Show the Loops folder");
+    menu.addItem (1000, tr ("Show the Loops folder"));
    #endif
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (loadButton),
@@ -516,7 +518,7 @@ void LooperPanel::loadLoops (const juce::File& folder)
 
     if (error.isNotEmpty())
     {
-        showFileMessage ("Not loaded: " + error);
+        showFileMessage (tr ("Not loaded: {error}", error));
         juce::Logger::writeToLog ("Loading loops from " + folder.getFullPathName() + " failed: " + error);
         return;
     }
@@ -531,8 +533,8 @@ void LooperPanel::loadLoops (const juce::File& folder)
     (set.source == Looper::Source::beforeFx ? beforeFxButton : afterFxButton).setToggleState (true, juce::dontSendNotification);
     saveSettings();
     juce::Logger::writeToLog ("Loaded loops from " + folder.getFullPathName());
-    showFileMessage ("Loaded \"" + folder.getFileName() + "\": metronome set to " + juce::String (set.getBpm(), 1).trimCharactersAtEnd ("0").trimCharactersAtEnd (".")
-                     + " bpm, " + juce::String (set.beatsPerBar) + " beats; the loops play from its first downbeat.");
+    showFileMessage (tr ("Loaded \"{name}\": metronome set to {bpm} bpm, {beats} beats; the loops play from its first downbeat.",
+                         folder.getFileName(), i18n::number (set.getBpm(), 1), set.beatsPerBar));
 }
 
 //==============================================================================
@@ -561,7 +563,7 @@ void LooperPanel::startCalibration()
         metronome.start();
 
     looper.calibrator.start();
-    calibrateButton.setButtonText ("Cancel");
+    calibrateButton.setButtonText (tr ("Cancel"));
 }
 
 void LooperPanel::endCalibration()
@@ -575,7 +577,7 @@ void LooperPanel::endCalibration()
     if (stopMetronomeAfterCalibration)
         metronome.stop();
 
-    calibrateButton.setButtonText ("Calibrate...");
+    calibrateButton.setButtonText (tr ("Calibrate..."));
 }
 
 void LooperPanel::updateCalibration()
@@ -591,8 +593,8 @@ void LooperPanel::updateCalibration()
         if (juce::Time::getMillisecondCounterHiRes() - calibrationStartMs > calibrationTimeoutMs)
         {
             calibrationMessage = calibrationLags.empty()
-                                   ? "Calibration stopped: no notes detected. Check that your instrument input is working (meter in the Rig tab)."
-                                   : "Calibration stopped: only " + juce::String (calibrationLags.size()) + " notes detected in 45 s. Try again.";
+                                   ? tr ("Calibration stopped: no notes detected. Check that your instrument input is working (meter in the Rig tab).")
+                                   : tr ("Calibration stopped: only {count} notes detected in 45 s. Try again.", (int) calibrationLags.size());
             endCalibration();
         }
 
@@ -608,13 +610,13 @@ void LooperPanel::updateCalibration()
         const auto offset = juce::jlimit (-100.0, 100.0, result.lagMs - deviceMs);
         offsetSlider.setValue (offset, juce::sendNotificationSync);
         saveSettings();
-        calibrationMessage = "Calibrated: your notes arrive " + juce::String (result.lagMs, 1) + " ms after the click (spread "
-                             + juce::String (result.spreadMs, 1) + " ms); the audio device reports " + juce::String (deviceMs, 1)
-                             + " ms, so the fine-tune is now " + juce::String (offset, 1) + " ms.";
+        calibrationMessage = tr ("Calibrated: your notes arrive {lag} ms after the click (spread {spread} ms); the audio device reports {device} ms, "
+                                 "so the fine-tune is now {offset} ms.",
+                                 i18n::decimal (result.lagMs, 1), i18n::decimal (result.spreadMs, 1), i18n::decimal (deviceMs, 1), i18n::decimal (offset, 1));
     }
     else
     {
-        calibrationMessage = "Calibration failed: " + result.problem + ". Try again with short muted notes right on the clicks.";
+        calibrationMessage = tr ("Calibration failed: {problem}. Try again with short muted notes right on the clicks.", result.problem);
     }
 
     endCalibration();
@@ -690,15 +692,14 @@ void LooperPanel::timerCallback()
     undoButton.setEnabled (looper.canUndo());
     clearAllButton.setEnabled (! empty);
     muteAllButton.setEnabled (! empty);
-    metronomeButton.setButtonText (metronome.isRunning() ? "Stop metronome" : "Start metronome");
+    metronomeButton.setButtonText (metronome.isRunning() ? tr ("Stop metronome") : tr ("Start metronome"));
 
     const auto running = metronome.isRunning();
     tempoDisplay.setText (juce::String (juce::roundToInt (running ? metronome.getCurrentBpm() : metronome.startBpm.load())) + " bpm",
                           juce::dontSendNotification);
 
     const auto rate = juce::jmax (1.0, looper.getSampleRate());
-    latencyLabel.setText ("Compensation " + juce::String (looper.getCompensationSamples() * 1000.0 / rate, 1)
-                              + " ms (device + plugins + fine-tune)",
+    latencyLabel.setText (tr ("Compensation {ms} ms (device + plugins + fine-tune)", i18n::decimal (looper.getCompensationSamples() * 1000.0 / rate, 1)),
                           juce::dontSendNotification);
 
     updateCalibration();
@@ -716,9 +717,9 @@ void LooperPanel::timerCallback()
     if (calibrating)
     {
         const auto hits = juce::jmax (0, (int) calibrationLags.size() - warmUpHits);
-        hint = "Calibrating: play a short muted note (or strum) exactly on every click (or connect the output to the input with a cable). "
-               + juce::String (juce::jmin (hits, calibrationHits)) + " / " + juce::String (calibrationHits)
-               + (calibrationLags.size() < (size_t) warmUpHits ? " (warming up)" : "");
+        hint = tr ("Calibrating: play a short muted note (or strum) exactly on every click (or connect the output to the input with a cable).")
+               + " " + juce::String (juce::jmin (hits, calibrationHits)) + " / " + juce::String (calibrationHits)
+               + (calibrationLags.size() < (size_t) warmUpHits ? " " + tr ("(warming up)") : juce::String());
     }
     else if (fileMessage.isNotEmpty())
     {
@@ -730,20 +731,20 @@ void LooperPanel::timerCallback()
     }
     else if (looper.isLoading())
     {
-        hint = "Loaded loops start with the metronome.";
+        hint = tr ("Loaded loops start with the metronome.");
     }
     else if (locked)
-        hint = "Tempo and bar length are locked while there are loops. Clear all to change them.";
+        hint = tr ("Tempo and bar length are locked while there are loops. Clear all to change them.");
     else if (empty)
-        hint = "Tap Record (or press 1-4): recording starts on the nearest bar line. "
-               "If the metronome is stopped it starts, with one bar of count-in.";
+        hint = tr ("Tap Record (or press 1-4): recording starts on the nearest bar line. "
+                   "If the metronome is stopped it starts, with one bar of count-in.");
 
     if (beforeFx && engine.chain->getOutputStage().muted.load())
         hint << (hint.isEmpty() ? "" : "\n")
-             << "Before-FX loops play through the rig: switch Monitor on in the Rig tab to hear them.";
+             << tr ("Before-FX loops play through the rig: switch Monitor on in the Rig tab to hear them.");
 
     if (metronome.followSong.load() && locked)
-        hint << (hint.isEmpty() ? "" : "\n") << "\"Follow song beats\" is paused while there are loops.";
+        hint << (hint.isEmpty() ? "" : "\n") << tr ("\"Follow song beats\" is paused while there are loops.");
 
     hintLabel.setText (hint, juce::dontSendNotification);
 
