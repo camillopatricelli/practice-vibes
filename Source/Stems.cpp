@@ -317,7 +317,7 @@ namespace StemSeparator
 
     juce::URL getModelUrl()
     {
-        return juce::URL ("https://github.com/joefrezza/practice-vibes/releases/download/stem-model-v1/htdemucs_6s.onnx");
+        return juce::URL ("https://github.com/camillopatricelli/practice-vibes/releases/download/stem-model-v1/htdemucs_6s.onnx");
     }
 
     bool hasModel()             { return getModelFile().getSize() == modelBytes; }

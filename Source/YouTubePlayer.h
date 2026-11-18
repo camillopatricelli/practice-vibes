@@ -20,7 +20,7 @@ class YouTubePlayer final : public juce::Component
 {
 public:
     /** Where the helper page lives (one place to change if it ever moves to another host). */
-    static constexpr const char* pageUrl = "https://joefrezza.github.io/practice-vibes/youtube/";
+    static constexpr const char* pageUrl = "https://camillopatricelli.github.io/practice-vibes/youtube/";
 
     /** Floating player size: 16:9 video at least 200 px high (YouTube's minimum) plus the title bar. */
     static constexpr int compactVideoWidth = 384, compactVideoHeight = 216, compactBarHeight = 34;
