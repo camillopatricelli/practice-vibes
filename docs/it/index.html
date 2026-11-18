@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Practice Vibes</title>
+<meta name="description" content="Un'app gratuita per studiare, per chitarristi, bassisti e altri musicisti, su iPad, Windows e macOS. Lettore, accordi, metronomo, looper, accordatore, plugin e un diario di studio automatico.">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="alternate" hreflang="en" href="../">
+<link rel="alternate" hreflang="it" href="./">
+<style>
+  :root {
+    --bg: #f6f6f4; --surface: #ffffff; --text: #1d1e22; --muted: #5b5e66; --line: #e2e2de;
+    --accent: #2f6fb8; --accent-2: #b8860b; --badge: #fff4d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1b1f; --surface: #23252b; --text: #e8e8ea; --muted: #a2a5ad; --line: #34373f;
+      --accent: #7fb2ef; --accent-2: #ffd166; --badge: #3a3220;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 17px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 20px; }
+  header.top { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; color: var(--text); text-decoration: none; }
+  .brand img { width: 32px; height: 32px; border-radius: 8px; }
+  .lang { font-size: 15px; color: var(--muted); }
+  .lang a, .lang strong { padding: 2px 4px; }
+  .hero { padding: 40px 0 28px; }
+  .hero h1 { font-size: clamp(30px, 5vw, 44px); line-height: 1.15; margin: 0 0 14px; letter-spacing: -0.01em; }
+  .hero p.lead { font-size: 19px; color: var(--muted); max-width: 680px; margin: 0 0 22px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0 0 26px; list-style: none; }
+  .tags li { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 12px; font-size: 14px; }
+  .btn { display: inline-block; background: var(--accent); color: #fff; text-decoration: none; padding: 11px 20px;
+         border-radius: 10px; font-weight: 600; max-width: 100%; overflow-wrap: anywhere; }
+  @media (prefers-color-scheme: dark) { .btn { color: #10141a; } }
+  .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); margin-left: 8px; }
+  .note { background: var(--badge); border-radius: 10px; padding: 12px 16px; font-size: 15px; margin: 26px 0 0; }
+  section { padding: 34px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: 24px; margin: 0 0 18px; }
+  h3 { font-size: 18px; margin: 0 0 8px; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+  .card p, .card ul { margin: 0; color: var(--muted); font-size: 16px; }
+  .card ul { padding-left: 18px; }
+  .card .os { font-size: 14px; color: var(--muted); margin: 0 0 12px; }
+  .card .btn { margin-top: 12px; font-size: 15px; padding: 8px 14px; }
+  .features { columns: 2 260px; column-gap: 32px; padding-left: 18px; margin: 0; }
+  .features li { margin: 0 0 8px; break-inside: avoid; }
+  footer { padding: 30px 0 50px; color: var(--muted); font-size: 15px; border-top: 1px solid var(--line); }
+  footer p { margin: 0 0 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="./"><img src="../icon.svg" alt="">Practice Vibes</a>
+    <div class="lang"><a href="../" hreflang="en" lang="en">English</a> | <strong>Italiano</strong></div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <h1>Tutto quello che ti serve per studiare, in un'app sola.</h1>
+      <p class="lead">Rallenta i brani e mettili in loop, guarda gli accordi, suona con metronomo, looper e batteria,
+        accordati, usa i tuoi plugin di effetti. E lascia che l'app tenga il conto di quanto suoni davvero.</p>
+      <ul class="tags">
+        <li>iPad</li><li>Windows</li><li>macOS</li><li>Gratis, senza account</li><li>Niente pubblicità né tracciamento</li><li>Open source (AGPLv3)</li>
+      </ul>
+      <a class="btn" href="#download">Download</a><a class="btn ghost" href="https://github.com/camillopatricelli/practice-vibes">Codice sorgente</a>
+      <p class="note"><strong>Lavori in corso.</strong> I download sono build di prova automatiche, non versioni stabili.
+        Windows è la versione più provata, l'iPad è in prova e la versione per Mac non è ancora stata provata su un Mac vero.</p>
+    </div>
+
+    <!-- Qui andranno gli screenshot quando ci saranno (vedi la lista degli screenshot). -->
+
+    <section>
+      <h2>Per chi è</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Chi studia da solo</h3>
+          <p>Il tempo di studio viene registrato da solo mentre suoni: contano solo i minuti in cui suoni davvero. Una
+            rotazione di argomenti ti mostra cosa stai trascurando, e un pianificatore divide il tempo per te.</p>
+        </div>
+        <div class="card">
+          <h3>Insegnanti</h3>
+          <p>Manda una lezione come unico file: note, brani, link e un compito con un tempo da raggiungere. Gli allievi
+            lo vedono nella schermata Oggi e possono rimandarti i loro take e un riepilogo del loro studio.</p>
+        </div>
+        <div class="card">
+          <h3>Musicisti che vogliono un solo strumento</h3>
+          <p>Looper con drum machine, accordatore, separazione degli stem, il tuo rig di plugin e un footswitch MIDI,
+            configurati una volta e sempre pronti.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Cosa fa</h2>
+      <ul class="features">
+        <li><strong>Lettore</strong>: file audio e video di YouTube, velocità 25–150 % senza cambiare l'intonazione, tonalità ±12 semitoni, loop A-B, zoom della forma d'onda.</li>
+        <li><strong>Stem</strong> (Windows, Mac): silenzia la chitarra, il basso o la voce del disco e suona tu la parte.</li>
+        <li><strong>Accordi, beat e tempi in chiave</strong> riconosciuti da soli e mostrati mentre il brano suona.</li>
+        <li><strong>Metronomo</strong> con suddivisioni, swing, allenatore di velocità e clic che seguono il brano.</li>
+        <li><strong>Looper a 4 tracce</strong> agganciato al tempo, con overdub, calibrazione della latenza e una <strong>drum machine</strong>.</li>
+        <li><strong>Accordatore</strong>: ago o strobo, accordature alternative, controllo di tutte le corde con una pennata.</li>
+        <li><strong>Take</strong>: registrati sopra il brano e riascoltati a tempo.</li>
+        <li><strong>Argomenti</strong>: lezioni, brani, PDF e link in una cartella che scegli tu; condividila tra i dispositivi con iCloud Drive.</li>
+        <li><strong>Rig</strong>: i tuoi plugin di effetti e strumenti (AUv3, VST3, Audio Unit).</li>
+        <li><strong>Footswitch</strong>: qualsiasi pedale MIDI, USB o Bluetooth, per comandare il looper e altro a mani libere.</li>
+      </ul>
+    </section>
+
+    <section id="download">
+      <h2>Download</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Windows</h3>
+          <p class="os">Windows 10 o 11, 64 bit</p>
+          <p>Estrai e avvia. La prima volta Windows chiede conferma: <em>Ulteriori informazioni › Esegui comunque</em>.</p>
+          <a class="btn" href="https://github.com/camillopatricelli/practice-vibes/releases/download/latest-build/PracticeVibes-windows.zip">PracticeVibes-windows.zip</a>
+        </div>
+        <div class="card">
+          <h3>iPad</h3>
+          <p class="os">iPadOS 16 o successivo</p>
+          <p>Non è sull'App Store: si installa con lo strumento gratuito SideStore e il tuo Apple ID, e si rinnova ogni
+            7 giorni. Il computer serve una volta sola.</p>
+          <a class="btn" href="https://github.com/camillopatricelli/practice-vibes/blob/main/README.it.md#download">Come installarla</a>
+        </div>
+        <div class="card">
+          <h3>Mac</h3>
+          <p class="os">macOS 12 o successivo, Apple Silicon o Intel</p>
+          <p>Non ancora provata su un Mac vero. L'app non è autenticata da Apple, quindi macOS ti chiede di consentirla una volta.</p>
+          <a class="btn" href="https://github.com/camillopatricelli/practice-vibes/releases/tag/latest-build">Ultima build</a>
+        </div>
+      </div>
+      <p>Tutti i file e le note della build: <a href="https://github.com/camillopatricelli/practice-vibes/releases/tag/latest-build">ultima build su GitHub</a> (pagina in inglese).
+        Le istruzioni di installazione passo passo sono nel <a href="https://github.com/camillopatricelli/practice-vibes/blob/main/README.it.md#download">README</a>; una guida completa è in arrivo.</p>
+    </section>
+
+    <section>
+      <h2>Gratis, e resterà gratis</h2>
+      <p>Practice Vibes è software libero con licenza <a href="https://github.com/camillopatricelli/practice-vibes/blob/main/LICENSE">GNU AGPLv3</a>.
+        Niente prezzo, niente account, niente pubblicità, niente acquisti in-app. L'app non invia nulla su di te: la tua
+        libreria e il tuo diario di studio restano sui tuoi dispositivi, o nella tua cartella cloud se ne scegli una.
+        I dettagli sono nell'<a href="https://github.com/camillopatricelli/practice-vibes/blob/main/PRIVACY.md">informativa sulla privacy</a> (in inglese).</p>
+      <p>Idea, design e test di Camillo Patricelli; codice scritto con Claude Code (l'IA di Anthropic). Realizzato con JUCE.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>Problemi o idee? <a href="https://github.com/camillopatricelli/practice-vibes/issues">Apri una segnalazione</a>
+      o scrivi a <a href="mailto:practicevibes.app@gmail.com">practicevibes.app@gmail.com</a> (anche in italiano).</p>
+    <p><a href="https://github.com/camillopatricelli/practice-vibes">Codice sorgente</a> ·
+      <a href="https://github.com/camillopatricelli/practice-vibes/blob/main/LICENSE">Licenza</a> ·
+      <a href="https://github.com/camillopatricelli/practice-vibes/blob/main/PRIVACY.md">Privacy</a> ·
+      <a href="https://github.com/camillopatricelli/practice-vibes/blob/main/THIRD_PARTY_NOTICES.md">Componenti di terze parti</a></p>
+    <p>Questo sito non usa cookie, statistiche o font esterni. Ospita anche la
+      <a href="../youtube/">pagina del lettore YouTube</a> usata dall'app.</p>
+  </footer>
+</div>
+</body>
+</html>
