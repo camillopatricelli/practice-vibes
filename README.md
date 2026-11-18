@@ -1,5 +1,7 @@
 # Practice Vibes
 
+🇬🇧 English | [🇮🇹 Italiano](README.it.md)
+
 A practice app for guitarists, bassists and other musicians, for **iPad, Windows and macOS**.
 Free software under the [GNU AGPLv3](LICENSE): no price, no account, no ads, no tracking.
 
