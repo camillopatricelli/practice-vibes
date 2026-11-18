@@ -1,121 +1,125 @@
 # Practice Vibes
 
-A free, open-source, all-in-one guitar practice app, mainly for iPad (with a
-Windows version).
+A practice app for guitarists, bassists and other musicians, for **iPad, Windows and macOS**.
+Free software under the [GNU AGPLv3](LICENSE): no price, no account, no ads, no tracking.
 
-The goal is to bring together in one place things that today need several apps:
-playing along with songs, slowing them down, looping sections, chord
-recognition, a progressive metronome, a multi-track looper, AUv3 effect chains
-with presets, a drum machine synced to the looper, Bluetooth MIDI footswitch
-control, and a place for lesson notes and practice schedules.
+It puts the things you'd normally need several apps for in one place: a song player that slows songs down and loops
+them, chord recognition, a metronome, a looper with a drum machine, a tuner, your effect plugins, a MIDI footswitch,
+and a place for your lessons and practice notes. It also keeps track of how much you really play.
 
-> **Status: early feasibility prototype.** The current build exists to prove
-> the hardest parts work on a real iPad: hosting AUv3 plugins, Bluetooth MIDI
-> footswitches, and installing without a Mac. It is not yet useful for practice.
+> **Status: in active development.** The downloads below are automatic test builds, not stable releases. Expect rough
+> edges, and please [report what you find](../../issues).
 
-## Credits
+<!-- Screenshots to add (see the screenshot list): Today tab, Practice tab with chords and loop, Looper with drums,
+     Tuner, Topics, Rig with plugins. -->
 
-Practice Vibes is being built by *vibe coding*: the code is written by
-[Claude](https://www.anthropic.com/claude) (Anthropic's AI) through
-[Claude Code](https://claude.com/claude-code), steered by a guitarist who wanted
-this app to exist. The name is a nod to that process.
+## Who it's for
 
-It is built on [JUCE](https://juce.com).
+- **Students practising alone**: practice time is logged automatically while you play, with a rotation of topics,
+  session plans, metronome and loops.
+- **Teachers**: send a lesson (notes, songs, assignments) as one file and see what comes back.
+- **Musicians who want one tool**: looper and drum machine, tuner, stem separation, plugin rig, footswitch.
 
-## What works so far
+## What it does
 
-- Song player for audio files (WAV, AIFF, FLAC, MP3, M4A...) with waveform view
-- Speed change without pitch change (25-150 %) and pitch change without speed
-  change (+/-12 semitones), powered by
-  [Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch)
-- A-B looping (drag across the waveform, or Set A / Set B)
-- Stem separation (Windows): splits a song into vocals, guitar, bass, drums,
-  piano and other with Meta's [Demucs](https://github.com/facebookresearch/demucs)
-  (htdemucs_6s, run with [ONNX Runtime](https://onnxruntime.ai)); mute, solo or
-  rebalance the stems while practising, at any speed or pitch. Stems saved in the
-  library reach the iPad too
-- Record takes (your guitar after the effects) and replay them in step with the
-  song; export song + take as one .m4a file
-- Metronome with subdivisions (with swing, from straight to shuffle and dotted),
-  several sounds and a speed trainer (e.g. +2 bpm every minute, up to a limit);
-  it can also follow the song's detected beats
-- Chord recognition (including slash chords), beat, bar and time-signature
-  detection, shown as a chord display and a chord lane on the waveform
-- 4-track looper locked to the metronome's bars: fixed or free length,
-  overdub with undo, recording before or after the effects, latency compensation
-  with a calibration helper (play along with the clicks); loops can be saved as
-  WAV files (one per track plus a mix) and loaded again
-- Built-in drum machine on the looper page: same tempo and bars as the loops, a
-  step editor (8ths, triplets or 16ths, with swing; accents and ghost notes),
-  an acoustic (sampled) or electronic (synthesised) kit, a dozen starter patterns,
-  your own patterns saved by name, and the pattern saved with each loop session
-- Guitar input -> chain of plugins -> output, with input/output gain and meters
-- AUv3 plugins on iPad, VST3 plugins on Windows, with their own interfaces
-- The chain (including each plugin's settings) is saved and restored
-- Bluetooth MIDI pairing and a live view of incoming MIDI messages
-- MIDI footswitch control of the looper: each switch is "learned", with a tap
-  and a hold action (record / overdub / play, clear, mute, undo, bypass...)
+- **Song player**: WAV, AIFF, FLAC, MP3, M4A and YouTube videos. Speed 25-150 % without pitch change, pitch ±12
+  semitones, A-B loop with snap to bars, waveform zoom.
+- **Stems** (Windows, macOS): split a song into vocals, guitar, bass, drums, piano and other, then mute, solo or
+  rebalance them.
+- **Chords, beats and time signatures** detected automatically and shown as you play.
+- **Metronome** with subdivisions, swing, several sounds, a speed trainer, and "follow the song's beats".
+- **4-track looper** locked to the metronome, with overdub and undo, latency calibration, and a built-in **drum
+  machine** (acoustic or electronic kit, step editor).
+- **Tuner**: needle or strobe, guitar and bass tunings, strum all strings at once.
+- **Practice log**: counts only the minutes you actually play (audio or MIDI keyboard), with history, rotation and
+  session plans. No streaks, no notifications.
+- **Topics**: your lessons with notes, tags, songs, PDFs and links, in a folder you choose (put it in iCloud Drive or
+  another cloud folder to use it on all your devices). Share a topic as one file.
+- **Rig**: your own effect and instrument plugins (AUv3 on iPad, VST3 on Windows, Audio Units and VST3 on macOS).
+- **Footswitch**: any MIDI footswitch over USB or Bluetooth, each switch with a tap and a hold action.
+- Dark and light themes; English and Italian.
 
-## Installing on iPad (no Mac needed)
+## Download
 
-The app isn't on the App Store. It is installed with
-[SideStore](https://sidestore.io), which signs apps with your own free Apple ID.
+From the [latest build](../../releases/tag/latest-build) page:
 
-1. Set up SideStore by following its official guide at
-   [docs.sidestore.io](https://docs.sidestore.io). This needs a computer once.
-2. On the iPad, open this repository's
-   [Releases](../../releases/tag/latest-build) page in Safari and download
-   `PracticeVibes.ipa`.
+| Platform | File |
+|---|---|
+| Windows 10/11 (64-bit) | [PracticeVibes-windows.zip](../../releases/download/latest-build/PracticeVibes-windows.zip) |
+| macOS (Apple Silicon and Intel) | [PracticeVibes-macos.dmg](../../releases/download/latest-build/PracticeVibes-macos.dmg) |
+| iPad | [PracticeVibes.ipa](../../releases/download/latest-build/PracticeVibes.ipa) (install with SideStore, see below) |
+
+The app is not signed with paid developer certificates, so each system warns you the first time. That is expected:
+
+**Windows.** Unzip the folder anywhere and run `Practice Vibes.exe`. If SmartScreen says "Windows protected your PC",
+click **More info**, then **Run anyway**. The in-app viewer needs Microsoft Edge WebView2, which comes with Windows 11
+(on Windows 10, install the WebView2 Runtime from Microsoft if documents don't open).
+
+**macOS.** Open the .dmg and drag Practice Vibes to Applications. The app is not notarised by Apple, so the first
+launch is blocked: on macOS 15 or later go to System Settings > Privacy & Security and click **Open Anyway**; on
+macOS 12-14 right-click the app and choose **Open**. The `READ ME FIRST.txt` in the .dmg has the details.
+
+**iPad.** The app isn't on the App Store. It is installed with [SideStore](https://sidestore.io), which signs apps
+with your own free Apple ID:
+1. Set up SideStore by following [its official guide](https://docs.sidestore.io) (needs a computer once).
+2. On the iPad, open the [latest build](../../releases/tag/latest-build) page in Safari and download `PracticeVibes.ipa`.
 3. In SideStore, go to **My Apps**, tap **+** and pick the downloaded file.
 
-Apps installed with a free Apple ID must be refreshed every 7 days; SideStore
-does this from the iPad.
+Apps installed with a free Apple ID must be refreshed every 7 days; SideStore does this from the iPad.
 
-On first launch, allow microphone access (needed for the guitar input).
-The log file can be found in the Files app under
-**On My iPad > Practice Vibes**.
+On first launch, allow microphone access: it is needed for your instrument input. An audio interface works best; the
+device's built-in microphone also hears the room.
 
-## Building
+## Problems and ideas
 
-Builds for both platforms run automatically on GitHub Actions for every push
-(see `.github/workflows/build.yml`).
+Please open an [issue](../../issues). In the app, **Audio settings > About Practice Vibes > Copy diagnostic info**
+copies the version and device details to paste into your report. The log file is in:
+- Windows: `%APPDATA%\Practice Vibes\PracticeVibes.log`
+- macOS: `~/Library/Application Support/Practice Vibes/PracticeVibes.log`
+- iPad: Files app > On My iPad > Practice Vibes
 
-### Windows
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more.
 
-Requirements: Visual Studio 2022 Build Tools (C++ workload), CMake 3.22+,
-Ninja, Git. JUCE is downloaded automatically.
+## Privacy
 
-From a "x64 Native Tools" command prompt:
+The app has no accounts and sends nothing to the developer. Your data stays in the folder you choose.
+Details in [PRIVACY.md](PRIVACY.md).
+
+## Building from source
+
+Builds for all platforms run on GitHub Actions (see `.github/workflows/build.yml`).
+
+**Windows**: Visual Studio 2022 Build Tools (C++ workload), CMake 3.22+, Ninja and Git. JUCE and the other
+dependencies are downloaded automatically. From an "x64 Native Tools" command prompt:
 
 ```
 cmake --preset windows
 cmake --build --preset windows-release
 ```
 
-In VS Code, the CMake Tools extension picks up `CMakePresets.json`.
+The offline tests are `PracticeVibesTests` in the same build folder.
 
-Offline DSP tests: run `PracticeVibesTests` from the same build folder.
+**macOS / iOS**: Xcode, then `cmake --preset macos` or `cmake --preset ios` (see the workflow file for the exact
+build commands).
 
-### iOS
+## Licence and credits
 
-Requires macOS with Xcode:
+Practice Vibes is free software: you can use, study, share and change it under the
+[GNU Affero General Public License v3](LICENSE). It comes with no warranty.
 
-```
-cmake --preset ios
-cmake --build build/ios --config Release --target PracticeVibes -- -sdk iphoneos
-```
+It is built on [JUCE](https://juce.com) (used under its AGPLv3 option),
+[Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch),
+[ONNX Runtime](https://onnxruntime.ai), Meta's [Demucs](https://github.com/facebookresearch/demucs) model,
+[Lucide](https://lucide.dev) icon shapes, the Outfit and DM Sans fonts and the
+[Big Rusty Drums](https://github.com/sfzinstruments/karoryfer.big-rusty-drums) samples by Karoryfer Samples.
+The full list with licences is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and in the app under
+About > Open source licences.
 
-## License
+Practice Vibes is made by a guitarist, Camillo Patricelli, by *vibe coding*: the code is written by
+[Claude](https://www.anthropic.com/claude) (Anthropic's AI) through [Claude Code](https://claude.com/claude-code),
+steered by someone who wanted this app to exist. The name is a nod to that process.
 
-[GNU AGPLv3](LICENSE). JUCE is used under its AGPLv3 option.
+The name "Practice Vibes" and the app icon belong to the author. The licence covers the code, not the name: if you
+publish a modified version, please give it a different name and icon.
 
-Third-party components keep their own licences: Signalsmith Stretch (MIT),
-ONNX Runtime (MIT; its licence and notices ship next to the Windows app),
-Demucs and its htdemucs_6s model (MIT, downloaded by the app on first use;
-exported to ONNX with [demucs.onnx](https://github.com/sevagh/demucs.onnx), MIT).
-The acoustic drum kit is made from
-[Big Rusty Drums](https://github.com/sfzinstruments/karoryfer.big-rusty-drums)
-by Karoryfer Samples (CC0, public domain).
-The interface fonts [Outfit](https://github.com/Outfitio/Outfit-Fonts) and
-[DM Sans](https://github.com/googlefonts/dm-fonts) are used under the SIL Open Font
-License 1.1 (texts in `Resources/Fonts`).
+Contact: [practicevibes.app@gmail.com](mailto:practicevibes.app@gmail.com)

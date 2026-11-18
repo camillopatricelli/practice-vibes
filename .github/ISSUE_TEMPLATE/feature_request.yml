@@ -1,0 +1,30 @@
+name: Feature request
+description: An idea to make practising better
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: Describe the situation and what's missing or awkward today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How you imagine it working (optional).
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform you use
+      multiple: true
+      options:
+        - iPad
+        - Windows
+        - macOS
+  - type: input
+    id: version
+    attributes:
+      label: Version and build
+      description: "Shown in Audio settings > About Practice Vibes (optional)."

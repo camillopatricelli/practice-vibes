@@ -1,6 +1,8 @@
 Practice Vibes for macOS (test build)
 =====================================
 
+Free software under the GNU AGPLv3 (see LICENSE.txt and THIRD_PARTY_NOTICES.md).
+
 This build is not notarised by Apple (no paid developer account), so macOS will
 warn the first time you open it. That is expected.
 
@@ -32,4 +34,6 @@ Problems?
 ---------
 The log file is here (Finder > Go > Go to Folder... and paste the path):
   ~/Library/Application Support/Practice Vibes/PracticeVibes.log
-Please send it along with a short description of what happened.
+Please open an issue at https://github.com/camillopatricelli/practice-vibes/issues
+with a short description of what happened, the log, and the text from
+Audio settings > About Practice Vibes > Copy diagnostic info.

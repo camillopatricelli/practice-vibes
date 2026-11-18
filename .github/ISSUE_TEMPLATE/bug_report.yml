@@ -1,0 +1,44 @@
+name: Bug report
+description: Something doesn't work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: diagnostic
+    attributes:
+      label: Diagnostic info
+      description: "In the app: Audio settings > About Practice Vibes > Copy diagnostic info, then paste it here. It contains the version, build number, platform and audio device."
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - iPad
+        - Windows
+        - macOS
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What did you do, step by step?
+      placeholder: |
+        1. Open a song in the Practice tab
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log excerpt (optional)
+      description: "The end of PracticeVibes.log. Windows: %APPDATA%\\Practice Vibes. macOS: ~/Library/Application Support/Practice Vibes. iPad: Files > On My iPad > Practice Vibes. Check it for anything private (file or folder names) before pasting."
+      render: text
