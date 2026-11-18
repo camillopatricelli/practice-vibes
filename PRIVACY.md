@@ -1,6 +1,6 @@
 # Privacy
 
-*Draft, last updated 18 November 2026.*
+*Last updated 18 November 2026.*
 
 Practice Vibes is made by one person, Camillo Patricelli. In short: **the app collects nothing about you and sends
 nothing to the developer.**

@@ -115,9 +115,9 @@ It is built on [JUCE](https://juce.com) (used under its AGPLv3 option),
 The full list with licences is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and in the app under
 About > Open source licences.
 
-Practice Vibes is made by a guitarist, Camillo Patricelli, by *vibe coding*: the code is written by
-[Claude](https://www.anthropic.com/claude) (Anthropic's AI) through [Claude Code](https://claude.com/claude-code),
-steered by someone who wanted this app to exist. The name is a nod to that process.
+Practice Vibes is made by a guitarist, Camillo Patricelli, by *vibe coding*: the idea, the design, the decisions and
+the testing are his; the code is written by [Claude](https://www.anthropic.com/claude) (Anthropic's AI) through
+[Claude Code](https://claude.com/claude-code). The name is a nod to that process.
 
 The name "Practice Vibes" and the app icon belong to the author. The licence covers the code, not the name: if you
 publish a modified version, please give it a different name and icon.

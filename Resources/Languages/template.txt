@@ -18,26 +18,26 @@ countries: (two-letter language code, e.g. it)
 // Source/AboutPanel.cpp:48
 "Copyright 2026 {name}. Free software under the GNU AGPLv3: you may use, study, share and change it. It comes with no warranty." = "Copyright 2026 {name}. Free software under the GNU AGPLv3: you may use, study, share and change it. It comes with no warranty."
 // Source/AboutPanel.cpp:51
-"Written with Claude Code (Anthropic's AI). Built with JUCE." = "Written with Claude Code (Anthropic's AI). Built with JUCE."
-// Source/AboutPanel.cpp:73
-"User guide" = "User guide"
-// Source/AboutPanel.cpp:74
-"Privacy" = "Privacy"
+"Idea, design and testing by {name}, code written with Claude Code (Anthropic's AI). Built with JUCE." = "Idea, design and testing by {name}, code written with Claude Code (Anthropic's AI). Built with JUCE."
 // Source/AboutPanel.cpp:75
-"Licence" = "Licence"
+"User guide" = "User guide"
 // Source/AboutPanel.cpp:76
-"Source code" = "Source code"
+"Privacy" = "Privacy"
+// Source/AboutPanel.cpp:77
+"Licence" = "Licence"
 // Source/AboutPanel.cpp:78
+"Source code" = "Source code"
+// Source/AboutPanel.cpp:80
 "Open source licences" = "Open source licences"
-// Source/AboutPanel.cpp:79
+// Source/AboutPanel.cpp:81
 "The licences of the libraries, fonts and sounds the app is built with" = "The licences of the libraries, fonts and sounds the app is built with"
-// Source/AboutPanel.cpp:83
+// Source/AboutPanel.cpp:85
 "Copy diagnostic info" = "Copy diagnostic info"
-// Source/AboutPanel.cpp:84
+// Source/AboutPanel.cpp:86
 "Copies the version, build and device details, to paste into a bug report" = "Copies the version, build and device details, to paste into a bug report"
-// Source/AboutPanel.cpp:88
+// Source/AboutPanel.cpp:90
 "Copied" = "Copied"
-// Source/AboutPanel.cpp:92
+// Source/AboutPanel.cpp:94
 "Back" = "Back"
 // Source/BluetoothMidiView_ios.mm:29
 "Switch the device on (in pairing mode, if it has one), then tap it below to connect. Once connected it appears as a MIDI input." = "Switch the device on (in pairing mode, if it has one), then tap it below to connect. Once connected it appears as a MIDI input."

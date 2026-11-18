@@ -1061,7 +1061,7 @@ countries: it
 "Made by {name}" = "Realizzato da {name}"
 "Write to the developer" = "Scrivi allo sviluppatore"
 "Copyright 2026 {name}. Free software under the GNU AGPLv3: you may use, study, share and change it. It comes with no warranty." = "Copyright 2026 {name}. Software libero con licenza GNU AGPLv3: puoi usarlo, studiarlo, condividerlo e modificarlo. Non è fornita alcuna garanzia."
-"Written with Claude Code (Anthropic's AI). Built with JUCE." = "Scritto con Claude Code (l'IA di Anthropic). Realizzato con JUCE."
+"Idea, design and testing by {name}, code written with Claude Code (Anthropic's AI). Built with JUCE." = "Idea, design e test di {name}, codice scritto con Claude Code (l'IA di Anthropic). Realizzato con JUCE."
 "User guide" = "Guida"
 "Privacy" = "Privacy"
 "Licence" = "Licenza"

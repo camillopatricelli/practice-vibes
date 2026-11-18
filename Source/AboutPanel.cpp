@@ -48,7 +48,9 @@ AboutPanel::AboutPanel (std::function<juce::String()> info)
     licenceNote.setText (tr ("Copyright 2026 {name}. Free software under the GNU AGPLv3: you may use, study, share and change it. "
                              "It comes with no warranty.", developerName),
                          juce::dontSendNotification);
-    credit.setText (tr ("Written with Claude Code (Anthropic's AI). Built with JUCE."), juce::dontSendNotification);
+    credit.setText (tr ("Idea, design and testing by {name}, code written with Claude Code (Anthropic's AI). Built with JUCE.",
+                        developerName),
+                    juce::dontSendNotification);
 
     for (auto* l : { &version, &platform, &developer, &licenceNote, &credit })
     {
@@ -148,8 +150,8 @@ void AboutPanel::resized()
         return;
     }
 
-    // The block below is ~420 px tall: centred, so the card can stay tall enough for the licences view.
-    r.removeFromTop (juce::jmax (0, (r.getHeight() - 420) / 2));
+    // The block below is ~440 px tall: centred, so the card can stay tall enough for the licences view.
+    r.removeFromTop (juce::jmax (0, (r.getHeight() - 440) / 2));
 
     title.setBounds (r.removeFromTop (48));
     version.setBounds (r.removeFromTop (26));
@@ -175,7 +177,8 @@ void AboutPanel::resized()
     licenceNote.setBounds (r.removeFromTop (48));
     licenceNote.setMinimumHorizontalScale (1.0f);
     r.removeFromTop (8);
-    credit.setBounds (r.removeFromTop (24));
+    credit.setBounds (r.removeFromTop (44));    // two lines when needed
+    credit.setMinimumHorizontalScale (1.0f);
 }
 
 } // namespace pv
