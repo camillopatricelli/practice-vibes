@@ -43,6 +43,7 @@ private:
     class Overlay;
 
     void openAudioSettings();
+    void openAbout();
     bool isLogTabShown() const;
     void setLogTabShown (bool);     // the Log tab is hidden unless switched on in the audio settings
     void toggleTuner();

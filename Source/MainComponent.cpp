@@ -15,6 +15,7 @@
 #include "AppPaths.h"
 #include "Localisation.h"
 #include "BluetoothMidiView.h"
+#include "AboutPanel.h"
 #include <AppIconData.h>
 
 namespace pv
@@ -1837,11 +1838,15 @@ void MainComponent::openAudioSettings()
                   std::function<void (const juce::String&, PracticeTiming)> setTiming,
                   std::function<juce::StringArray()> getMidiInputs, std::function<juce::String()> getMidiDevice,
                   std::function<void (const juce::String&)> setMidiDevice,
-                  bool teacher, std::function<void (bool)> onTeacher)
+                  bool teacher, std::function<void (bool)> onTeacher, std::function<void()> onAbout)
             : selector (std::move (s)), currentInput (std::move (getInput)), timingFor (std::move (getTiming)),
               onTiming (std::move (setTiming)), midiInputs (std::move (getMidiInputs)), midiDeviceFor (std::move (getMidiDevice)),
               onMidiDevice (std::move (setMidiDevice))
         {
+            aboutButton.setTooltip (tr ("Version, licences, links and diagnostic info"));
+            aboutButton.onClick = std::move (onAbout);
+            addAndMakeVisible (aboutButton);
+
             // Which MIDI input's notes count as playing (a MIDI keyboard; the footswitch's messages never count).
             midiLabel.setText (tr ("MIDI notes"), juce::dontSendNotification);
             midiLabel.setJustificationType (juce::Justification::centredRight);
@@ -1971,7 +1976,9 @@ void MainComponent::openAudioSettings()
         void resized() override
         {
             auto r = getLocalBounds().reduced (20, 16);
-            displayHeader.setBounds (r.removeFromTop (30));
+            auto headerRow = r.removeFromTop (30);
+            aboutButton.setBounds (headerRow.removeFromRight (juce::jmin (220, headerRow.getWidth() / 2)));
+            displayHeader.setBounds (headerRow);
             r.removeFromTop (6);
 
             auto row = r.removeFromTop (40).reduced (0, 4);
@@ -2082,6 +2089,7 @@ void MainComponent::openAudioSettings()
         juce::Label displayHeader, audioHeader;
         std::unique_ptr<juce::Component> selector;
         juce::ToggleButton logToggle { tr ("Show the Log tab") }, teacherToggle { tr ("I teach") };
+        juce::TextButton aboutButton { tr ("About Practice Vibes") };
         juce::Label themeLabel;
         juce::ComboBox themeBox;
         juce::Label languageLabel, languageInfo;
@@ -2120,7 +2128,31 @@ void MainComponent::openAudioSettings()
                                                                {
                                                                    setTeacherSetting (on);
                                                                    saveUiSetting ("teacher", on);
+                                                               },
+                                                               [safe = juce::Component::SafePointer<MainComponent> (this)]
+                                                               {
+                                                                   // Async: the About card replaces this overlay, button included.
+                                                                   juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->openAbout(); });
                                                                }));
+}
+
+void MainComponent::openAbout()
+{
+    showOverlay (tr ("About Practice Vibes"), std::make_unique<AboutPanel> ([this]
+    {
+        juce::String info = "Audio: ";
+
+        if (auto* device = engine.deviceManager.getCurrentAudioDevice())
+            info << device->getTypeName() << " / " << device->getName() << ", "
+                 << juce::String (device->getCurrentSampleRate(), 0) << " Hz, "
+                 << device->getCurrentBufferSizeSamples() << " samples, "
+                 << device->getActiveInputChannels().countNumberOfSetBits() << " in / "
+                 << device->getActiveOutputChannels().countNumberOfSetBits() << " out";
+        else
+            info << "no device open";
+
+        return info;
+    }));
 }
 
 bool MainComponent::isLogTabShown() const

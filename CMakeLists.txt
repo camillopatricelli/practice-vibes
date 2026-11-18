@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.22)
 
 project(PracticeVibes VERSION 0.1.0 LANGUAGES C CXX)
 
+# Build number shown in About and the log: CI passes its run number (-DPV_BUILD_NUMBER=...); empty = local build.
+set(PV_BUILD_NUMBER "" CACHE STRING "Build number (CI run number); empty for local builds")
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -154,6 +157,7 @@ juce_add_gui_app(PracticeVibes
 target_sources(PracticeVibes PRIVATE
     Source/Main.cpp
     Source/AacFile.cpp
+    Source/AboutPanel.cpp
     Source/AppEngine.cpp
     Source/AppLog.cpp
     Source/ChordAnalyzer.cpp
@@ -213,7 +217,8 @@ target_compile_definitions(PracticeVibes PRIVATE
     JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
     JUCE_USE_CURL=0
     JUCE_STRICT_REFCOUNTEDPOINTER=1
-    JUCE_SILENCE_XCODE_15_LINKER_WARNING=1)
+    JUCE_SILENCE_XCODE_15_LINKER_WARNING=1
+    PV_BUILD_NUMBER="${PV_BUILD_NUMBER}")
 
 # iPad: exported mixes go out through the share sheet; library folders in cloud drives need folder access (bookmarks).
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -296,6 +301,12 @@ juce_add_binary_data(PracticeVibesLanguages
     NAMESPACE   LanguageData
     SOURCES     ${PV_LANGUAGES})
 
+# The third-party notices shown in About > Open source licences.
+juce_add_binary_data(PracticeVibesNotices
+    HEADER_NAME NoticesData.h
+    NAMESPACE   NoticesData
+    SOURCES     THIRD_PARTY_NOTICES.md)
+
 target_link_libraries(PracticeVibes
     PRIVATE
         juce::juce_audio_utils
@@ -306,6 +317,7 @@ target_link_libraries(PracticeVibes
         PracticeVibesDrumKit
         PracticeVibesFonts
         PracticeVibesLanguages
+        PracticeVibesNotices
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags

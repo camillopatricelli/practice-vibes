@@ -2,6 +2,7 @@
 #include "AppEngine.h"
 #include "AppLog.h"
 #include "AppPaths.h"
+#include "BuildInfo.h"
 #include "Localisation.h"
 #include "MainComponent.h"
 #include "SharePicker.h"
@@ -96,8 +97,8 @@ public:
     {
         log = std::make_unique<AppLog>();
 
-        juce::Logger::writeToLog (getApplicationName() + " " + getApplicationVersion() + " starting on "
-                                  + juce::SystemStats::getOperatingSystemName()
+        juce::Logger::writeToLog (getApplicationName() + " " + pv::build::versionLine() + " starting on "
+                                  + pv::build::platform()
                                   + " (" + juce::SystemStats::getDeviceDescription() + ")");
         juce::Logger::writeToLog ("Data folder: " + getAppDataFolder().getFullPathName());
 

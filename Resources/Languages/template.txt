@@ -7,6 +7,38 @@ countries: (two-letter language code, e.g. it)
 // Do not translate: Looper, Loop, Practice Vibes, note names (C, C#, Db ... B), chord symbols (Am7, G/B...), bpm, Hz, dB, ms, MIDI, YouTube, iCloud Drive, AUv3, VST3, ASIO.
 // Try a translation without a new build: put it in <app data>/languages/<code>.txt and pick it in Settings.
 
+// Source/AboutPanel.cpp:38
+"Version {version} (build {build})" = "Version {version} (build {build})"
+// Source/AboutPanel.cpp:39
+"Version {version} (local build)" = "Version {version} (local build)"
+// Source/AboutPanel.cpp:42
+"Made by {name}" = "Made by {name}"
+// Source/AboutPanel.cpp:46
+"Write to the developer" = "Write to the developer"
+// Source/AboutPanel.cpp:48
+"Copyright 2026 {name}. Free software under the GNU AGPLv3: you may use, study, share and change it. It comes with no warranty." = "Copyright 2026 {name}. Free software under the GNU AGPLv3: you may use, study, share and change it. It comes with no warranty."
+// Source/AboutPanel.cpp:51
+"Written with Claude Code (Anthropic's AI). Built with JUCE." = "Written with Claude Code (Anthropic's AI). Built with JUCE."
+// Source/AboutPanel.cpp:73
+"User guide" = "User guide"
+// Source/AboutPanel.cpp:74
+"Privacy" = "Privacy"
+// Source/AboutPanel.cpp:75
+"Licence" = "Licence"
+// Source/AboutPanel.cpp:76
+"Source code" = "Source code"
+// Source/AboutPanel.cpp:78
+"Open source licences" = "Open source licences"
+// Source/AboutPanel.cpp:79
+"The licences of the libraries, fonts and sounds the app is built with" = "The licences of the libraries, fonts and sounds the app is built with"
+// Source/AboutPanel.cpp:83
+"Copy diagnostic info" = "Copy diagnostic info"
+// Source/AboutPanel.cpp:84
+"Copies the version, build and device details, to paste into a bug report" = "Copies the version, build and device details, to paste into a bug report"
+// Source/AboutPanel.cpp:88
+"Copied" = "Copied"
+// Source/AboutPanel.cpp:92
+"Back" = "Back"
 // Source/BluetoothMidiView_ios.mm:29
 "Switch the device on (in pairing mode, if it has one), then tap it below to connect. Once connected it appears as a MIDI input." = "Switch the device on (in pairing mode, if it has one), then tap it below to connect. Once connected it appears as a MIDI input."
 // Source/ChordView.cpp:50
@@ -849,201 +881,205 @@ countries: (two-letter language code, e.g. it)
 "Load loops..." = "Load loops..."
 // Source/LooperPanel.h:59
 "Save loops" = "Save loops"
-// Source/MainComponent.cpp:57
+// Source/MainComponent.cpp:58
 "Log file: {path}" = "Log file: {path}"
-// Source/MainComponent.cpp:101
+// Source/MainComponent.cpp:102
 "Copy log" = "Copy log"
-// Source/MainComponent.cpp:201
+// Source/MainComponent.cpp:202
 "Close" = "Close"
-// Source/MainComponent.cpp:230
+// Source/MainComponent.cpp:231
 "What you're practising: played time is logged to this topic (see the Today tab)" = "What you're practising: played time is logged to this topic (see the Today tab)"
-// Source/MainComponent.cpp:235
+// Source/MainComponent.cpp:236
 "Chromatic tuner (a footswitch can open and close it too)" = "Chromatic tuner (a footswitch can open and close it too)"
-// Source/MainComponent.cpp:238
+// Source/MainComponent.cpp:239
 "Record yourself (your instrument after the rig) into the topic you're practising. Open the take later to hear it over the song, in step. A footswitch can do this too." = "Record yourself (your instrument after the rig) into the topic you're practising. Open the take later to hear it over the song, in step. A footswitch can do this too."
-// Source/MainComponent.cpp:266
+// Source/MainComponent.cpp:267
 "Audio settings (devices, theme, Log tab)" = "Audio settings (devices, theme, Log tab)"
-// Source/MainComponent.cpp:269
+// Source/MainComponent.cpp:270
 "Bluetooth MIDI (pair a footswitch)" = "Bluetooth MIDI (pair a footswitch)"
-// Source/MainComponent.cpp:272
+// Source/MainComponent.cpp:273
 "Save (settings, rig and session)" = "Save (settings, rig and session)"
-// Source/MainComponent.cpp:414
+// Source/MainComponent.cpp:415
 "Practice" = "Practice"
-// Source/MainComponent.cpp:416
+// Source/MainComponent.cpp:417
 "Links" = "Links"
-// Source/MainComponent.cpp:418
+// Source/MainComponent.cpp:419
 "Rig" = "Rig"
-// Source/MainComponent.cpp:784
+// Source/MainComponent.cpp:785
 "Free practice" = "Free practice"
-// Source/MainComponent.cpp:794
+// Source/MainComponent.cpp:795
 "(paused: Start on the Today tab)" = "(paused: Start on the Today tab)"
-// Source/MainComponent.cpp:795
+// Source/MainComponent.cpp:796
 "(paused: Resume on the Today tab)" = "(paused: Resume on the Today tab)"
-// Source/MainComponent.cpp:795
+// Source/MainComponent.cpp:796
 "(paused: play to continue)" = "(paused: play to continue)"
-// Source/MainComponent.cpp:799
-"Time's up - next: {title}" = "Time's up - next: {title}"
 // Source/MainComponent.cpp:800
+"Time's up - next: {title}" = "Time's up - next: {title}"
+// Source/MainComponent.cpp:801
 "Time's up - finish the session" = "Time's up - finish the session"
-// Source/MainComponent.cpp:806
+// Source/MainComponent.cpp:807
 "(paused)" = "(paused)"
-// Source/MainComponent.cpp:806
+// Source/MainComponent.cpp:807
 "(timing)" = "(timing)"
-// Source/MainComponent.cpp:808
+// Source/MainComponent.cpp:809
 "(playing)" = "(playing)"
-// Source/MainComponent.cpp:812
-"Lesson:" = "Lesson:"
 // Source/MainComponent.cpp:813
-"no topic" = "no topic"
+"Lesson:" = "Lesson:"
 // Source/MainComponent.cpp:814
+"no topic" = "no topic"
+// Source/MainComponent.cpp:815
 "(not logged)" = "(not logged)"
-// Source/MainComponent.cpp:867
-"Lesson over" = "Lesson over"
 // Source/MainComponent.cpp:868
-"Send {title} to your student?" = "Send {title} to your student?"
+"Lesson over" = "Lesson over"
 // Source/MainComponent.cpp:869
+"Send {title} to your student?" = "Send {title} to your student?"
+// Source/MainComponent.cpp:870
 "Not now" = "Not now"
-// Source/MainComponent.cpp:896
-"Teaching" = "Teaching"
-// Source/MainComponent.cpp:896
-"Teaching: tap to stop" = "Teaching: tap to stop"
 // Source/MainComponent.cpp:897
-"Lesson mode is on: nothing goes to your practice log. Tap when the lesson is over." = "Lesson mode is on: nothing goes to your practice log. Tap when the lesson is over."
+"Teaching" = "Teaching"
+// Source/MainComponent.cpp:897
+"Teaching: tap to stop" = "Teaching: tap to stop"
 // Source/MainComponent.cpp:898
+"Lesson mode is on: nothing goes to your practice log. Tap when the lesson is over." = "Lesson mode is on: nothing goes to your practice log. Tap when the lesson is over."
+// Source/MainComponent.cpp:899
 "Start a lesson: the app works as usual but nothing goes to your practice log" = "Start a lesson: the app works as usual but nothing goes to your practice log"
-// Source/MainComponent.cpp:919
+// Source/MainComponent.cpp:920
 "Next topic: {title}" = "Next topic: {title}"
-// Source/MainComponent.cpp:921
+// Source/MainComponent.cpp:922
 "Finish the session" = "Finish the session"
-// Source/MainComponent.cpp:923
-"5 more minutes" = "5 more minutes"
 // Source/MainComponent.cpp:924
+"5 more minutes" = "5 more minutes"
+// Source/MainComponent.cpp:925
 "End the session" = "End the session"
-// Source/MainComponent.cpp:928
+// Source/MainComponent.cpp:929
 "Open the Today tab" = "Open the Today tab"
-// Source/MainComponent.cpp:931
+// Source/MainComponent.cpp:932
 "Stop practising \"{title}\"" = "Stop practising \"{title}\""
-// Source/MainComponent.cpp:950
+// Source/MainComponent.cpp:951
 "Practise a rotation topic" = "Practise a rotation topic"
-// Source/MainComponent.cpp:954
+// Source/MainComponent.cpp:955
 "Plan a session..." = "Plan a session..."
-// Source/MainComponent.cpp:963
+// Source/MainComponent.cpp:964
 "Start a saved plan" = "Start a saved plan"
-// Source/MainComponent.cpp:969
+// Source/MainComponent.cpp:970
 "No topics in the practice rotation yet" = "No topics in the practice rotation yet"
-// Source/MainComponent.cpp:1085
+// Source/MainComponent.cpp:1086
 "Plan a practice session" = "Plan a practice session"
-// Source/MainComponent.cpp:1179
+// Source/MainComponent.cpp:1180
 "no backing" = "no backing"
-// Source/MainComponent.cpp:1227
+// Source/MainComponent.cpp:1228
 "History: {title}" = "History: {title}"
-// Source/MainComponent.cpp:1271
+// Source/MainComponent.cpp:1272
 "History: all topics" = "History: all topics"
-// Source/MainComponent.cpp:1329
+// Source/MainComponent.cpp:1330
 "Practice entry" = "Practice entry"
-// Source/MainComponent.cpp:1352
-"Add to your library?" = "Add to your library?"
 // Source/MainComponent.cpp:1353
+"Add to your library?" = "Add to your library?"
+// Source/MainComponent.cpp:1354
 "\"{name}\" isn't in your library folder.\n\nAdd a copy to the Topics Inbox? It then syncs to your other devices, and its stems are kept next to it (stems you already made for it move along)." = "\"{name}\" isn't in your library folder.\n\nAdd a copy to the Topics Inbox? It then syncs to your other devices, and its stems are kept next to it (stems you already made for it move along)."
-// Source/MainComponent.cpp:1356
+// Source/MainComponent.cpp:1357
 "Add to Inbox" = "Add to Inbox"
-// Source/MainComponent.cpp:1384
+// Source/MainComponent.cpp:1385
 "Could not copy the song into the library (details in the log)" = "Could not copy the song into the library (details in the log)"
-// Source/MainComponent.cpp:1394
+// Source/MainComponent.cpp:1395
 "Added to the Inbox: move it into a topic from the Topics tab" = "Added to the Inbox: move it into a topic from the Topics tab"
-// Source/MainComponent.cpp:1486
+// Source/MainComponent.cpp:1487
 "Add practice time" = "Add practice time"
-// Source/MainComponent.cpp:1591
+// Source/MainComponent.cpp:1592
 "No audio input" = "No audio input"
-// Source/MainComponent.cpp:1624
+// Source/MainComponent.cpp:1625
 "Can't record" = "Can't record"
-// Source/MainComponent.cpp:1651
+// Source/MainComponent.cpp:1652
 "Too short: < {seconds} s" = "Too short: < {seconds} s"
-// Source/MainComponent.cpp:1710
+// Source/MainComponent.cpp:1711
 "Take saved" = "Take saved"
-// Source/MainComponent.cpp:1723
+// Source/MainComponent.cpp:1724
 "Saving..." = "Saving..."
-// Source/MainComponent.cpp:1764
+// Source/MainComponent.cpp:1765
 "Rec" = "Rec"
 // Source/MainComponent.cpp:1846
+"Version, licences, links and diagnostic info" = "Version, licences, links and diagnostic info"
+// Source/MainComponent.cpp:1851
 "MIDI notes" = "MIDI notes"
-// Source/MainComponent.cpp:1849
+// Source/MainComponent.cpp:1854
 "Notes played on a MIDI keyboard count as practice time, like sound on the input. Choose one device if other MIDI gear (a pad, a sequencer) sends notes too." = "Notes played on a MIDI keyboard count as practice time, like sound on the input. Choose one device if other MIDI gear (a pad, a sequencer) sends notes too."
-// Source/MainComponent.cpp:1865
+// Source/MainComponent.cpp:1870
 "Practice log" = "Practice log"
-// Source/MainComponent.cpp:1869
+// Source/MainComponent.cpp:1874
 "How practice time is counted with this input. A microphone also hears talking and other room noise, so by default it counts only between Start and Pause (Today tab)." = "How practice time is counted with this input. A microphone also hears talking and other room noise, so by default it counts only between Start and Pause (Today tab)."
-// Source/MainComponent.cpp:1890
+// Source/MainComponent.cpp:1895
 "Display" = "Display"
-// Source/MainComponent.cpp:1891
+// Source/MainComponent.cpp:1896
 "Audio and MIDI" = "Audio and MIDI"
-// Source/MainComponent.cpp:1901
-"A tab with everything the app writes to its log, for troubleshooting" = "A tab with everything the app writes to its log, for troubleshooting"
 // Source/MainComponent.cpp:1906
-"Shows a Teaching switch in the top bar: during a lesson the app works as usual but nothing goes to your practice log" = "Shows a Teaching switch in the top bar: during a lesson the app works as usual but nothing goes to your practice log"
+"A tab with everything the app writes to its log, for troubleshooting" = "A tab with everything the app writes to its log, for troubleshooting"
 // Source/MainComponent.cpp:1911
-"Theme" = "Theme"
+"Shows a Teaching switch in the top bar: during a lesson the app works as usual but nothing goes to your practice log" = "Shows a Teaching switch in the top bar: during a lesson the app works as usual but nothing goes to your practice log"
 // Source/MainComponent.cpp:1916
-"Dark" = "Dark"
-// Source/MainComponent.cpp:1917
-"Light" = "Light"
-// Source/MainComponent.cpp:1919
-"Follow the system (Appearance setting)" = "Follow the system (Appearance setting)"
+"Theme" = "Theme"
 // Source/MainComponent.cpp:1921
+"Dark" = "Dark"
+// Source/MainComponent.cpp:1922
+"Light" = "Light"
+// Source/MainComponent.cpp:1924
+"Follow the system (Appearance setting)" = "Follow the system (Appearance setting)"
+// Source/MainComponent.cpp:1926
 "Follow the system (Windows app mode)" = "Follow the system (Windows app mode)"
-// Source/MainComponent.cpp:1933
+// Source/MainComponent.cpp:1938
 "Language" = "Language"
-// Source/MainComponent.cpp:1939
+// Source/MainComponent.cpp:1944
 "Device language" = "Device language"
-// Source/MainComponent.cpp:1951
-"The language of the app. Words musicians use everywhere (Looper, Loop) and note names stay as they are." = "The language of the app. Words musicians use everywhere (Looper, Loop) and note names stay as they are."
 // Source/MainComponent.cpp:1956
+"The language of the app. Words musicians use everywhere (Looper, Loop) and note names stay as they are." = "The language of the app. Words musicians use everywhere (Looper, Loop) and note names stay as they are."
+// Source/MainComponent.cpp:1961
 "Restart the app to apply the new language." = "Restart the app to apply the new language."
-// Source/MainComponent.cpp:2027
+// Source/MainComponent.cpp:2034
 "From any MIDI input" = "From any MIDI input"
-// Source/MainComponent.cpp:2028
+// Source/MainComponent.cpp:2035
 "Don't count MIDI notes" = "Don't count MIDI notes"
-// Source/MainComponent.cpp:2031
+// Source/MainComponent.cpp:2038
 "Only from {device}" = "Only from {device}"
-// Source/MainComponent.cpp:2031
+// Source/MainComponent.cpp:2038
 "Only from {device} (not connected)" = "Only from {device} (not connected)"
-// Source/MainComponent.cpp:2050
+// Source/MainComponent.cpp:2057
 "No audio input open" = "No audio input open"
-// Source/MainComponent.cpp:2052
-"MIDI keyboard notes still count as playing" = "MIDI keyboard notes still count as playing"
-// Source/MainComponent.cpp:2057
-"Default for this input: automatic" = "Default for this input: automatic"
-// Source/MainComponent.cpp:2057
-"Default for this input: with Start / Pause" = "Default for this input: with Start / Pause"
-// Source/MainComponent.cpp:2058
-"Automatic: count the time I play" = "Automatic: count the time I play"
 // Source/MainComponent.cpp:2059
-"Only between Start and Pause (Today tab)" = "Only between Start and Pause (Today tab)"
-// Source/MainComponent.cpp:2060
-"Only MIDI keyboard notes (ignore the sound)" = "Only MIDI keyboard notes (ignore the sound)"
-// Source/MainComponent.cpp:2063
-"\"{name}\" looks like a microphone: it hears the room too" = "\"{name}\" looks like a microphone: it hears the room too"
+"MIDI keyboard notes still count as playing" = "MIDI keyboard notes still count as playing"
 // Source/MainComponent.cpp:2064
+"Default for this input: automatic" = "Default for this input: automatic"
+// Source/MainComponent.cpp:2064
+"Default for this input: with Start / Pause" = "Default for this input: with Start / Pause"
+// Source/MainComponent.cpp:2065
+"Automatic: count the time I play" = "Automatic: count the time I play"
+// Source/MainComponent.cpp:2066
+"Only between Start and Pause (Today tab)" = "Only between Start and Pause (Today tab)"
+// Source/MainComponent.cpp:2067
+"Only MIDI keyboard notes (ignore the sound)" = "Only MIDI keyboard notes (ignore the sound)"
+// Source/MainComponent.cpp:2070
+"\"{name}\" looks like a microphone: it hears the room too" = "\"{name}\" looks like a microphone: it hears the room too"
+// Source/MainComponent.cpp:2071
 "\"{name}\" looks like an audio interface" = "\"{name}\" looks like an audio interface"
-// Source/MainComponent.cpp:2084
+// Source/MainComponent.cpp:2091
 "I teach" = "I teach"
-// Source/MainComponent.cpp:2084
+// Source/MainComponent.cpp:2091
 "Show the Log tab" = "Show the Log tab"
 // Source/MainComponent.cpp:2092
+"About Practice Vibes" = "About Practice Vibes"
+// Source/MainComponent.cpp:2100
 "Audio settings" = "Audio settings"
-// Source/MainComponent.cpp:2142
-"Log" = "Log"
-// Source/MainComponent.cpp:2167
-"Pair a Bluetooth MIDI device" = "Pair a Bluetooth MIDI device"
 // Source/MainComponent.cpp:2174
+"Log" = "Log"
+// Source/MainComponent.cpp:2199
+"Pair a Bluetooth MIDI device" = "Pair a Bluetooth MIDI device"
+// Source/MainComponent.cpp:2206
 "Windows pairs Bluetooth devices itself. Switch the footswitch on, then add it in Windows Settings > Bluetooth & devices. Once it's paired, it shows up under MIDI inputs in the audio settings." = "Windows pairs Bluetooth devices itself. Switch the footswitch on, then add it in Windows Settings > Bluetooth & devices. Once it's paired, it shows up under MIDI inputs in the audio settings."
-// Source/MainComponent.cpp:2178
+// Source/MainComponent.cpp:2210
 "Pair the footswitch in the system's Bluetooth settings. Once it's paired, it shows up under MIDI inputs in the audio settings." = "Pair the footswitch in the system's Bluetooth settings. Once it's paired, it shows up under MIDI inputs in the audio settings."
-// Source/MainComponent.cpp:2212
+// Source/MainComponent.cpp:2244
 "Open Bluetooth settings" = "Open Bluetooth settings"
-// Source/MainComponent.cpp:2221
+// Source/MainComponent.cpp:2253
 "Bluetooth MIDI" = "Bluetooth MIDI"
-// Source/MainComponent.cpp:2241
+// Source/MainComponent.cpp:2273
 "Tuner" = "Tuner"
 // Source/PlayerProcessor.cpp:80
 "can't decode this {format} file: {error}" = "can't decode this {format} file: {error}"
