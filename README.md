@@ -46,8 +46,8 @@ From the [latest build](../../releases/tag/latest-build) page:
 | Platform | File |
 |---|---|
 | Windows 10/11 (64-bit) | [PracticeVibes-windows.zip](../../releases/download/latest-build/PracticeVibes-windows.zip) |
-| macOS (Apple Silicon and Intel) | [PracticeVibes-macos.dmg](../../releases/download/latest-build/PracticeVibes-macos.dmg) |
-| iPad | [PracticeVibes.ipa](../../releases/download/latest-build/PracticeVibes.ipa) (install with SideStore, see below) |
+| macOS 12 or later (Apple Silicon and Intel) | [PracticeVibes-macos.dmg](../../releases/download/latest-build/PracticeVibes-macos.dmg) |
+| iPad (iPadOS 16 or later) | [PracticeVibes.ipa](../../releases/download/latest-build/PracticeVibes.ipa) (install with SideStore, see below) |
 
 The app is not signed with paid developer certificates, so each system warns you the first time. That is expected:
 
@@ -63,9 +63,12 @@ macOS 12-14 right-click the app and choose **Open**. The `READ ME FIRST.txt` in 
 with your own free Apple ID:
 1. Set up SideStore by following [its official guide](https://docs.sidestore.io) (needs a computer once).
 2. On the iPad, open the [latest build](../../releases/tag/latest-build) page in Safari and download `PracticeVibes.ipa`.
-3. In SideStore, go to **My Apps**, tap **+** and pick the downloaded file.
+3. Turn on LocalDevVPN (part of the SideStore setup), then in SideStore go to **My Apps**, tap **+** and pick the
+   downloaded file.
 
-Apps installed with a free Apple ID must be refreshed every 7 days; SideStore does this from the iPad.
+Apps installed with a free Apple ID must be refreshed every 7 days: in SideStore, **My Apps** > **Refresh All**
+(with LocalDevVPN on). To update, install the new .ipa over the old app; don't delete the app first, or its data goes
+with it.
 
 On first launch, allow microphone access: it is needed for your instrument input. An audio interface works best; the
 device's built-in microphone also hears the room.
