@@ -172,9 +172,12 @@ jobs:
           Free software under the GNU AGPLv3: the source of this build is this tag."
           if [ -f PracticeVibes-macos.dmg ]; then
             FILES="$FILES PracticeVibes-macos.dmg"
-          else
+          elif gh release view latest-build --json assets --jq '.assets[].name' 2> /dev/null | grep -q '^PracticeVibes-macos.dmg$'; then
             NOTES="$NOTES
           The macOS file is from an earlier build: the macOS job failed this time."
+          else
+            NOTES="$NOTES
+          No macOS file this time: the macOS job failed."
           fi
 
           if gh release view latest-build > /dev/null 2>&1; then
