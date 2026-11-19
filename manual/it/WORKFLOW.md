@@ -5,7 +5,7 @@ rimanda al capitolo della guida quando vuoi i dettagli.
 
 | Sei... | Leggi | Cosa userai di più |
 |---|---|---|
-| **Chi studia da solo** (con o senza insegnante) | [WORKFLOW-STUDENT.md](WORKFLOW-STUDENT.md) | diario di studio automatico, rotazione, piani di sessione, metronomo, loop |
+| **Uno studente** (con o senza insegnante) | [WORKFLOW-STUDENT.md](WORKFLOW-STUDENT.md) | diario di studio automatico, rotazione, piani di sessione, metronomo, loop |
 | **Un insegnante** | [WORKFLOW-TEACHER.md](WORKFLOW-TEACHER.md) | argomenti-lezione, condivisione di argomenti e link, modalità Lezione, seguire il lavoro dell'allievo |
 | **Un musicista che vuole una sola app** | [WORKFLOW-MUSICIAN.md](WORKFLOW-MUSICIAN.md) | looper e drum machine, registratore, accordatore, stem, rig di plugin, footswitch MIDI |
 

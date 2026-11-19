@@ -6,7 +6,7 @@ A practice app for guitarists, bassists and other musicians, for **iPad, Windows
 Free software under the [GNU AGPLv3](LICENSE): no price, no account, no ads, no tracking.
 
 It puts the things you'd normally need several apps for in one place: a song player that slows songs down and loops
-them, chord recognition, a metronome, a looper with a drum machine, a tuner, your effect plugins, a MIDI footswitch,
+them, chord recognition, a recorder, a metronome, a looper with a drum machine, a tuner, your effect plugins, a MIDI footswitch,
 and a place for your lessons and practice notes. It also keeps track of how much you really play.
 
 > **Status: in active development.** The downloads below are automatic test builds, not stable releases. Expect rough
@@ -23,10 +23,10 @@ and a place for your lessons and practice notes. It also keeps track of how much
 
 ## Who it's for
 
-- **Students practising alone**: practice time is logged automatically while you play, with a rotation of topics,
+- **Students**: practice time is logged automatically while you play, with a rotation of topics,
   session plans, metronome and loops.
 - **Teachers**: send a lesson (notes, songs, assignments) as one file and see what comes back.
-- **Musicians who want one tool**: looper and drum machine, tuner, stem separation, plugin rig, footswitch.
+- **Musicians who want one tool only**: looper and drum machine, tuner, stem separation, plugin rig, footswitch.
 
 ## What it does
 
@@ -36,6 +36,7 @@ and a place for your lessons and practice notes. It also keeps track of how much
   rebalance them.
 - **Chords, beats and time signatures** detected automatically and shown as you play.
 - **Metronome** with subdivisions, swing, several sounds, a speed trainer, and "follow the song's beats".
+- **Recorder** to record your track, with or without a backing track, in sync with the backing track. No need for a DAW to record a track to share with someone or to hear how you're doing.
 - **4-track looper** locked to the metronome, with overdub and undo, latency calibration, and a built-in **drum
   machine** (acoustic or electronic kit, step editor).
 - **Tuner**: needle or strobe, guitar and bass tunings, strum all strings at once.
@@ -126,7 +127,7 @@ It is built on [JUCE](https://juce.com) (used under its AGPLv3 option),
 The full list with licences is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and in the app under
 About > Open source licences.
 
-Practice Vibes is made by a **terrible guitarist**, Cam Patricelli, frustrated by the time wasted during practice sessions, by *vibe coding*: the idea, the design, the decisions and
+Practice Vibes is made by Cam, a guitarist, frustrated by the time wasted during practice sessions, by *vibe coding*: the idea, the design, the decisions and
 the testing are his; the code is written by [Claude](https://www.anthropic.com/claude) (Anthropic's AI) through
 [Claude Code](https://claude.com/claude-code). The name is a nod to that process.
 

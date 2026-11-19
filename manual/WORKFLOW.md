@@ -5,9 +5,9 @@ practical, and links to the guide chapter when you want the details.
 
 | You are... | Read | What you'll use most |
 |---|---|---|
-| **A student practising alone** (with or without a teacher) | [WORKFLOW-STUDENT.md](WORKFLOW-STUDENT.md) | automatic practice log, rotation, session plans, metronome, loops |
+| **A student** (with or without a teacher) | [WORKFLOW-STUDENT.md](WORKFLOW-STUDENT.md) | automatic practice log, rotation, session plans, metronome, loops |
 | **A teacher** | [WORKFLOW-TEACHER.md](WORKFLOW-TEACHER.md) | lesson topics, sharing topics and links, Teaching mode, following a student's work |
-| **A musician who wants one tool** | [WORKFLOW-MUSICIAN.md](WORKFLOW-MUSICIAN.md) | looper and drum machine, tuner, stems, plugin rig, MIDI footswitch |
+| **A musician who wants one tool only** | [WORKFLOW-MUSICIAN.md](WORKFLOW-MUSICIAN.md) | looper and drum machine, tuner, stems, plugin rig, MIDI footswitch |
 
 Before any of them: **[AUDIO-SETUP.md](AUDIO-SETUP.md)**, one page on what to plug in. It decides how well the
 automatic practice log works.

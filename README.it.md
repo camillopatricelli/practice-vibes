@@ -6,7 +6,7 @@ Un'app per esercitarsi, per chitarristi, bassisti e altri musicisti, su **iPad, 
 Software open source con licenza [GNU AGPLv3](LICENSE): gratis, senza account, senza pubblicità, senza tracciamento.
 
 Riunisce in un posto solo quello per cui di solito servono diverse app: un lettore che rallenta i brani e li mette in
-loop, il riconoscimento degli accordi, un metronomo, un looper con drum machine, un accordatore, i tuoi plugin di
+loop, il riconoscimento degli accordi, un registratore, un metronomo, un looper con drum machine, un accordatore, i tuoi plugin di
 effetti, una pedaliera MIDI e uno spazio per le tue lezioni e i tuoi appunti. E tiene il conto di quanto tempo suoni davvero.
 
 > **Stato: in pieno sviluppo.** I download qui sotto sono build di prova automatiche, non versioni stabili. Aspettati
@@ -23,7 +23,7 @@ effetti, una pedaliera MIDI e uno spazio per le tue lezioni e i tuoi appunti. E 
 
 ## Per chi è
 
-- **Chi studia da solo**: il tempo di studio viene registrato da solo mentre suoni, con una rotazione degli argomenti,
+- **Studenti**: il tempo di studio viene registrato da solo mentre suoni, con una rotazione degli argomenti,
   piani di sessione, metronomo e loop.
 - **Insegnanti**: invii una lezione (appunti, brani, compiti) come un unico file e vedi cosa torna indietro.
 - **Musicisti che vogliono un solo strumento**: looper e drum machine, accordatore, separazione in stem, rig di plugin,
@@ -37,6 +37,7 @@ effetti, una pedaliera MIDI e uno spazio per le tue lezioni e i tuoi appunti. E 
   puoi silenziarle, ascoltarle da sole o bilanciarle.
 - **Accordi, beat e tempi in chiave** riconosciuti automaticamente e mostrati mentre suoni.
 - **Metronomo** con suddivisioni, swing, diversi suoni, aumento graduale del tempo e "segui i beat del brano".
+- **Registratore** per registrare delle take al volo, con o senza base, allineando la tua traccia alla base. Non hai bisogno di una DAW per registrare una traccia da far ascoltare a qualcuno o per riascoltare te stesso.
 - **Looper a 4 tracce** agganciato al metronomo, con sovraincisione e annulla, calibrazione della latenza e una **drum
   machine** integrata (kit acustico o elettronico, editor a step).
 - **Accordatore**: ago o strobo, accordature per chitarra e basso, tutte le corde in una pennata.
@@ -117,7 +118,7 @@ delle icone di [Lucide](https://lucide.dev), i font Outfit e DM Sans e i campion
 L'elenco completo con le licenze è in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) e nell'app, in Informazioni >
 Licenze open source.
 
-Practice Vibes è stato creato da un **pessimo chitarrista**, Cam Patricelli, frustrato dalle perdite di tempo durante lo studio, con il *vibe coding*: l'idea, il design, le decisioni e
+Practice Vibes è stato creato con il *vibe coding* da Cam, un chitarrista frustrato dalle perdite di tempo durante lo studio: l'idea, il design, le decisioni e
 i test sono suoi; il codice è scritto da [Claude](https://www.anthropic.com/claude) (l'IA di Anthropic) tramite
 [Claude Code](https://claude.com/claude-code). Il nome è un omaggio a questo modo di lavorare.
 
