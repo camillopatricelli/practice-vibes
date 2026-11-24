@@ -102,6 +102,10 @@ private:
     void startRecording();
     void stopRecording (bool waitForFile = false);
     void updateRecordButton();
+
+    // Rig scenes: top-bar button with the current scene, lit in footswitch Scene mode (hidden until a scene exists).
+    void updateSceneButton();
+    void showSceneMenu();
     juce::File takeFolder() const;
     void openAudioFile (const juce::File&);     // a take replays over its song; anything else loads as a song
 
@@ -120,7 +124,8 @@ private:
                      bluetoothButton     { tr ("Bluetooth MIDI") },
                      saveButton          { tr ("Save") },
                      practisingButton,
-                     teachingButton      { tr ("Teaching") };
+                     teachingButton      { tr ("Teaching") },
+                     sceneButton;
     bool teaching = false, teacherSetting = false;
     bool recordingDemo = false;         // the take being recorded started during a lesson: named "Demo ..."
     void offerToShareLesson (const juce::String& topicId);

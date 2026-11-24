@@ -30,7 +30,8 @@ Apri **Configura footswitch...** (scheda Rig, o **Footswitch** nella scheda Loop
 2. Per ogni switch, scegli un'azione per il **Tocco** e, se vuoi, una per **Tieni 1 s**.
 
 Predefinito: switch A–D = tracce del looper 1–4. Il **tocco** registra, sovraincide o suona la traccia; **tenuto** la
-svuota.
+svuota. Tenendo premuto **D** passi alla modalità scene (vedi sotto), quindi la traccia 4 si svuota sullo schermo o con
+**Svuota tutte le tracce**.
 
 Le azioni:
 - Traccia 1–4: registra / sovraincidi / suona · svuota · muto / attiva
@@ -40,11 +41,36 @@ Le azioni:
 - Registra un take (avvia / ferma)
 - Muto / attiva uno degli stem del brano (voce, chitarra, basso, batteria, piano o altro: ognuno ha la sua voce)
 - Rig: bypass del plugin selezionato
+- Rig: scena 1–4 · Rig: scena successiva · Rig: scena precedente (capitolo 10)
+- Cambia modalità del footswitch (looper / scene)
 
 L'azione del tocco avviene **alla pressione**, così un loop parte esattamente quando pesti il pedale. Le righe del
 looper mostrano quale switch le comanda ("pedale A").
 
 Gli switch appresi vengono ricordati, e il pedale funziona di nuovo la volta dopo senza doverlo riapprendere.
+
+---
+
+## Due modalità: looper e scene
+
+Quattro switch non bastano per tutto. Per questo il pedale ha due modalità, ognuna con le sue azioni per il tocco e
+per la pressione tenuta:
+- **Modalità looper** (all'avvio): A–D comandano le tracce del looper 1–4, come sopra.
+- **Modalità scene**: A–D passano alle scene 1–4 del rig (capitolo 10), così vai dal pulito al crunch con il piede.
+
+**Tieni premuto D** per cambiare modalità. In modalità scene i loop continuano a suonare; solo non li comandi con i
+piedi finché non torni indietro.
+
+La barra in alto mostra la scena attuale e si illumina in modalità scene. Puoi cambiare modalità anche lì (toccala), o
+in cima a **Configura footswitch...**, dove **Modalità looper** / **Modalità scene** sceglie anche di quale modalità
+stai modificando le azioni.
+
+> **Pedale a ritenuta?** Non può tenere premuto, quindi la modalità cambia con un **tocco su D**. La modalità looper ha
+> allora le tracce 1–3 e la modalità scene le scene 1–3.
+
+Puoi cambiare ogni azione in entrambe le modalità. Lascia solo **Cambia modalità del footswitch** su uno switch in
+ciascuna modalità, altrimenti non torni indietro con i piedi. **Azioni predefinite** rimette la disposizione descritta
+sopra.
 
 ---
 

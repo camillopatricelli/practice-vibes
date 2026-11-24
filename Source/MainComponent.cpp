@@ -226,6 +226,9 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
         addAndMakeVisible (*b);
 
     addChildComponent (teachingButton);
+    addChildComponent (sceneButton);
+    sceneButton.setTooltip (tr ("Rig scene: tap to switch the sound. The footswitch switches scenes in Scene mode (hold D)."));
+    sceneButton.onClick = [this] { showSceneMenu(); };
     teachingButton.onClick = [this] { setTeaching (! teaching); };
 
     practisingButton.setTooltip (tr ("What you're practising: played time is logged to this topic (see the Today tab)"));
@@ -561,6 +564,9 @@ void MainComponent::resized()
     if (teachingButton.isVisible())
         teachingButton.setBounds (top.removeFromRight (teaching ? 210 : 120).reduced (4));
 
+    if (sceneButton.isVisible())
+        sceneButton.setBounds (top.removeFromRight (juce::jlimit (110, 170, top.getWidth() / 6)).reduced (4));
+
     practisingButton.setBounds (top.removeFromRight (juce::jlimit (150, 320, top.getWidth() - 180)).reduced (4));
     iconBounds = top.removeFromLeft (iconSize + 6).withSizeKeepingCentre (iconSize, iconSize);
     titleLabel.setBounds (top);
@@ -575,6 +581,7 @@ void MainComponent::timerCallback()
     layoutYouTube();
     tickTracker();
     updateRecordButton();
+    updateSceneButton();
 }
 
 void MainComponent::openSharedTopic (const juce::File& file)
@@ -1771,6 +1778,51 @@ void MainComponent::updateRecordButton()
 
     if (recordButton.getButtonText() != text)
         recordButton.setButtonText (text);
+}
+
+void MainComponent::updateSceneButton()
+{
+    auto& chain = *engine.chain;
+    const auto sceneMode = engine.footswitch->getMode() == Footswitch::sceneMode;
+    const auto visible = chain.hasSavedScenes() || sceneMode;
+
+    if (sceneButton.isVisible() != visible)
+    {
+        sceneButton.setVisible (visible);
+        resized();
+    }
+
+    if (! visible)
+        return;
+
+    const auto current = chain.getCurrentScene();
+    const auto text = current >= 0 ? juce::String (current + 1) + "  " + chain.getSceneName (current) : tr ("Scenes");
+
+    if (sceneButton.getButtonText() != text)
+        sceneButton.setButtonText (text);
+
+    if (sceneButton.getToggleState() != sceneMode)
+        sceneButton.setToggleState (sceneMode, juce::dontSendNotification);     // lit = the pedal plays scenes
+}
+
+void MainComponent::showSceneMenu()
+{
+    auto& chain = *engine.chain;
+    juce::PopupMenu menu;
+
+    for (int i = 0; i < PluginChain::numScenes; ++i)
+        menu.addItem (juce::String (i + 1) + "  " + (chain.isSceneSaved (i) ? chain.getSceneName (i) : tr ("empty")),
+                      chain.isSceneSaved (i), chain.getCurrentScene() == i,
+                      [this, i] { engine.chain->recallScene (i); });
+
+    menu.addSeparator();
+    menu.addSectionHeader (tr ("Footswitch"));
+
+    for (auto mode : { Footswitch::looperMode, Footswitch::sceneMode })
+        menu.addItem (Footswitch::modeName (mode), true, engine.footswitch->getMode() == mode,
+                      [this, mode] { engine.footswitch->setMode (mode); });
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (sceneButton));
 }
 
 void MainComponent::openAudioFile (const juce::File& file)

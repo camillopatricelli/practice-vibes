@@ -265,6 +265,11 @@ void AppEngine::saveState()
         deviceXml->writeTo (getDeviceStateFile());
     }
 
+    saveChain();
+}
+
+void AppEngine::saveChain()
+{
     if (auto chainXml = chain->createStateXml())
         if (chainXml->writeTo (getChainFile()))
             juce::Logger::writeToLog ("Saved chain to " + getChainFile().getFullPathName());
@@ -378,6 +383,15 @@ void AppEngine::performFootswitchAction (FootswitchAction action, double pressSe
             if (onToggleStem)
                 onToggleStem (action.track);
             break;
+
+        case Kind::scene:
+            if (! chain->recallScene (action.track))
+                juce::Logger::writeToLog ("Scene " + juce::String (action.track + 1) + " is empty: save it on the Rig tab first");
+            break;
+
+        case Kind::sceneNext:     chain->recallNextScene (1); break;
+        case Kind::scenePrevious: chain->recallNextScene (-1); break;
+        case Kind::switchMode:    break;      // handled by the footswitch itself
 
         case Kind::none:
             break;

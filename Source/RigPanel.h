@@ -8,7 +8,7 @@ namespace pv
 {
 
 /** The "Rig" tab: plugin catalogue, plugin chain (an instrument on top, played from a MIDI keyboard, then the
-    effects), levels and MIDI footswitch. */
+    effects), levels, scenes (saved sounds of the chain, switched while playing) and MIDI footswitch. */
 class RigPanel final : public juce::Component,
                        private juce::Timer,
                        private juce::ChangeListener
@@ -37,6 +37,11 @@ private:
     void refreshMidiDevices();
     void handleMidi (const juce::MidiMessage&, const juce::String& source);
 
+    void refreshScenes();
+    void sceneClicked (int scene);
+    void showSceneMenu();
+    void renameScene (int scene);
+
     void addSelectedPlugin();
     void openEditor (int chainIndex);
     int selectedChainIndex() const;
@@ -45,7 +50,7 @@ private:
 
     std::vector<PluginCatalogue::Entry> catalogueEntries;
 
-    juce::Label catalogueHeader, chainHeader, levelsHeader, midiHeader;
+    juce::Label catalogueHeader, chainHeader, levelsHeader, scenesHeader, midiHeader;
 
     std::unique_ptr<ListModel> catalogueModel, chainModel;
     juce::ListBox catalogueList, chainList;
@@ -60,6 +65,11 @@ private:
     juce::Slider inputGainSlider, outputGainSlider;
     juce::Label inputGainLabel, outputGainLabel;
     juce::ToggleButton monitorButton { tr ("Monitor input (use headphones!)") };
+
+    std::array<juce::TextButton, PluginChain::numScenes> sceneButtons;
+    juce::TextButton sceneMenuButton { "..." };
+    juce::Label sceneHint;
+    int shownSceneVersion = -1, shownFootswitchMode = -1;
 
     juce::Label midiDevicesLabel, lastMidiLabel;
     juce::TextButton footswitchButton { tr ("Footswitch setup...") };

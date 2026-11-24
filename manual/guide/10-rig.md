@@ -62,6 +62,42 @@ A footswitch can bypass the selected plugin (chapter 11).
 
 ---
 
+## Scenes: change the sound while you play
+
+Going from a clean sound to a crunchy one usually means opening a plugin's window and turning knobs. **Scenes** save
+up to four sounds of the same chain, so you can switch with one tap, or with your foot (chapter 11).
+
+A scene remembers every plugin's settings, which plugins are on or bypassed, and the **Output level** (so a lead sound
+can be louder).
+
+1. Set up a sound: open the plugins, turn the knobs, bypass what you don't need.
+2. Under **Scenes**, tap an empty scene (**1 empty**): the current sound is saved there.
+3. Set up the next sound and tap the next empty scene. And so on.
+4. Tap a saved scene to switch to it.
+
+The **...** button next to the scenes:
+- **Save the current sound to**: update a scene after you've changed the knobs (tapping a saved scene only switches
+  to it).
+- **Rename**: give a scene a name, e.g. *Clean* or *Crunch*.
+- **Clear**: empty a scene.
+- *Plugin*: **scenes restore its full state**: see below.
+
+Once a scene is saved, the top bar shows the current scene on every tab. Tap it to switch scenes, or to put the
+footswitch in Looper or Scene mode.
+
+> **Some sounds don't come back?** To switch quickly, a scene sets the knobs a plugin shows to the app (its
+> parameters). Some plugins keep part of the sound elsewhere: an amp model picked from a menu, a loaded IR or
+> capture file. For those, select the plugin in the chain, then **...** › *plugin*: **scenes restore its full
+> state**. That works with any plugin, but it's slower and the sound may drop out for a moment when switching. The
+> chain marks such plugins with **(full scene recall)**.
+
+Good to know:
+- A plugin you add after saving a scene is left as it is by that scene. Save the scene again to include it.
+- Moving plugins up or down doesn't break your scenes.
+- Delay and reverb tails may cut off when you switch. That's fine for practising.
+
+---
+
 ## Play a MIDI keyboard through an instrument plugin
 
 A MIDI keyboard (or pad) makes no sound by itself. Add an **instrument** plugin (a piano, a synth, a drum sampler) and

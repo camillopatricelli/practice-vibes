@@ -46,8 +46,8 @@ public:
             holdBox.addItem (actions[a].describe(), (int) a + 1);
         }
 
-        tapBox.onChange  = [this] { footswitch.setTapAction (index, actionFor (tapBox)); };
-        holdBox.onChange = [this] { footswitch.setHoldAction (index, actionFor (holdBox)); };
+        tapBox.onChange  = [this] { footswitch.setTapAction (index, actionFor (tapBox), footswitch.getMode()); };
+        holdBox.onChange = [this] { footswitch.setHoldAction (index, actionFor (holdBox), footswitch.getMode()); };
         addAndMakeVisible (tapBox);
         addAndMakeVisible (holdBox);
     }
@@ -75,8 +75,8 @@ public:
         learnButton.setButtonText (learning ? tr ("Cancel") : tr ("Learn"));
         forgetButton.setEnabled (sw.trigger.isValid());
 
-        selectAction (tapBox, sw.tap);
-        selectAction (holdBox, sw.hold);
+        selectAction (tapBox, sw.tap[(size_t) footswitch.getMode()]);
+        selectAction (holdBox, sw.hold[(size_t) footswitch.getMode()]);
 
         const auto holdPossible = sw.momentary || ! sw.trigger.isValid();
         holdBox.setEnabled (holdPossible);
@@ -191,7 +191,22 @@ FootswitchPanel::FootswitchPanel (AppEngine& e)
         }
     };
 
-    defaultsButton.setTooltip (tr ("Switch A-D = track 1-4: tap records / overdubs / plays, hold clears the track. Learned switches are kept."));
+    modeSelector.addItem (Footswitch::modeName (Footswitch::looperMode), 1 + Footswitch::looperMode);
+    modeSelector.addItem (Footswitch::modeName (Footswitch::sceneMode), 1 + Footswitch::sceneMode);
+    modeSelector.setSelectedId (1 + footswitch.getMode(), juce::dontSendNotification);
+    modeSelector.onChange = [this] { footswitch.setMode ((Footswitch::Mode) (modeSelector.getSelectedId() - 1)); };
+    addAndMakeVisible (modeSelector);
+
+    modeHint.setText (tr ("Each mode has its own actions. By default, hold D to switch between them "
+                          "(tap D if the switch is latching)."), juce::dontSendNotification);
+    modeHint.setColour (juce::Label::textColourId, theme::text().withAlpha (0.6f));
+    modeHint.setFont (juce::FontOptions (13.0f));
+    modeHint.setJustificationType (juce::Justification::centredLeft);
+    modeHint.setMinimumHorizontalScale (0.9f);     // wraps onto two lines rather than shrinking
+    addAndMakeVisible (modeHint);
+
+    defaultsButton.setTooltip (tr ("Looper mode: switch A-D = track 1-4 (tap records / overdubs / plays, hold clears). "
+                                   "Scene mode: switch A-D = scene 1-4. Hold D switches the mode. Learned switches are kept."));
     defaultsButton.onClick = [this] { footswitch.setDefaultActions(); };
     addAndMakeVisible (learnAllButton);
     addAndMakeVisible (defaultsButton);
@@ -240,6 +255,9 @@ void FootswitchPanel::timerCallback()
                                           : tr ("MIDI inputs: {names}", names.joinIntoString (", ")),
                           juce::dontSendNotification);
 
+    if (! modeSelector.isPopupActive())
+        modeSelector.setSelectedId (1 + footswitch.getMode(), juce::dontSendNotification);
+
     for (auto& row : rows)
         row->update();
 }
@@ -261,7 +279,13 @@ void FootswitchPanel::resized()
     learnAllButton.setBounds (buttons.removeFromLeft (200).reduced (0, 3));
     buttons.removeFromLeft (8);
     defaultsButton.setBounds (buttons.removeFromLeft (160).reduced (0, 3));
-    area.removeFromTop (8);
+    area.removeFromTop (6);
+
+    auto modeRow = area.removeFromTop (38);
+    modeSelector.setBounds (modeRow.removeFromLeft (juce::jmin (280, modeRow.getWidth() / 2)).reduced (0, 4));
+    modeRow.removeFromLeft (10);
+    modeHint.setBounds (modeRow);
+    area.removeFromTop (6);
 
     const auto rowHeight = juce::jlimit (70, 104, area.getHeight() / Footswitch::numSwitches);
 

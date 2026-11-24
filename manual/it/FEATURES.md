@@ -125,13 +125,19 @@ Funziona su **iPad**, **Windows** e **macOS**.
   ripristinate.
 - **Plugin strumento** (pianoforte, synth, campionatore di batteria) suonati da una **tastiera MIDI**: il suono passa
   per i tuoi effetti e finisce in loop e take.
+- **Scene**: fino a quattro suoni salvati della stessa catena (per esempio Pulito, Crunch, Solista), da cambiare con un
+  tocco o con il footswitch mentre suoni. Una scena ricorda le impostazioni di ogni plugin, quali plugin sono accesi e
+  il livello in uscita.
 
 ## Footswitch
 - Qualsiasi **footswitch MIDI**, via USB o **Bluetooth MIDI** (abbinamento integrato nell'app).
 - Fino a quattro switch, ognuno "appreso" premendolo, con un'azione per il **tocco** e una per la pressione **tenuta**:
   registra / sovraincidi / suona una traccia del looper, svuota, muto, annulla, muto o svuota tutto, avvia / ferma il
   metronomo, accordatore, bypass di un plugin, registra un take, silenzia uno degli stem del brano (per esempio
-  chitarra, basso o piano).
+  chitarra, basso o piano), cambia scena del rig.
+- **Due modalità**: modalità looper (gli switch A–D comandano il looper) e modalità scene (gli switch A–D scelgono le
+  scene 1–4), ognuna con le sue azioni. Tieni premuto D per passare dall'una all'altra (un tocco su D con un pedale a
+  ritenuta).
 
 ## Aspetto
 - Tema scuro e chiaro, oppure segui l'impostazione di sistema.

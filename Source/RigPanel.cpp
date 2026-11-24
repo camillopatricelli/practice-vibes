@@ -80,6 +80,7 @@ RigPanel::RigPanel (AppEngine& e)
     setupHeader (catalogueHeader, tr ("Available plugins"));
     setupHeader (chainHeader, tr ("Effects chain"));
     setupHeader (levelsHeader, tr ("Input / output"));
+    setupHeader (scenesHeader, tr ("Scenes"));
     setupHeader (midiHeader, tr ("MIDI footswitch"));
 
     for (auto* b : { &addButton, &scanButton, &editButton, &bypassButton, &upButton, &downButton, &removeButton, &footswitchButton })
@@ -126,7 +127,8 @@ RigPanel::RigPanel (AppEngine& e)
     {
         const auto number = engine.chain->hasInstrument() ? row : row + 1;     // effects count from 1
         return (engine.chain->isInstrument (row) ? tr ("Instrument:") + "  " : juce::String (number) + ".  ")
-             + engine.chain->getPluginName (row) + (engine.chain->isBypassed (row) ? "   " + tr ("(bypassed)") : juce::String());
+             + engine.chain->getPluginName (row) + (engine.chain->isBypassed (row) ? "   " + tr ("(bypassed)") : juce::String())
+             + (engine.chain->isFullRecall (row) ? "   " + tr ("(full scene recall)") : juce::String());
     };
     chainModel->onDoubleClick = [this] (int row) { openEditor (row); };
     chainList.setModel (chainModel.get());
@@ -225,6 +227,24 @@ RigPanel::RigPanel (AppEngine& e)
         juce::Logger::writeToLog (monitorButton.getToggleState() ? "Monitoring ON" : "Monitoring OFF");
     };
     addAndMakeVisible (monitorButton);
+
+    // Scenes ---------------------------------------------------------------
+    for (int i = 0; i < PluginChain::numScenes; ++i)
+    {
+        auto& b = sceneButtons[(size_t) i];
+        b.setClickingTogglesState (false);
+        b.onClick = [this, i] { sceneClicked (i); };
+        addAndMakeVisible (b);
+    }
+
+    sceneMenuButton.setTooltip (tr ("Save, rename or clear a scene"));
+    sceneMenuButton.onClick = [this] { showSceneMenu(); };
+    addAndMakeVisible (sceneMenuButton);
+
+    sceneHint.setColour (juce::Label::textColourId, theme::text().withAlpha (0.6f));
+    sceneHint.setFont (juce::FontOptions (13.0f));
+    sceneHint.setMinimumHorizontalScale (0.6f);
+    addAndMakeVisible (sceneHint);
 
     // MIDI -----------------------------------------------------------------
     midiDevicesLabel.setColour (juce::Label::textColourId, theme::text().withAlpha (0.8f));
@@ -340,7 +360,21 @@ void RigPanel::resized()
     }
 
     monitorButton.setBounds (take (36));
-    take (16);
+    take (10);
+
+    scenesHeader.setBounds (take (30));
+
+    {
+        auto r = take (46);
+        sceneMenuButton.setBounds (r.removeFromRight (44).reduced (2, 3));
+        const auto w = r.getWidth() / PluginChain::numScenes;
+
+        for (auto& b : sceneButtons)
+            b.setBounds (r.removeFromLeft (w).reduced (2, 3));
+    }
+
+    sceneHint.setBounds (take (24));
+    take (10);
 
     midiHeader.setBounds (take (30));
     midiDevicesLabel.setBounds (take (30));
@@ -378,6 +412,9 @@ void RigPanel::timerCallback()
 
     if (chainHint.getText() != hint)
         chainHint.setText (hint, juce::dontSendNotification);
+
+    if (engine.chain->getSceneVersion() != shownSceneVersion || (int) engine.footswitch->getMode() != shownFootswitchMode)
+        refreshScenes();
 
     const auto selected = selectedChainIndex();
     const auto movable = selected >= 0 && ! engine.chain->isInstrument (selected);
@@ -450,6 +487,121 @@ void RigPanel::handleMidi (const juce::MidiMessage& message, const juce::String&
 {
     lastMidiLabel.setText (message.getDescription(), juce::dontSendNotification);
     juce::Logger::writeToLog ("MIDI [" + source + "] " + message.getDescription());
+}
+
+//==============================================================================
+void RigPanel::refreshScenes()
+{
+    auto& chain = *engine.chain;
+    shownSceneVersion = chain.getSceneVersion();
+    shownFootswitchMode = (int) engine.footswitch->getMode();
+
+    for (int i = 0; i < PluginChain::numScenes; ++i)
+    {
+        auto& b = sceneButtons[(size_t) i];
+        const auto saved = chain.isSceneSaved (i);
+        const auto current = chain.getCurrentScene() == i;
+
+        b.setButtonText (juce::String (i + 1) + "  " + (saved ? chain.getSceneName (i) : tr ("empty")));
+        b.setToggleState (current, juce::dontSendNotification);
+        b.setAlpha (saved ? 1.0f : 0.6f);
+        b.setTooltip (saved ? tr ("Switch to this sound (a footswitch can do it too, in Scene mode)")
+                            : tr ("Empty: tap to save the current sound here"));
+    }
+
+    const auto inSceneMode = engine.footswitch->getMode() == Footswitch::sceneMode;
+    sceneHint.setText (! chain.hasSavedScenes() ? tr ("Set up a sound, then tap an empty scene to save it")
+                       : inSceneMode ? tr ("Footswitch in Scene mode: A-D switch scenes")
+                                     : tr ("Footswitch in Looper mode: hold D for scenes"),
+                       juce::dontSendNotification);
+    sceneHint.setColour (juce::Label::textColourId, inSceneMode ? theme::highlight() : theme::text().withAlpha (0.6f));
+}
+
+void RigPanel::sceneClicked (int scene)
+{
+    auto& chain = *engine.chain;
+
+    if (chain.isSceneSaved (scene))
+    {
+        chain.recallScene (scene);
+        return;
+    }
+
+    chain.saveScene (scene);
+    engine.saveChain();
+}
+
+void RigPanel::showSceneMenu()
+{
+    auto& chain = *engine.chain;
+    const auto current = chain.getCurrentScene();
+
+    juce::PopupMenu save;
+
+    for (int i = 0; i < PluginChain::numScenes; ++i)
+        save.addItem (juce::String (i + 1) + "  " + chain.getSceneName (i), [this, i]
+        {
+            engine.chain->saveScene (i);
+            engine.saveChain();
+        });
+
+    juce::PopupMenu menu;
+
+    if (current >= 0)
+        menu.addItem (tr ("Save the current sound to \"{scene}\"", chain.getSceneName (current)), [this, current]
+        {
+            engine.chain->saveScene (current);
+            engine.saveChain();
+        });
+
+    menu.addSubMenu (tr ("Save the current sound to"), save);
+
+    juce::PopupMenu rename, clear;
+
+    for (int i = 0; i < PluginChain::numScenes; ++i)
+    {
+        rename.addItem (juce::String (i + 1) + "  " + chain.getSceneName (i), [this, i] { renameScene (i); });
+        clear.addItem (juce::String (i + 1) + "  " + chain.getSceneName (i), chain.isSceneSaved (i), false, [this, i]
+        {
+            engine.chain->clearScene (i);
+            engine.saveChain();
+        });
+    }
+
+    menu.addSubMenu (tr ("Rename"), rename);
+    menu.addSubMenu (tr ("Clear"), clear, chain.hasSavedScenes());
+    menu.addSeparator();
+
+    const auto selected = selectedChainIndex();
+
+    if (selected >= 0)
+        menu.addItem (tr ("{plugin}: scenes restore its full state (slower; for amp models, IR files...)", chain.getPluginName (selected)),
+                      true, chain.isFullRecall (selected), [this, selected]
+        {
+            engine.chain->setFullRecall (selected, ! engine.chain->isFullRecall (selected));
+            engine.saveChain();
+        });
+    else
+        menu.addItem (tr ("Select a plugin in the chain to make scenes restore its full state"), false, false, [] {});
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (sceneMenuButton));
+}
+
+void RigPanel::renameScene (int scene)
+{
+    auto* window = new juce::AlertWindow (tr ("Rename scene"), tr ("Name:"), juce::MessageBoxIconType::NoIcon, this);
+    window->addTextEditor ("name", engine.chain->getSceneName (scene));
+    window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([safeThis = SafePointer<RigPanel> (this), window, scene] (int result)
+    {
+        if (safeThis == nullptr || result != 1)
+            return;
+
+        safeThis->engine.chain->setSceneName (scene, window->getTextEditorContents ("name"));
+        safeThis->engine.saveChain();
+    }), true);
 }
 
 //==============================================================================

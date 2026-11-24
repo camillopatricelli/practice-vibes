@@ -1274,7 +1274,8 @@ namespace
         {
             Footswitch fs;
             std::vector<juce::String> fired;
-            Rig() { fs.perform = [this] (FootswitchAction a, double) { fired.push_back (a.toString()); }; }
+            std::vector<double> times;
+            Rig() { fs.perform = [this] (FootswitchAction a, double t) { fired.push_back (a.toString()); times.push_back (t); }; }
         };
 
         // Momentary CC: learned from press + quick release; tap on press, hold after 1 s, once.
@@ -1333,7 +1334,7 @@ namespace
             check (r.fs.getSwitch (0).momentary && r.fs.getSwitch (0).trigger.type == MidiTrigger::Type::note, "note switch is momentary");
             r.fs.startLearning (3);
             r.fs.handleMidi (juce::MidiMessage::programChange (1, 5), 2.0);
-            r.fs.setTapAction (3, { Kind::undo, 0 });
+            r.fs.setTapAction (3, { Kind::undo, 0 }, Footswitch::looperMode);
             r.fs.handleMidi (juce::MidiMessage::programChange (1, 5), 3.0);
             check (r.fired.size() == 1 && r.fired[0] == "undo", "program change taps the chosen action");
 
@@ -1348,16 +1349,109 @@ namespace
             Footswitch a;
             a.startLearning (2);
             a.handleMidi (cc (64, 0), 1.0);
-            a.setHoldAction (2, { Kind::metronome, 0 });
-            a.setTapAction (1, { Kind::trackMute, 3 });
+            a.setHoldAction (2, { Kind::metronome, 0 }, Footswitch::looperMode);
+            a.setTapAction (1, { Kind::trackMute, 3 }, Footswitch::looperMode);
+            a.setTapAction (1, { Kind::sceneNext, 0 }, Footswitch::sceneMode);
 
             Footswitch b;
             b.fromXml (*a.toXml());
-            check (b.getSwitch (2).trigger == a.getSwitch (2).trigger && ! b.getSwitch (2).momentary
-                       && b.getSwitch (2).hold.kind == Kind::metronome && b.getSwitch (1).tap.toString() == "mute:3"
-                       && b.getSwitch (0).tap.toString() == "press:0" && b.getSwitch (0).hold.toString() == "clear:0",
-                   "settings survive a save / load");
+            const auto& b2 = b.getSwitch (2);
+            const auto& b1 = b.getSwitch (1);
+            const auto& b0 = b.getSwitch (0);
+            check (b2.trigger == a.getSwitch (2).trigger && ! b2.momentary
+                       && b2.hold[Footswitch::looperMode].kind == Kind::metronome && b1.tap[Footswitch::looperMode].toString() == "mute:3"
+                       && b0.tap[Footswitch::looperMode].toString() == "press:0" && b0.hold[Footswitch::looperMode].toString() == "clear:0"
+                       && b1.tap[Footswitch::sceneMode].toString() == "sceneNext" && b0.tap[Footswitch::sceneMode].toString() == "scene:0",
+                   "settings survive a save / load (both modes)");
         }
+
+        // Modes: defaults, hold D switches, D's tap waits for the release (dated at the press).
+        {
+            Rig r;
+            check (r.fs.getMode() == Footswitch::looperMode, "starts in Looper mode");
+            check (r.fs.getSwitch (3).hold[Footswitch::looperMode].kind == Kind::switchMode
+                     && r.fs.getSwitch (3).tap[Footswitch::looperMode].toString() == "press:3"
+                     && r.fs.getSwitch (0).tap[Footswitch::sceneMode].toString() == "scene:0"
+                     && r.fs.getSwitch (3).tap[Footswitch::sceneMode].toString() == "scene:3"
+                     && r.fs.getSwitch (3).hold[Footswitch::sceneMode].kind == Kind::switchMode,
+                   "defaults: A-D = tracks / scenes, hold D switches the mode");
+
+            r.fs.startLearning (3);
+            r.fs.handleMidi (cc (23, 127), 1.0);
+            r.fs.handleMidi (cc (23, 0), 1.1);
+            check (r.fs.getSwitch (3).momentary, "D learned as momentary");
+
+            r.fs.handleMidi (cc (23, 127), 10.0);
+            check (r.fired.empty(), "D press: the tap waits (its hold switches the mode)");
+            r.fs.update (10.2);
+            r.fs.handleMidi (cc (23, 0), 10.25);
+            check (r.fired.size() == 1 && r.fired[0] == "press:3" && std::abs (r.times[0] - 10.0) < 1.0e-9,
+                   "D short tap: track 4 on release, dated at the press");
+
+            r.fs.handleMidi (cc (23, 127), 20.0);
+            r.fs.update (21.05);
+            check (r.fs.getMode() == Footswitch::sceneMode && r.fired.size() == 1, "hold D: Scene mode, no track 4");
+            r.fs.handleMidi (cc (23, 0), 21.5);
+            check (r.fired.size() == 1, "releasing after the hold fires no tap");
+
+            r.fs.startLearning (0);
+            r.fs.handleMidi (cc (20, 127), 30.0);
+            r.fs.handleMidi (cc (20, 0), 30.1);
+            r.fs.handleMidi (cc (20, 127), 31.0);
+            check (r.fired.size() == 2 && r.fired[1] == "scene:0", "Scene mode: A taps scene 1 at once");
+            r.fs.handleMidi (cc (20, 0), 31.1);
+
+            r.fs.handleMidi (cc (23, 127), 40.0);
+            r.fs.update (41.1);
+            r.fs.handleMidi (cc (23, 0), 41.2);
+            check (r.fs.getMode() == Footswitch::looperMode && r.fired.size() == 2, "hold D again: back to Looper mode");
+        }
+
+        // A latching D can't hold: its tap switches the mode (Looper mode keeps tracks 1-3).
+        {
+            Rig r;
+            r.fs.startLearning (3);
+            r.fs.handleMidi (cc (33, 0), 1.0);      // starts at 0: latching
+            check (! r.fs.getSwitch (3).momentary && r.fs.getSwitch (3).tap[Footswitch::looperMode].kind == Kind::switchMode
+                     && r.fs.getSwitch (3).tap[Footswitch::sceneMode].kind == Kind::switchMode,
+                   "latching D: tap switches the mode in both modes");
+            r.fs.handleMidi (cc (33, 127), 2.0);
+            check (r.fs.getMode() == Footswitch::sceneMode && r.fired.empty(), "stomp D: Scene mode");
+            r.fs.handleMidi (cc (33, 0), 3.0);
+            check (r.fs.getMode() == Footswitch::looperMode, "stomp D again: Looper mode");
+
+            r.fs.forget (3);
+            check (r.fs.getSwitch (3).hold[Footswitch::looperMode].kind == Kind::switchMode
+                     && r.fs.getSwitch (3).tap[Footswitch::looperMode].toString() == "press:3",
+                   "forgetting D brings the momentary defaults back");
+        }
+
+        // Settings from before the modes: the old D defaults make way for the mode switch, custom actions stay.
+        {
+            auto old = juce::parseXML ("<PRACTICE_VIBES_FOOTSWITCH>"
+                                       "<SWITCH index=\"0\" trigger=\"cc:1:20\" momentary=\"1\" tap=\"undo\" hold=\"clear:0\"/>"
+                                       "<SWITCH index=\"3\" trigger=\"cc:1:23\" momentary=\"1\" tap=\"press:3\" hold=\"clear:3\"/>"
+                                       "</PRACTICE_VIBES_FOOTSWITCH>");
+            Footswitch fs;
+            fs.fromXml (*old);
+            check (fs.getSwitch (0).tap[Footswitch::looperMode].kind == Kind::undo
+                     && fs.getSwitch (3).tap[Footswitch::looperMode].toString() == "press:3"
+                     && fs.getSwitch (3).hold[Footswitch::looperMode].kind == Kind::switchMode
+                     && fs.getSwitch (0).tap[Footswitch::sceneMode].toString() == "scene:0",
+                   "old settings: custom actions kept, hold D now switches the mode, Scene mode gets defaults");
+
+            auto custom = juce::parseXML ("<PRACTICE_VIBES_FOOTSWITCH>"
+                                          "<SWITCH index=\"3\" trigger=\"cc:1:23\" momentary=\"1\" tap=\"press:3\" hold=\"metronome\"/>"
+                                          "</PRACTICE_VIBES_FOOTSWITCH>");
+            Footswitch fs2;
+            fs2.fromXml (*custom);
+            check (fs2.getSwitch (3).hold[Footswitch::looperMode].kind == Kind::metronome, "old settings: a custom hold on D is kept");
+        }
+
+        check (FootswitchAction::fromString (FootswitchAction { Kind::scene, 2 }.toString()) == FootswitchAction { Kind::scene, 2 }
+                 && FootswitchAction::fromString ("switchMode").kind == Kind::switchMode
+                 && FootswitchAction::fromString ("scenePrevious").kind == Kind::scenePrevious,
+               "scene actions round trip");
     }
 
     // Runs the metronome's clock and the drums together, as the app does (clock first, then the graph).
@@ -2690,6 +2784,163 @@ namespace
         const float amount;
         int held = 0;
     };
+}
+
+namespace
+{
+    /** An effect with one parameter (gain) and a "model" that lives only in its state, like an amp sim's model menu. */
+    class ParamPlugin : public juce::AudioPluginInstance
+    {
+    public:
+        struct Gain final : public Parameter
+        {
+            float value = 1.0f;
+            float get() const noexcept                          { return value; }
+            Gain& operator= (float v)                           { setValueNotifyingHost (v); return *this; }
+            float getValue() const override                     { return value; }
+            void setValue (float v) override                    { value = v; }
+            float getDefaultValue() const override              { return 1.0f; }
+            juce::String getName (int) const override           { return "Gain"; }
+            juce::String getLabel() const override              { return {}; }
+            juce::String getParameterID() const override        { return "gain"; }
+        };
+
+        explicit ParamPlugin (const juce::String& n)
+            : juce::AudioPluginInstance (BusesProperties().withInput ("In", juce::AudioChannelSet::stereo())
+                                                          .withOutput ("Out", juce::AudioChannelSet::stereo())),
+              name (n)
+        {
+            auto p = std::make_unique<Gain>();
+            gain = p.get();
+            addHostedParameter (std::move (p));
+        }
+
+        void fillInPluginDescription (juce::PluginDescription& d) const override
+        {
+            d.name = name;
+            d.pluginFormatName = "Fake";
+            d.numInputChannels = 2;
+            d.numOutputChannels = 2;
+        }
+
+        const juce::String getName() const override             { return name; }
+        void prepareToPlay (double, int) override               {}
+        void releaseResources() override                        {}
+        void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override { buffer.applyGain (gain->get()); }
+        double getTailLengthSeconds() const override            { return 0.0; }
+        bool acceptsMidi() const override                       { return false; }
+        bool producesMidi() const override                      { return false; }
+        juce::AudioProcessorEditor* createEditor() override     { return nullptr; }
+        bool hasEditor() const override                         { return false; }
+        int getNumPrograms() override                           { return 1; }
+        int getCurrentProgram() override                        { return 0; }
+        void setCurrentProgram (int) override                   {}
+        const juce::String getProgramName (int) override        { return {}; }
+        void changeProgramName (int, const juce::String&) override {}
+
+        void getStateInformation (juce::MemoryBlock& block) override
+        {
+            juce::MemoryOutputStream out (block, false);
+            out.writeInt (model);
+            out.writeFloat (gain->get());
+        }
+
+        void setStateInformation (const void* data, int size) override
+        {
+            juce::MemoryInputStream in (data, (size_t) size, false);
+            model = in.readInt();
+            *gain = in.readFloat();
+            ++stateLoads;
+        }
+
+        const juce::String name;
+        Gain* gain = nullptr;
+        int model = 0, stateLoads = 0;
+    };
+}
+
+static void testRigScenes()
+{
+    std::cout << "\n[Rig: scenes]\n";
+
+    juce::AudioDeviceManager deviceManager;
+    juce::AudioPluginFormatManager formats;
+    PluginChain chain (deviceManager, formats);
+
+    auto amp = std::make_unique<ParamPlugin> ("Amp");
+    auto delay = std::make_unique<ParamPlugin> ("Delay");
+    auto* a = amp.get();
+    chain.addPluginInstance (std::move (amp));
+    chain.addPluginInstance (std::move (delay));
+
+    check (! chain.hasSavedScenes() && chain.getCurrentScene() < 0 && chain.getSceneName (1) == "Scene 2", "no scenes at first");
+
+    // Clean: low gain, delay off, -6 dB.
+    *a->gain = 0.2f;
+    a->model = 1;
+    chain.setBypassed (1, true);
+    chain.getOutputStage().gain = 0.5f;
+    chain.saveScene (0);
+    chain.setSceneName (0, "  Clean ");
+
+    // Crunch: high gain, delay on, 0 dB, another amp model.
+    *a->gain = 0.9f;
+    a->model = 2;
+    chain.setBypassed (1, false);
+    chain.getOutputStage().gain = 1.0f;
+    chain.saveScene (2);
+
+    check (chain.isSceneSaved (0) && ! chain.isSceneSaved (1) && chain.isSceneSaved (2) && chain.getCurrentScene() == 2
+             && chain.getSceneName (0) == "Clean", "scenes 1 and 3 saved, names trimmed");
+
+    const auto version = chain.getSceneVersion();
+    check (chain.recallScene (0), "recall Clean");
+    check (std::abs (a->gain->get() - 0.2f) < 1.0e-4f && chain.isBypassed (1) && std::abs (chain.getOutputStage().gain.load() - 0.5f) < 1.0e-6f
+             && chain.getCurrentScene() == 0 && chain.getSceneVersion() > version,
+           "Clean: parameters, bypass and output level come back");
+    check (a->model == 2 && a->stateLoads == 0, "parameters only: the model (state only) is left alone, no state load");
+
+    check (! chain.recallScene (1), "an empty scene can't be recalled");
+
+    chain.setFullRecall (0, true);
+    chain.recallScene (0);
+    check (a->model == 1 && a->stateLoads == 1 && chain.isFullRecall (0) && ! chain.isFullRecall (1),
+           "full recall restores the plugin's whole state");
+    chain.recallScene (2);
+    check (a->model == 2 && std::abs (a->gain->get() - 0.9f) < 1.0e-4f && ! chain.isBypassed (1), "and back to Crunch");
+
+    chain.recallNextScene (1);
+    check (chain.getCurrentScene() == 0, "next scene wraps over the empty ones (3 -> 1)");
+    chain.recallNextScene (-1);
+    check (chain.getCurrentScene() == 2, "previous scene wraps too (1 -> 3)");
+
+    // A scene travels with its plugin when the chain is reordered; a newer plugin is left as it is.
+    chain.movePlugin (1, -1);       // Delay, Amp
+    auto extra = std::make_unique<ParamPlugin> ("Reverb");
+    auto* r = extra.get();
+    chain.addPluginInstance (std::move (extra));
+    *r->gain = 0.33f;
+    chain.recallScene (0);
+    check (chain.getPluginName (0) == "Delay" && chain.isBypassed (0) && ! chain.isBypassed (1)
+             && std::abs (a->gain->get() - 0.2f) < 1.0e-4f && std::abs (r->gain->get() - 0.33f) < 1.0e-4f,
+           "scene data follows a moved plugin; a plugin added later is untouched");
+
+    // Saved in the chain's XML.
+    auto xml = chain.createStateXml();
+    auto* sceneList = xml->getChildByName ("SCENES");
+    int savedSlots = 0;
+
+    for (auto* slot : xml->getChildWithTagNameIterator ("SLOT"))
+        savedSlots += slot->getChildByName ("SCENE") != nullptr ? 1 : 0;
+
+    check (sceneList != nullptr && sceneList->getIntAttribute ("current") == 0 && savedSlots == 2
+             && xml->toString().contains ("Clean"), "scenes are written with the chain");
+
+    chain.clearScene (0);
+    check (! chain.isSceneSaved (0) && chain.getCurrentScene() < 0 && chain.getSceneName (0) == "Scene 1", "clear a scene");
+
+    chain.clear();
+    check (! chain.hasSavedScenes(), "an emptied chain has no scenes");
 }
 
 static void testInstrumentSlot()
@@ -5041,6 +5292,7 @@ int main()
     testPracticeLog();
     testLogCorrections();
     testInstrumentSlot();
+    testRigScenes();
     testMidiPracticeTiming();
     testNoGuitarTopics();
     testStartButtonMode();

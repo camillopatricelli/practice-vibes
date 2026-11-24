@@ -65,6 +65,43 @@ Un footswitch può mettere in bypass il plugin selezionato (capitolo 11).
 
 ---
 
+## Scene: cambiare suono mentre suoni
+
+Passare da un suono pulito a uno crunch di solito vuol dire aprire la finestra di un plugin e girare manopole. Le
+**Scene** salvano fino a quattro suoni della stessa catena, così cambi con un tocco, o con il piede (capitolo 11).
+
+Una scena ricorda le impostazioni di ogni plugin, quali plugin sono accesi o in bypass, e il **Livello in uscita**
+(così un suono solista può essere più forte).
+
+1. Imposta un suono: apri i plugin, gira le manopole, metti in bypass quello che non ti serve.
+2. Sotto **Scene**, tocca una scena vuota (**1 vuoto**): il suono attuale viene salvato lì.
+3. Imposta il suono successivo e tocca la scena vuota successiva. E così via.
+4. Tocca una scena salvata per passare a quel suono.
+
+Il pulsante **...** accanto alle scene:
+- **Salva il suono attuale in**: aggiorna una scena dopo aver cambiato le manopole (toccare una scena salvata passa
+  soltanto a quel suono).
+- **Rinomina**: dai un nome alla scena, per esempio *Pulito* o *Crunch*.
+- **Svuota**: svuota una scena.
+- *Plugin*: **le scene ripristinano il suo stato completo**: vedi sotto.
+
+Appena salvi una scena, la barra in alto mostra la scena attuale in tutte le schede. Toccala per cambiare scena, o per
+mettere il footswitch in modalità looper o scene.
+
+> **Qualche suono non torna?** Per cambiare in fretta, una scena imposta le manopole che il plugin mostra all'app (i
+> suoi parametri). Alcuni plugin tengono parte del suono altrove: un modello di ampli scelto da un menu, un file IR o
+> una cattura caricati. Per questi, seleziona il plugin nella catena, poi **...** › *plugin*: **le scene
+> ripristinano il suo stato completo**. Funziona con qualsiasi plugin, ma è più lento e il suono può interrompersi un
+> attimo al cambio. La catena segna questi plugin con **(scena: stato completo)**.
+
+Buono a sapersi:
+- Un plugin aggiunto dopo aver salvato una scena resta com'è quando richiami quella scena. Salva di nuovo la scena per
+  includerlo.
+- Spostare i plugin su o giù non rovina le scene.
+- Le code di delay e riverbero possono interrompersi al cambio. Per studiare va bene così.
+
+---
+
 ## Suonare una tastiera MIDI attraverso un plugin strumento
 
 Una tastiera MIDI (o un pad) da sola non fa suono. Aggiungi un plugin **strumento** (un pianoforte, un synth, un

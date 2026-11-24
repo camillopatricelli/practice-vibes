@@ -2,13 +2,15 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "AppEngine.h"
+#include "SegmentedControl.h"
 #include "Localisation.h"
 
 namespace pv
 {
 
 /** Footswitch setup (shown in the overlay): learn each switch of a MIDI pedal board and
-    choose what a tap and a hold do. Opened from the Looper and Rig tabs.
+    choose what a tap and a hold do, in Looper mode and in Scene mode. The mode selector is the
+    pedal's real mode (the pedal itself switches it too). Opened from the Looper and Rig tabs.
 */
 class FootswitchPanel final : public juce::Component,
                               private juce::Timer
@@ -28,7 +30,8 @@ private:
     AppEngine& engine;
     Footswitch& footswitch;
 
-    juce::Label intro, devicesLabel;
+    juce::Label intro, devicesLabel, modeHint;
+    SegmentedControl modeSelector;
     juce::TextButton learnAllButton { tr ("Learn A-D in a row") }, defaultsButton { tr ("Default actions") };
     std::array<std::unique_ptr<SwitchRow>, Footswitch::numSwitches> rows;
     bool learningAll = false;

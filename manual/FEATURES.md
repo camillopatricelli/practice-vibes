@@ -106,12 +106,16 @@ It runs on **iPad**, **Windows** and **macOS**.
 - Add, reorder, bypass and remove plugins. The chain and every plugin's settings are saved and restored.
 - **Instrument plugins** (piano, synth, drum sampler) played from a **MIDI keyboard**: the sound goes through your
   effects and into loops and takes.
+- **Scenes**: up to four saved sounds of the same chain (say Clean, Crunch, Lead), switched with one tap or a
+  footswitch while you play. A scene keeps every plugin's settings, which plugins are on, and the output level.
 
 ## Footswitch
 - Any **MIDI footswitch**, over USB or **Bluetooth MIDI** (pairing built into the app).
 - Up to four switches, each "learned" by pressing it, with a **tap** and a **hold** action: looper track record /
   overdub / play, clear, mute, undo, mute or clear all, start / stop metronome, tuner, bypass a plugin, record a take,
-  mute one of the song's stems (e.g. the guitar, bass or piano).
+  mute one of the song's stems (e.g. the guitar, bass or piano), switch rig scenes.
+- **Two modes**: Looper mode (switches A–D run the looper) and Scene mode (switches A–D pick scenes 1–4), each with
+  its own actions. Hold D to switch between them (tap D on a latching pedal).
 
 ## Look
 - Dark and light themes, or follow the system setting.

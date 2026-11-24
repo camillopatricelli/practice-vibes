@@ -1,4 +1,5 @@
 #include "PluginChain.h"
+#include "Localisation.h"
 
 namespace pv
 {
@@ -291,8 +292,11 @@ void PluginChain::clear()
         graph.removeNode (slot.node->nodeID, UpdateKind::none);
 
     slots.clear();
+    scenes = {};
+    currentScene = -1;
     rebuildConnections();
     notifyChange();
+    scenesChanged();
 }
 
 void PluginChain::setLooperNodes (std::unique_ptr<juce::AudioProcessor> beforeFx, std::unique_ptr<juce::AudioProcessor> afterFx)
@@ -443,12 +447,43 @@ std::unique_ptr<juce::XmlElement> PluginChain::createStateXml() const
         auto* element = xml->createNewChildElement ("SLOT");
         element->setAttribute ("bypassed", slot.node->isBypassed());
 
+        if (slot.fullRecall)
+            element->setAttribute ("fullRecall", true);
+
+        for (int i = 0; i < numScenes; ++i)
+            if (slot.scenes[(size_t) i].saved)
+            {
+                auto* sceneElement = element->createNewChildElement ("SCENE");
+                sceneElement->setAttribute ("index", i);
+                sceneToXml (slot.scenes[(size_t) i], *sceneElement);
+            }
+
         juce::MemoryBlock state;
         slot.node->getProcessor()->getStateInformation (state);
         element->setAttribute ("state", state.toBase64Encoding());
 
         if (auto description = slot.description.createXml())
             element->addChildElement (description.release());
+    }
+
+    if (hasSavedScenes())
+    {
+        auto* sceneList = xml->createNewChildElement ("SCENES");
+        sceneList->setAttribute ("current", currentScene);
+
+        for (int i = 0; i < numScenes; ++i)
+        {
+            const auto& info = scenes[(size_t) i];
+
+            if (! info.saved && info.name.isEmpty())
+                continue;
+
+            auto* e = sceneList->createNewChildElement ("SCENE");
+            e->setAttribute ("index", i);
+            e->setAttribute ("name", info.name);
+            e->setAttribute ("saved", info.saved);
+            e->setAttribute ("outputGain", (double) info.outputGain);
+        }
     }
 
     return xml;
@@ -483,7 +518,40 @@ void PluginChain::restoreFromXml (const juce::XmlElement& xml, std::function<voi
 
         slot.state.fromBase64Encoding (element->getStringAttribute ("state"));
         slot.bypassed = element->getBoolAttribute ("bypassed");
+        slot.fullRecall = element->getBoolAttribute ("fullRecall");
+
+        for (auto* sceneElement : element->getChildWithTagNameIterator ("SCENE"))
+        {
+            const auto i = sceneElement->getIntAttribute ("index", -1);
+
+            if (juce::isPositiveAndBelow (i, numScenes))
+                sceneFromXml (*sceneElement, slot.scenes[(size_t) i]);
+        }
+
         pending->push_back (std::move (slot));
+    }
+
+    if (auto* sceneList = xml.getChildByName ("SCENES"))
+    {
+        for (auto* e : sceneList->getChildWithTagNameIterator ("SCENE"))
+        {
+            const auto i = e->getIntAttribute ("index", -1);
+
+            if (! juce::isPositiveAndBelow (i, numScenes))
+                continue;
+
+            auto& info = scenes[(size_t) i];
+            info.name = e->getStringAttribute ("name");
+            info.saved = e->getBoolAttribute ("saved");
+            info.outputGain = (float) e->getDoubleAttribute ("outputGain", 1.0);
+        }
+
+        currentScene = sceneList->getIntAttribute ("current", -1);
+
+        if (! isSceneSaved (currentScene))
+            currentScene = -1;
+
+        scenesChanged();
     }
 
     juce::Logger::writeToLog ("Restoring chain with " + juce::String ((int) pending->size()) + " plugin(s)");
@@ -517,6 +585,13 @@ void PluginChain::restoreNext (std::shared_ptr<std::vector<PendingSlot>> pending
                 node->getProcessor()->setStateInformation (entry.state.getData(), (int) entry.state.getSize());
 
             node->setBypassed (entry.bypassed);
+
+            for (auto& slot : slots)
+                if (slot.node == node)
+                {
+                    slot.fullRecall = entry.fullRecall;
+                    slot.scenes = std::move (entry.scenes);
+                }
         }
         else
         {
@@ -526,6 +601,215 @@ void PluginChain::restoreNext (std::shared_ptr<std::vector<PendingSlot>> pending
         notifyChange();
         restoreNext (pending, index + 1, onDone);
     });
+}
+
+//==============================================================================
+bool PluginChain::isSceneSaved (int scene) const
+{
+    return juce::isPositiveAndBelow (scene, numScenes) && scenes[(size_t) scene].saved;
+}
+
+bool PluginChain::hasSavedScenes() const
+{
+    for (auto& info : scenes)
+        if (info.saved)
+            return true;
+
+    return false;
+}
+
+juce::String PluginChain::getSceneName (int scene) const
+{
+    if (! juce::isPositiveAndBelow (scene, numScenes))
+        return {};
+
+    const auto& name = scenes[(size_t) scene].name;
+    return name.isNotEmpty() ? name : tr ("Scene {n}", scene + 1);
+}
+
+void PluginChain::setSceneName (int scene, const juce::String& name)
+{
+    if (! juce::isPositiveAndBelow (scene, numScenes))
+        return;
+
+    scenes[(size_t) scene].name = name.trim();
+    scenesChanged();
+}
+
+void PluginChain::saveScene (int scene)
+{
+    if (! juce::isPositiveAndBelow (scene, numScenes))
+        return;
+
+    for (auto& slot : slots)
+    {
+        auto& snapshot = slot.scenes[(size_t) scene];
+        snapshot.saved = true;
+        snapshot.bypassed = slot.node->isBypassed();
+        snapshot.values.clear();
+
+        auto* processor = slot.node->getProcessor();
+
+        for (auto* parameter : processor->getParameters())
+            snapshot.values.push_back (parameter->getValue());
+
+        snapshot.state.reset();
+        processor->getStateInformation (snapshot.state);
+    }
+
+    auto& info = scenes[(size_t) scene];
+    info.saved = true;
+    info.outputGain = getOutputStage().gain.load();
+    currentScene = scene;
+
+    juce::Logger::writeToLog ("Saved scene " + juce::String (scene + 1) + " with " + juce::String (getNumPlugins()) + " plugin(s)");
+    scenesChanged();
+}
+
+bool PluginChain::recallScene (int scene)
+{
+    if (! isSceneSaved (scene))
+        return false;
+
+    const auto started = juce::Time::getMillisecondCounterHiRes();
+    int changedParameters = 0, fullStates = 0;
+    bool bypassChanged = false;
+
+    for (auto& slot : slots)
+    {
+        const auto& snapshot = slot.scenes[(size_t) scene];
+
+        if (! snapshot.saved)
+            continue;       // added after the scene was saved: stays as it is
+
+        auto* processor = slot.node->getProcessor();
+        const auto& parameters = processor->getParameters();
+        const auto sameParameters = parameters.size() == (int) snapshot.values.size();
+
+        if ((slot.fullRecall || ! sameParameters) && snapshot.state.getSize() > 0)
+        {
+            // Also when the plugin's parameter list changed since the scene was saved (e.g. a plugin update).
+            processor->setStateInformation (snapshot.state.getData(), (int) snapshot.state.getSize());
+            ++fullStates;
+        }
+        else if (sameParameters)
+        {
+            for (int p = 0; p < parameters.size(); ++p)
+            {
+                const auto value = snapshot.values[(size_t) p];
+
+                if (std::abs (parameters[p]->getValue() - value) > 1.0e-6f)
+                {
+                    parameters[p]->setValueNotifyingHost (value);
+                    ++changedParameters;
+                }
+            }
+        }
+
+        if (slot.node->isBypassed() != snapshot.bypassed)
+        {
+            slot.node->setBypassed (snapshot.bypassed);
+            bypassChanged = true;
+        }
+    }
+
+    getOutputStage().gain = scenes[(size_t) scene].outputGain;
+    currentScene = scene;
+
+    juce::Logger::writeToLog ("Scene " + juce::String (scene + 1) + ": " + juce::String (changedParameters)
+                              + " parameter(s) changed, " + juce::String (fullStates) + " full state(s) restored, "
+                              + juce::String (juce::Time::getMillisecondCounterHiRes() - started, 1) + " ms");
+
+    if (bypassChanged)
+        notifyChange();
+
+    scenesChanged();
+    return true;
+}
+
+void PluginChain::recallNextScene (int delta)
+{
+    const auto direction = delta < 0 ? -1 : 1;
+    const auto base = currentScene >= 0 ? currentScene : (direction > 0 ? -1 : numScenes);
+
+    for (int step = 1; step <= numScenes; ++step)
+    {
+        const auto scene = ((base + direction * step) % numScenes + numScenes) % numScenes;
+
+        if (isSceneSaved (scene))
+        {
+            recallScene (scene);
+            return;
+        }
+    }
+}
+
+void PluginChain::clearScene (int scene)
+{
+    if (! juce::isPositiveAndBelow (scene, numScenes))
+        return;
+
+    for (auto& slot : slots)
+        slot.scenes[(size_t) scene] = {};
+
+    scenes[(size_t) scene] = {};
+
+    if (currentScene == scene)
+        currentScene = -1;
+
+    juce::Logger::writeToLog ("Cleared scene " + juce::String (scene + 1));
+    scenesChanged();
+}
+
+bool PluginChain::isFullRecall (int index) const
+{
+    return juce::isPositiveAndBelow (index, getNumPlugins()) && slots[(size_t) index].fullRecall;
+}
+
+void PluginChain::setFullRecall (int index, bool shouldRecallFullState)
+{
+    if (! juce::isPositiveAndBelow (index, getNumPlugins()))
+        return;
+
+    slots[(size_t) index].fullRecall = shouldRecallFullState;
+    juce::Logger::writeToLog (getPluginName (index) + (shouldRecallFullState ? ": scenes restore the full plugin state"
+                                                                              : ": scenes set parameters only"));
+    notifyChange();
+}
+
+void PluginChain::scenesChanged()
+{
+    ++sceneVersion;
+}
+
+void PluginChain::sceneToXml (const SceneSnapshot& snapshot, juce::XmlElement& e)
+{
+    e.setAttribute ("bypassed", snapshot.bypassed);
+
+    // Little-endian floats, base64: compact even for plugins with thousands of parameters.
+    juce::MemoryOutputStream values;
+
+    for (auto v : snapshot.values)
+        values.writeFloat (v);
+
+    e.setAttribute ("values", values.getMemoryBlock().toBase64Encoding());
+    e.setAttribute ("state", snapshot.state.toBase64Encoding());
+}
+
+void PluginChain::sceneFromXml (const juce::XmlElement& e, SceneSnapshot& snapshot)
+{
+    snapshot = {};
+    snapshot.saved = true;
+    snapshot.bypassed = e.getBoolAttribute ("bypassed");
+
+    juce::MemoryBlock values;
+    values.fromBase64Encoding (e.getStringAttribute ("values"));
+    juce::MemoryInputStream in (values, false);
+
+    while (in.getNumBytesRemaining() >= 4)
+        snapshot.values.push_back (in.readFloat());
+
+    snapshot.state.fromBase64Encoding (e.getStringAttribute ("state"));
 }
 
 } // namespace pv

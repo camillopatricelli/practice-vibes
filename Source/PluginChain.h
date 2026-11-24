@@ -110,6 +110,31 @@ public:
         isn't counted: the looper compensates the audio input's round trip. */
     int getPluginLatencySamples() const;
 
+    //==========================================================================
+    // Scenes: up to numScenes saved sounds of the same chain ("Clean", "Crunch"...), switched while playing.
+    // A scene keeps, per plugin, every parameter value, the bypass state and the plugin's full state, plus the
+    // output level. Recalling sets only the parameters that differ (quick, works with any plugin); plugins marked
+    // "full recall" get their whole state back instead (for sounds that live outside the parameters, e.g. an
+    // amp model menu or an IR file; may drop out briefly). A scene's data travels with its plugin when the
+    // chain is reordered; a plugin added after a scene was saved is left as it is by that scene.
+    static constexpr int numScenes = 4;
+
+    bool isSceneSaved (int scene) const;
+    bool hasSavedScenes() const;
+    juce::String getSceneName (int scene) const;            // "Scene 2" until renamed
+    void setSceneName (int scene, const juce::String&);     // empty = back to "Scene N"
+    void saveScene (int scene);
+    bool recallScene (int scene);                           // false: not saved
+    void recallNextScene (int delta);                       // +1 / -1 through the saved scenes, wrapping
+    void clearScene (int scene);
+    int getCurrentScene() const noexcept                    { return currentScene; }    // -1 = none recalled/saved yet
+
+    bool isFullRecall (int index) const;
+    void setFullRecall (int index, bool);
+
+    /** Goes up whenever a scene is recalled, saved, renamed or cleared (UI timers poll it). */
+    int getSceneVersion() const noexcept                    { return sceneVersion; }
+
     /** Serialises the chain, including every plugin's own state. */
     std::unique_ptr<juce::XmlElement> createStateXml() const;
 
@@ -123,11 +148,24 @@ private:
     using NodePtr = juce::AudioProcessorGraph::Node::Ptr;
     using NodeCallback = std::function<void (NodePtr, const juce::String& error)>;
 
+    /** One plugin's part of a scene. */
+    struct SceneSnapshot
+    {
+        bool saved = false;
+        bool bypassed = false;
+        std::vector<float> values;          // every parameter, normalised, in getParameters() order
+        juce::MemoryBlock state;            // getStateInformation()
+    };
+
+    using SlotScenes = std::array<SceneSnapshot, numScenes>;
+
     struct Slot
     {
         NodePtr node;
         juce::PluginDescription description;
         bool instrument = false;
+        bool fullRecall = false;
+        SlotScenes scenes {};
     };
 
     struct PendingSlot
@@ -135,7 +173,20 @@ private:
         juce::PluginDescription description;
         juce::MemoryBlock state;
         bool bypassed = false;
+        bool fullRecall = false;
+        SlotScenes scenes {};
     };
+
+    struct SceneInfo
+    {
+        juce::String name;                  // empty = "Scene N"
+        bool saved = false;
+        float outputGain = 1.0f;
+    };
+
+    void scenesChanged();
+    static void sceneToXml (const SceneSnapshot&, juce::XmlElement&);
+    static void sceneFromXml (const juce::XmlElement&, SceneSnapshot&);
 
     void loadPlugin (const juce::PluginDescription&, NodeCallback);     // adds the node, unconnected
     void addSlot (NodePtr);
@@ -192,6 +243,8 @@ private:
     std::vector<Slot> slots;
     std::vector<NodePtr> sources;
     int inputChannel = 0;
+    std::array<SceneInfo, numScenes> scenes {};
+    int currentScene = -1, sceneVersion = 0;
 
     // Async plugin-creation callbacks check this so they never touch a deleted chain.
     std::shared_ptr<bool> alive = std::make_shared<bool> (true);

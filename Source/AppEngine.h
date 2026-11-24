@@ -30,6 +30,7 @@ public:
 
     /** Writes the audio device settings and the plugin chain to disk. */
     void saveState();
+    void saveChain();               // the rig only (chain.xml), e.g. after a scene was saved
 
     void logAudioDeviceInfo();
 

@@ -422,15 +422,18 @@ void LooperPanel::updatePedalBadges()
 
         for (int i = 0; i < Footswitch::numSwitches; ++i)
         {
+            // The Looper mode actions (in Scene mode the pedal plays scenes until switched back).
             const auto& sw = footswitch.getSwitch (i);
-            const auto tapsThis = sw.tap.kind == FootswitchAction::Kind::trackPress && sw.tap.track == t;
+            const auto& tap = sw.tap[Footswitch::looperMode];
+            const auto& hold = sw.hold[Footswitch::looperMode];
+            const auto tapsThis = tap.kind == FootswitchAction::Kind::trackPress && tap.track == t;
 
             if (! sw.trigger.isValid() || ! tapsThis)
                 continue;
 
             letters.add (Footswitch::switchName (i));
-            details.add (sw.momentary && sw.hold.kind != FootswitchAction::Kind::none
-                             ? tr ("Footswitch {name}: tap = record / overdub / play, hold = {action}", Footswitch::switchName (i), sw.hold.describe())
+            details.add (sw.momentary && hold.kind != FootswitchAction::Kind::none
+                             ? tr ("Footswitch {name}: tap = record / overdub / play, hold = {action}", Footswitch::switchName (i), hold.describe())
                              : tr ("Footswitch {name}: tap = record / overdub / play", Footswitch::switchName (i)));
         }
 
