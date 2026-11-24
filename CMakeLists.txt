@@ -170,6 +170,7 @@ target_sources(PracticeVibes PRIVATE
     Source/FolderAccess.cpp
     Source/Footswitch.cpp
     Source/FootswitchPanel.cpp
+    Source/FretboardPanel.cpp
     Source/Icons.cpp
     Source/Library.cpp
     Source/LibraryPanel.cpp
@@ -307,6 +308,12 @@ juce_add_binary_data(PracticeVibesNotices
     NAMESPACE   NoticesData
     SOURCES     THIRD_PARTY_NOTICES.md)
 
+# The Fretboard tab's page and its font (Resources/Web; Archivo: SIL Open Font License, Resources/Web/fonts/Archivo-OFL.txt).
+juce_add_binary_data(PracticeVibesWeb
+    HEADER_NAME WebData.h
+    NAMESPACE   WebData
+    SOURCES     Resources/Web/fretboard.html Resources/Web/fonts/Archivo.ttf)
+
 target_link_libraries(PracticeVibes
     PRIVATE
         juce::juce_audio_utils
@@ -318,6 +325,7 @@ target_link_libraries(PracticeVibes
         PracticeVibesFonts
         PracticeVibesLanguages
         PracticeVibesNotices
+        PracticeVibesWeb
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags

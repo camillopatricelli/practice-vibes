@@ -79,6 +79,14 @@ Funziona su **iPad**, **Windows** e **macOS**.
   editor a passi (ottavi / terzine / sedicesimi, swing, accenti, ghost note), pattern da 1 a 8 battute che ripartono
   con i tuoi loop, i tuoi pattern salvati con un nome.
 
+## Tastiera
+- Un **prontuario di accordi per chitarra**: i sette accordi di una tonalità sul manico, per la scala maggiore, i suoi
+  modi, la minore armonica e la minore melodica, in qualsiasi tonalità.
+- **Arpeggi, triadi, accordi di settima drop 2 e drop 3**, nelle cinque forme CAGED, nei sette pattern a 3 note per
+  corda o lungo tutto il manico.
+- **Condotta delle voci** nelle progressioni più comuni e un **quiz** (accordo, rivolto, nota dell'accordo). Funziona
+  senza connessione.
+
 ## Accordatore
 - Accordatore cromatico con vista ad ago o **strobo**; riferimento La4 430–450 Hz.
 - **Chitarra**, **basso** (4, 5 o 6 corde) o **altro** (cromatico semplice, per qualsiasi strumento o la voce).

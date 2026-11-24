@@ -1106,3 +1106,7 @@ countries: it
 "Set up a sound, then tap an empty scene to save it" = "Imposta un suono, poi tocca una scena vuota per salvarlo"
 "Switch to this sound (a footswitch can do it too, in Scene mode)" = "Passa a questo suono (lo può fare anche il footswitch, in modalità scene)"
 "{plugin}: scenes restore its full state (slower; for amp models, IR files...)" = "{plugin}: le scene ripristinano il suo stato completo (più lento; per modelli di ampli, file IR...)"
+"Fretboard" = "Tastiera"
+"Get WebView2" = "Scarica WebView2"
+"It is free from Microsoft: install it, then restart Practice Vibes." = "È gratuito, di Microsoft: installalo e poi riavvia Practice Vibes."
+"The Fretboard page needs Microsoft WebView2, which isn't installed on this computer." = "La pagina Tastiera ha bisogno di Microsoft WebView2, che non è installato su questo computer."

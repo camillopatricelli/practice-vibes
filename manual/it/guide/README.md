@@ -19,6 +19,7 @@ Una guida breve: "per iniziare" più una pagina per ogni funzione.
 | 10 | [Rig](10-rig.md) – come funziona il rig, plugin, catena di effetti, livelli |
 | 11 | [Footswitch](11-footswitch.md) – abbinamento, apprendimento degli switch, azioni al tocco e tenendo premuto |
 | 12 | [Risoluzione dei problemi](12-troubleshooting.md) – domande frequenti, file di log, problemi comuni, segnalare un problema, Informazioni |
+| 13 | [Tastiera](13-fretboard.md) – i sette accordi di una tonalità sul manico: posizioni CAGED e a 3 note per corda, triadi, drop 2 / drop 3, condotta delle voci, quiz |
 
 Nel manuale trovi anche: [cosa collegare](../AUDIO-SETUP.md), l'[elenco delle funzioni](../FEATURES.md) e
 [i modi di usare l'app](../WORKFLOW.md) per chi studia, per gli insegnanti e per i musicisti che vogliono un solo strumento.

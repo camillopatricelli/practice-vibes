@@ -65,6 +65,13 @@ It runs on **iPad**, **Windows** and **macOS**.
   editor (8ths / triplets / 16ths, swing, accents, ghost notes), 1–8 bar patterns that restart with your loops,
   your own patterns saved by name.
 
+## Fretboard
+- A **chord chart for guitar**: the seven chords of a key on the neck, for the major scale, its modes, harmonic and
+  melodic minor, in any key.
+- **Arpeggios, triads, drop 2 and drop 3 seventh chords**, in the five CAGED shapes, the seven 3-notes-per-string
+  patterns, or along the whole neck.
+- **Voice leading** through common progressions, and a **quiz** (chord, inversion, chord tone). Works offline.
+
 ## Tuner
 - Chromatic tuner with needle or **strobe** view; reference A4 430–450 Hz.
 - **Guitar**, **bass** (4, 5 or 6 strings) or **other** (plain chromatic, for any instrument or voice).

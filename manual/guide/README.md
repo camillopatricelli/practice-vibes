@@ -19,6 +19,7 @@ A short guide: "getting started" plus one page per feature.
 | 10 | [Rig](10-rig.md) – how the rig works, plugins, effects chain, levels |
 | 11 | [Footswitch](11-footswitch.md) – pairing, learning switches, tap / hold actions |
 | 12 | [Troubleshooting](12-troubleshooting.md) – FAQ, log file, common problems, reporting a problem, About |
+| 13 | [Fretboard](13-fretboard.md) – the seven chords of a key on the neck: CAGED and 3-notes-per-string positions, triads, drop 2 / drop 3, voice leading, quiz |
 
 Also in the manual: [what to plug in](../AUDIO-SETUP.md), the [feature list](../FEATURES.md), and
 [ways to use the app](../WORKFLOW.md) for students, teachers and musicians who want one tool.

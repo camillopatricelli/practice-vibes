@@ -14,6 +14,7 @@
 namespace pv
 {
 
+class FretboardPanel;
 class LibraryPanel;
 class LinksPanel;
 class LooperPanel;
@@ -158,6 +159,7 @@ private:
     std::unique_ptr<LibraryPanel> libraryPanel;
     std::unique_ptr<LinksPanel> linksPanel;
     std::unique_ptr<LooperPanel> looperPanel;
+    std::unique_ptr<FretboardPanel> fretboardPanel;
     std::unique_ptr<RigPanel> rigPanel;
     std::unique_ptr<LogPanel> logPanel;
     juce::TabbedComponent tabs { juce::TabbedButtonBar::TabsAtTop };

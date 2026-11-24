@@ -3,6 +3,7 @@
 #include "LibraryPanel.h"
 #include "LinksPanel.h"
 #include "LooperPanel.h"
+#include "FretboardPanel.h"
 #include "PracticePanel.h"
 #include "PracticeViews.h"
 #include "RigPanel.h"
@@ -281,6 +282,7 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     libraryPanel = std::make_unique<LibraryPanel>();
     linksPanel = std::make_unique<LinksPanel>();
     looperPanel = std::make_unique<LooperPanel> (engine);
+    fretboardPanel = std::make_unique<FretboardPanel>();
     rigPanel = std::make_unique<RigPanel> (engine);
     logPanel = std::make_unique<LogPanel> (appLog);
 
@@ -419,6 +421,7 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     tabs.addTab (tr ("Topics"), theme::background(), libraryPanel.get(), false);
     tabs.addTab (tr ("Links"), theme::background(), linksPanel.get(), false);
     tabs.addTab (tr ("Looper"), theme::background(), looperPanel.get(), false);
+    tabs.addTab (tr ("Fretboard"), theme::background(), fretboardPanel.get(), false);
     tabs.addTab (tr ("Rig"), theme::background(), rigPanel.get(), false);
     addAndMakeVisible (tabs);
 
@@ -426,7 +429,7 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     // itself passes it to its first focusable child: on the Topics and Links tabs that's a text box, and the
     // iPad keyboard popped up on every visit. Panels keep the focus themselves; text boxes get it when tapped.
     for (auto* panel : std::initializer_list<juce::Component*> { todayPanel.get(), practicePanel.get(), libraryPanel.get(),
-                                                                linksPanel.get(), looperPanel.get(), rigPanel.get(), logPanel.get() })
+                                                                linksPanel.get(), looperPanel.get(), fretboardPanel.get(), rigPanel.get(), logPanel.get() })
         if (panel != nullptr)
             panel->setWantsKeyboardFocus (true);
 
@@ -482,7 +485,7 @@ MainComponent::MainComponent (AppEngine& e, AppLog& appLog)
     theme::addListener (this, [this] (const theme::Palette& oldPalette)
     {
         for (auto* panel : std::initializer_list<juce::Component*> { todayPanel.get(), practicePanel.get(), libraryPanel.get(),
-                                                                    linksPanel.get(), looperPanel.get(), rigPanel.get(), logPanel.get() })
+                                                                    linksPanel.get(), looperPanel.get(), fretboardPanel.get(), rigPanel.get(), logPanel.get() })
         {
             if (panel != nullptr && panel->getParentComponent() == nullptr)
             {
