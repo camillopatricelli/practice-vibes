@@ -18,10 +18,21 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
+      # The compiler environment from vcvars64.bat (what ilammy/msvc-dev-cmd did; that action still runs on Node 20).
       - name: Set up MSVC
-        uses: ilammy/msvc-dev-cmd@v1
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * `
+                  -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+          if (-not (Test-Path $vcvars)) { Write-Error "vcvars64.bat not found under '$vs'"; exit 1 }
+          cmd /c "`"$vcvars`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$' -and [Environment]::GetEnvironmentVariable($matches[1]) -ne $matches[2]) {
+              "$($matches[1])=$($matches[2])" >> $env:GITHUB_ENV
+            }
+          }
 
       - name: Configure
         run: cmake --preset windows -DPV_BUILD_NUMBER=${{ env.PV_BUILD_NUMBER }}
@@ -44,7 +55,7 @@ jobs:
           Get-ChildItem $dir -Recurse -File | ForEach-Object { $_.Name }
           Compress-Archive -Path "$dir/*" -DestinationPath PracticeVibes-windows.zip
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: PracticeVibes-windows
           path: PracticeVibes-windows.zip
@@ -53,7 +64,7 @@ jobs:
   ios:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Configure
         run: cmake --preset ios -DPV_BUILD_NUMBER=${{ env.PV_BUILD_NUMBER }}
@@ -88,7 +99,7 @@ jobs:
 
           zip -qry PracticeVibes.ipa Payload
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: PracticeVibes-ios
           path: PracticeVibes.ipa
@@ -98,7 +109,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Configure
         run: cmake --preset macos -DPV_BUILD_NUMBER=${{ env.PV_BUILD_NUMBER }}
@@ -139,7 +150,7 @@ jobs:
           done
           test -f PracticeVibes-macos.dmg
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: PracticeVibes-macos
           path: PracticeVibes-macos.dmg
@@ -158,7 +169,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           merge-multiple: true
 
