@@ -436,6 +436,11 @@ void MetronomeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     const auto targetGain = clicksMuted.load() ? 0.0f : gain.load();
     const auto isRunning = running.load();
 
+    // While running, a noise floor far below hearing (about -90 dBFS) fills the gaps between clicks. Some audio
+    // interfaces (seen with an iRig HD X on the iPad) mute their output on digital silence and wake up too slowly
+    // for a short click, so the clicks were only heard while the guitar kept the output busy.
+    constexpr float keepAwakeLevel = 3.0e-5f;
+
     // Follow mode: ticks come from the song's beat grid, placed where the player is.
     // Paused while the looper holds the tempo.
     std::shared_ptr<const ChordTrack> grid;
@@ -475,7 +480,8 @@ void MetronomeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 
         // Voices keep ringing briefly after stop, so stopping never clicks.
         const auto g = lastGain + (targetGain - lastGain) * ((float) i / (float) numSamples);
-        const auto sample = juce::jlimit (-1.0f, 1.0f, renderVoices() * g + renderChime());
+        const auto floor = isRunning ? (random.nextFloat() * 2.0f - 1.0f) * keepAwakeLevel : 0.0f;
+        const auto sample = juce::jlimit (-1.0f, 1.0f, renderVoices() * g + renderChime() + floor);
         left[i] = sample;
 
         if (right != nullptr)
