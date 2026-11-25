@@ -138,6 +138,16 @@ struct FretboardPanel::Browser final : public juce::WebBrowserComponent
     {
         juce::URL (url).launchInDefaultBrowser();
     }
+
+    void pageFinishedLoading (const juce::String&) override  { loaded = true; }
+
+    void load()
+    {
+        loaded = false;
+        goToURL (getResourceProviderRoot() + "fretboard.html");
+    }
+
+    bool loaded = false;
 };
 
 //==============================================================================
@@ -183,7 +193,11 @@ void FretboardPanel::resized()
     getWebViewButton.setBounds (box.removeFromTop (40).withSizeKeepingCentre (180, 40));
 }
 
-void FretboardPanel::visibilityChanged()       { createBrowserIfShown(); }
+void FretboardPanel::visibilityChanged()
+{
+    createBrowserIfShown();
+    reloadIfPageGone();
+}
 void FretboardPanel::parentHierarchyChanged()  { createBrowserIfShown(); }
 
 /** The web view starts the first time the tab is shown, not at app start (it takes memory and a moment to start). */
@@ -195,7 +209,31 @@ void FretboardPanel::createBrowserIfShown()
     browser = std::make_unique<Browser>();
     addAndMakeVisible (*browser);
     resized();
-    browser->goToURL (juce::WebBrowserComponent::getResourceProviderRoot() + "fretboard.html");
+    browser->load();
+}
+
+/** iOS ends a web view's page process when memory runs short (a song decoded into RAM is often enough), and JUCE
+    doesn't reload it: the tab stays white. So each time the tab is shown, the page is asked whether it is still
+    there, and loaded again if not. A page that answers keeps its state. */
+void FretboardPanel::reloadIfPageGone()
+{
+    if (browser == nullptr || ! isShowing() || ! browser->loaded)
+        return;
+
+    browser->evaluateJavascript ("document.getElementById('pv-app')!==null",
+                                 [safe = juce::Component::SafePointer<FretboardPanel> (this)] (juce::WebBrowserComponent::EvaluationResult r)
+                                 {
+                                     if (safe == nullptr || safe->browser == nullptr)
+                                         return;
+
+                                     const auto* value = r.getResult();
+
+                                     if (value == nullptr || ! (bool) *value)
+                                     {
+                                         juce::Logger::writeToLog ("Fretboard: page gone (web view process ended?), loading it again");
+                                         safe->browser->load();
+                                     }
+                                 });
 }
 
 /** Theme switch while the page is open: swap its colour style sheet (the page keeps its state). */

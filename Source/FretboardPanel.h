@@ -27,6 +27,7 @@ private:
     struct Browser;
 
     void createBrowserIfShown();
+    void reloadIfPageGone();
     void applyTheme();
 
     std::unique_ptr<Browser> browser;
